@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Scheme {
+  id                     String       @id @default(cuid())
+  name                   String
+  description            String       @db.Text
+  benefits               String       @db.Text
+  eligibility            String       @db.Text
+
+  // Legacy Scalar Fields
+  category               String?
+  ministry               String?
+  state                  String?
+  gender                 String?
+  occupation             String?
+  educationLevel         String?
+
+  // Robust Array Intersection Fields
+  allowedCategories      String[]
+  allowedStates          String[]
+  allowedGenders         String[]
+  allowedOccupations     String[]
+  allowedEducationLevels String[]
+
+  minIncome              Int?
+  maxIncome              Int?
+  minAge                 Int?
+  maxAge                 Int?
+
+  applicationLink        String?
+  sourceUrl              String?
+  tags                   String[]
+  documentsRequired      String?      @db.Text
+
+  externalId             String       
+  sourceId               String       
+  checksum               String       
+  version                Int          @default(1)
+  isActive               Boolean      @default(true)
+  lastSyncedAt           DateTime?
+  isScholarship          Boolean      @default(false)
+  isFemaleOnly           Boolean      @default(false) // 🚀 ADDED MISSING FIELD
+  
+  source                 SchemeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  embedding              Float[]
+  searchText             String?      @db.Text
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+  @@index([state])
+  @@index([occupation])
+  @@index([educationLevel])
+  @@index([minIncome])
+  @@index([maxIncome])
+  @@index([minAge])
+  @@index([maxAge])
+  @@index([category])
+  @@index([ministry])
+  @@index([isActive])
+  @@index([allowedCategories])
+  @@index([allowedStates])
+  @@index([allowedGenders])
+  @@index([allowedOccupations])
+  @@index([allowedEducationLevels])
+
+  @@unique([sourceId, externalId])
+  bookmarks Bookmark[]
+}
+
+model SchemeSource {
+  id          String    @id 
+  name        String    @unique
+  sourceUrl   String
+  lastSyncAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  schemes     Scheme[]
+}
+
+model RawScheme {
+  id          String   @id @default(cuid())
+  source      String
+  externalId  String?
+  payload     Json
+  fetchedAt   DateTime @default(now())
+}
+
+model SyncJob {
+  id             String    @id @default(cuid())
+  source         String
+  status         String
+  startedAt      DateTime
+  finishedAt     DateTime?
+  recordsRead    Int       @default(0)
+  recordsAdded   Int       @default(0)
+  recordsUpdated Int       @default(0)
+  error          Json?
+  createdAt      DateTime  @default(now())
+}
+
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  password  String     // Hashed password
+  bookmarks Bookmark[]
+  createdAt DateTime   @default(now())
+}
+
+model Bookmark {
+  id        String   @id @default(cuid())
+  userId    String
+  schemeId  String
+  user      User     @relation(fields: [userId], references: [id])
+  scheme    Scheme   @relation(fields: [schemeId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, schemeId])
+}
