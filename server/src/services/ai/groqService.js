@@ -1,21 +1,18 @@
 import Groq from "groq-sdk";
 import { profileSchema } from "../../validators/profileValidator.js";
 
-// =============================================================================
-// GROQ CLIENT
-// =============================================================================
+
 const groqClientInstance = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
-// =============================================================================
-// SHARED NORMALIZE HELPERS
-// =============================================================================
+
 export const normalize = (str = "") =>
   String(str || "")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "")
     .trim();
+
 
 const stateMap = {
   up: "uttarpradesh", uttarpradesh: "uttarpradesh",
@@ -54,6 +51,8 @@ const stateMap = {
   lakshadweep: "lakshadweep",
 };
 
+
+// ✅ FIXED: Added "widow" to occupationMap
 const occupationMap = {
   student:    ["student","engineeringstudent","medicalstudent","learner","college","school","btech","mtech","bsc","msc","ba","ma","bcom","mcom","mba","bca","mca","university"],
   farmer:     ["farmer","agriculture","agricultureworker","kisan","cultivator","farming","khet","fasal","krishak","annadata"],
@@ -61,12 +60,16 @@ const occupationMap = {
   worker:     ["worker","labour","labourer","mazdoor","employee","constructionworker","artisan","craftsman","carpenter","welder","shramik","majdoor","kamgar"],
   unemployed: ["jobless","unemployed","jobseeker","lookingforjob","berozgaar","naukri"],
   housewife:  ["housewife","homemaker","grihini","gharelu"],
+  // ✅ NEW: Widow occupation
+  widow:      ["widow","patavya","bereaved","bereavedwife","deceasedhusband","widowed"],
 };
+
 
 export const normalizeState = (state = "") => {
   const cleaned = normalize(state);
   return stateMap[cleaned] || cleaned;
 };
+
 
 export const normalizeOccupation = (occupation = "") => {
   const cleaned = normalize(occupation);
@@ -76,9 +79,7 @@ export const normalizeOccupation = (occupation = "") => {
   return cleaned || "unknown";
 };
 
-// =============================================================================
-// JSON EXTRACTOR
-// =============================================================================
+
 const extractJson = (content = "") => {
   try {
     return JSON.parse(content);
@@ -93,9 +94,7 @@ const extractJson = (content = "") => {
   return {};
 };
 
-// =============================================================================
-// DEFAULT PROFILE
-// =============================================================================
+
 const defaultProfile = () =>
   profileSchema.parse({
     age: null,
@@ -112,9 +111,7 @@ const defaultProfile = () =>
     emotionConfidence: 0,
   });
 
-// =============================================================================
-// MAIN EXTRACTION FUNCTION
-// =============================================================================
+
 export const extractUserProfile = async (message) => {
   try {
     const response = await groqClientInstance.chat.completions.create({
@@ -127,7 +124,9 @@ export const extractUserProfile = async (message) => {
           content: `You are an expert profile extraction engine for an Indian Government Schemes Recommendation System.
 You MUST understand English, Hindi, and Hinglish text equally well. Always extract every possible signal.
 
+
 HINDI/HINGLISH VOCABULARY (critical — always recognise these):
+
 
 Occupations:
 - kisan, kisaan, krishak, annadata, kheti, khet, fasal → occupation: "farmer", primaryIntent: "farmer"
@@ -136,6 +135,8 @@ Occupations:
 - vyapari, dukandaar, vyavsayi → occupation: "startup"
 - grihini, gharelu mahila, ghar pe rehna → occupation: "housewife"
 - berozgaar, naukri nahi, rojgaar nahi → occupation: "unemployed"
+- ✅ NEW: widow, patavya, bereaved, husband died, husband dead → occupation: "widow", primaryIntent: "widow-support"
+
 
 States (abbreviated or informal):
 - up, u.p., utar pradesh, uttar pradesh → state: "Uttar Pradesh"
@@ -150,6 +151,7 @@ States (abbreviated or informal):
 - gujarat, gj → state: "Gujarat"
 - karnataka, kar → state: "Karnataka"
 
+
 Intent signals (Hindi):
 - yojana chahiye, scheme chahiye, madad chahiye → extract intent from occupation/context
 - paisa chahiye, loan chahiye → primaryIntent: "loan"
@@ -158,6 +160,8 @@ Intent signals (Hindi):
 - kheti ke liye, fasal ke liye, beej, khaad → primaryIntent: "farmer"
 - naukri chahiye, rojgaar chahiye → primaryIntent: "job"
 - business karna chahta, dukaan kholni → primaryIntent: "startup-funding"
+- ✅ NEW: widow pension, bereaved, husband died → primaryIntent: "widow-support"
+
 
 Common Hinglish patterns:
 - "mai ek X hu" → I am a X → extract X as occupation
@@ -167,10 +171,12 @@ Common Hinglish patterns:
 - "se" = "from" → location marker
 - "bta" / "btao" = "tell me" → intent to find schemes
 
+
 INCOME PARSING:
 - "3 lakh" / "3L" / "3,00,000" → 300000
 - "monthly 25000" → annualise: 300000
 - "daily 500" → annualise: 182500
+
 
 EDUCATION LEVEL:
 - engineering, btech, college, degree, graduation, university → "higher_education"
@@ -178,21 +184,23 @@ EDUCATION LEVEL:
 - school, 10th, 12th, matric, intermediate → "school"
 - Not mentioned → "unknown"
 
+
 Return ONLY valid JSON with these exact fields:
 {
   "age": number | null,
   "gender": "male" | "female" | "other" | "unknown",
-  "occupation": "student" | "farmer" | "startup" | "worker" | "housewife" | "unemployed" | "unknown",
+  "occupation": "student" | "farmer" | "startup" | "worker" | "housewife" | "unemployed" | "widow" | "unknown",
   "state": string | "unknown",
   "income": number | null,
   "educationLevel": "higher_education" | "school" | "unknown",
   "casteCategory": "general" | "sc" | "st" | "obc" | "minority" | "unknown",
-  "primaryIntent": "student" | "business" | "job" | "medical" | "treatment" | "loan" | "scholarship" | "marriage" | "death" | "disability" | "maternity" | "farmer" | "unemployed" | "startup-funding" | "unknown",
+  "primaryIntent": "student" | "business" | "job" | "medical" | "treatment" | "loan" | "scholarship" | "marriage" | "death" | "disability" | "maternity" | "farmer" | "unemployed" | "startup-funding" | "widow-support" | "unknown",
   "secondaryIntents": string[],
   "emotion": "urgent" | "worried" | "desperate" | "anxious" | "frustrated" | "hopeful" | "calm" | "unknown",
   "intentConfidence": number between 0.0 and 1.0,
   "emotionConfidence": number between 0.0 and 1.0
 }
+
 
 EXAMPLES (study these carefully):
 - "mai ek kisan hu up se mujhe schemes bta" → occupation:"farmer", state:"Uttar Pradesh", primaryIntent:"farmer", intentConfidence:0.95
@@ -205,6 +213,9 @@ EXAMPLES (study these carefully):
 - "sc category ka student hu" → occupation:"student", casteCategory:"sc", primaryIntent:"scholarship", intentConfidence:0.80
 - "father's treatment ke liye loan chahiye" → primaryIntent:"treatment", secondaryIntents:["loan","medical"], emotion:"urgent", intentConfidence:0.92
 - "help chahiye" → primaryIntent:"unknown", intentConfidence:0.1
+- ✅ NEW: "i am a widow from delhi" → occupation:"widow", state:"Delhi", primaryIntent:"widow-support", intentConfidence:0.90
+- ✅ NEW: "meri husband died hui widow pension chahiye" → occupation:"widow", primaryIntent:"widow-support", intentConfidence:0.88
+
 
 intentConfidence rules:
 - occupation + intent both clear → 0.85-0.95
@@ -218,16 +229,17 @@ intentConfidence rules:
       ],
     });
 
+
     const rawContent = response?.choices?.[0]?.message?.content || "{}";
     const parsed = extractJson(rawContent);
 
-    // ── Sanitize string fields ──────────────────────────────────────────────
+
     for (const f of ["gender","occupation","casteCategory","state","primaryIntent","educationLevel"]) {
       if (typeof parsed[f] === "string")
         parsed[f] = parsed[f].toLowerCase().trim();
     }
 
-    // ── Sanitize numeric fields ─────────────────────────────────────────────
+
     if (parsed.age !== null && parsed.age !== undefined) {
       parsed.age = Number(parsed.age);
       if (Number.isNaN(parsed.age) || parsed.age < 0 || parsed.age > 120)
@@ -238,18 +250,19 @@ intentConfidence rules:
       if (Number.isNaN(parsed.income) || parsed.income < 0) parsed.income = null;
     }
 
-    // ── Sanitize arrays ─────────────────────────────────────────────────────
+
     parsed.secondaryIntents = Array.isArray(parsed.secondaryIntents)
       ? parsed.secondaryIntents
       : [];
 
-    // ── Clamp confidence scores ─────────────────────────────────────────────
+
     parsed.intentConfidence = Math.min(1, Math.max(0, Number(parsed.intentConfidence) || 0.5));
     parsed.emotionConfidence = Math.min(1, Math.max(0, Number(parsed.emotionConfidence) || 0.5));
 
-    // ── Normalize state + occupation via shared maps ────────────────────────
+
     parsed.state = normalizeState(parsed.state);
     parsed.occupation = normalizeOccupation(parsed.occupation);
+
 
     return profileSchema.parse(parsed);
   } catch (err) {

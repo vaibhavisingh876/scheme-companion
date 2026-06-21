@@ -4,9 +4,6 @@ import prisma from "../config/prisma.js";
 import { pipeline } from "@xenova/transformers";
 
 
-// =============================================================================
-// SINGLETON EXTRACTOR
-// =============================================================================
 let extractorInstance = null;
 const getExtractor = async () => {
   if (!extractorInstance) {
@@ -19,9 +16,6 @@ const getExtractor = async () => {
 };
 
 
-// =============================================================================
-// COSINE SIMILARITY
-// =============================================================================
 const cosineSimilarity = (a, b) => {
   if (!a || !b || a.length !== b.length) return 0;
   let dot = 0, normA = 0, normB = 0;
@@ -35,12 +29,6 @@ const cosineSimilarity = (a, b) => {
 };
 
 
-// =============================================================================
-// KEYWORD FALLBACK EXTRACTOR
-// Runs AFTER Groq. If Groq returns unknown for occupation/state/intent,
-// we scan the raw message ourselves using simple regex.
-// This is a safety net for Hinglish queries where the LLM fails.
-// =============================================================================
 const HINDI_OCCUPATION_PATTERNS = [
   { pattern: /kisan|kisaan|krishak|annadata|kheti|khet|fasal|farming|farmer/i, value: "farmer" },
   { pattern: /vidyarthi|chhatra|student|padhai|padhna|college|university|school/i, value: "student" },
@@ -48,6 +36,10 @@ const HINDI_OCCUPATION_PATTERNS = [
   { pattern: /vyapari|dukandaar|business|startup|msme|entrepreneur/i, value: "startup" },
   { pattern: /berozgaar|unemployed|naukri nahi|rojgaar nahi/i, value: "unemployed" },
   { pattern: /grihini|housewife|homemaker|gharelu/i, value: "housewife" },
+];
+
+const WIDOW_OCCUPATION_PATTERNS = [
+  { pattern: /widow|patavya|bereaved|husband died|husband dead|my husband is dead|widow pension/i, value: "widow" },
 ];
 
 const HINDI_STATE_PATTERNS = [
@@ -89,7 +81,15 @@ const applyKeywordFallback = (message, profile) => {
   const patched = { ...profile };
   let changed = false;
 
-  // Only patch fields that Groq left as "unknown"
+  for (const { pattern, value } of WIDOW_OCCUPATION_PATTERNS) {
+    if (pattern.test(message)) {
+      patched.occupation = value;
+      changed = true;
+      console.log("[Widow Override] Occupation overridden to 'widow' from message");
+      break;
+    }
+  }
+
   if (patched.occupation === "unknown") {
     for (const { pattern, value } of HINDI_OCCUPATION_PATTERNS) {
       if (pattern.test(message)) {
@@ -114,7 +114,6 @@ const applyKeywordFallback = (message, profile) => {
     for (const { pattern, value } of HINDI_INTENT_PATTERNS) {
       if (pattern.test(message)) {
         patched.primaryIntent = value;
-        // Give a moderate confidence since this is regex, not LLM
         patched.intentConfidence = Math.max(patched.intentConfidence, 0.70);
         changed = true;
         break;
@@ -130,27 +129,6 @@ const applyKeywordFallback = (message, profile) => {
 };
 
 
-// =============================================================================
-// INTENT → DB CATEGORY PRE-FILTER MAP
-// =============================================================================
-const INTENT_DB_CATEGORIES = {
-  treatment:        ["Health & Wellness"],
-  medical:          ["Health & Wellness"],
-  scholarship:      ["Education & Learning"],
-  student:          ["Education & Learning"],
-  maternity:        ["Health & Wellness", "Women and Child"],
-  disability:       ["Social welfare & Empowerment", "Health & Wellness"],
-  farmer:           ["Agriculture, Rural & Environment"],
-  "startup-funding":["Business & Entrepreneurship", "Banking,Financial Services and Insurance"],
-  loan:             ["Banking,Financial Services and Insurance", "Education & Learning", "Social welfare & Empowerment"],
-  marriage:         ["Social welfare & Empowerment", "Women and Child"],
-  death:            ["Social welfare & Empowerment"],
-};
-
-
-// =============================================================================
-// INTENT → SCORING CATEGORY MAP
-// =============================================================================
 const INTENT_SCORE_CATEGORIES = {
   treatment:        ["Health & Wellness", "Medical"],
   medical:          ["Health & Wellness", "Medical"],
@@ -166,6 +144,7 @@ const INTENT_SCORE_CATEGORIES = {
   disability:       ["Social welfare & Empowerment", "Disability"],
   marriage:         ["Social welfare & Empowerment", "Marriage"],
   death:            ["Social welfare & Empowerment"],
+  "widow-support":  ["Social welfare & Empowerment", "Women and Child"],
 };
 
 
@@ -175,21 +154,22 @@ const INTENT_OCCUPATION_MAP = {
   "startup-funding":"startup",
   business:         "startup",
   unemployed:       "unemployed",
+  "widow-support":  "widow",
 };
 
 
-// =============================================================================
-// DISABILITY CONTEXT DETECTOR
-// =============================================================================
 const userMentionsDisability = (message = "") =>
-  /disab|handicap|divyang|pwd|differently.?abled|blind|deaf|physically.?challenged|mental.?retard|cerebral|autism/i.test(
-    message
-  );
+  /disab|handicap|divyang|pwd|differently.?abled|blind|deaf|physically.?challenged|mental.?retard|cerebral|autism/i.test(message);
 
 
-// =============================================================================
-// EDUCATION LEVEL CONFLICT CHECK
-// =============================================================================
+const userMentionsWidow = (message = "") =>
+  /widow|patavya|bereaved|husband died|husband dead|my husband is dead|widow pension/i.test(message);
+
+
+const userMentionsPregnancy = (message = "") =>
+  /pregnant|maternity|pregnancy|pregn|magicare|agb|pgnancy|lgd|dada|childbirth|delivery|antenatal|neonate/i.test(message);
+
+
 const educationLevelConflicts = (schemeEduLevels = [], userEduLevel = "") => {
   if (!userEduLevel || userEduLevel === "unknown" || userEduLevel === "all")
     return false;
@@ -212,9 +192,7 @@ const educationLevelConflicts = (schemeEduLevels = [], userEduLevel = "") => {
 };
 
 
-// =============================================================================
-// SCORING
-// =============================================================================
+// ✅ FIXED: All 3 issues resolved
 const scoreScheme = (scheme, profile, queryEmbedding, rawMessage) => {
   const {
     primaryIntent,
@@ -231,10 +209,111 @@ const scoreScheme = (scheme, profile, queryEmbedding, rawMessage) => {
     gender,
   } = profile;
 
-  // ── Semantic similarity (base) ───────────────────────────────────────────
+
   let score = cosineSimilarity(queryEmbedding, scheme.embedding) * 100;
 
-  // ── primaryIntent boost ──────────────────────────────────────────────────
+
+  // ✅ FIXED: Age hard reject (OLD AGE detection add)
+  if (age !== null) {
+    if (scheme.minAge !== null && age < scheme.minAge) {
+      return -1000;
+    }
+    if (scheme.maxAge !== null && age > scheme.maxAge) {
+      return -1000;
+    }
+    
+    // ✅ NEW: Old Age scheme name/detection即使没有DB age limit
+    const schemeNameLower = (scheme.name || "").toLowerCase();
+    const schemeDescLower = (scheme.description || "").toLowerCase();
+    
+    if (
+      (/old age|senior citizen|senior citizen pension/i.test(schemeNameLower) ||
+       /old age|senior citizen|60 years|60+ years/i.test(schemeDescLower)) &&
+      age < 50
+    ) {
+      return -1000;
+    }
+  }
+
+
+  // Pregnancy/Maternity hard rejection
+  if (!userMentionsPregnancy(rawMessage) && occupation !== "widow") {
+    const schemeNameLower = (scheme.name || "").toLowerCase();
+    const schemeDescLower = (scheme.description || "").toLowerCase();
+    
+    if (
+      /pregnant|maternity|pregnancy|pregn|delivery|antenatal|neonate|matritva|suman/i.test(schemeNameLower) ||
+      /pregnant|maternity|pregnancy|pregn|delivery|antenatal|neonate/i.test(schemeDescLower)
+    ) {
+      return -1000;
+    }
+  }
+
+
+  // Child-specific hard rejection
+  if (occupation !== "widow") {
+    const schemeNameLower = (scheme.name || "").toLowerCase();
+    const schemeDescLower = (scheme.description || "").toLowerCase();
+    
+    if (
+      /girl child|ladli|child|bal|bach|juvenile|minor|kid|infant|newborn/i.test(schemeNameLower) ||
+      /girl child|ladli|child|bal|bach|juvenile|minor|kid|infant|newborn/i.test(schemeDescLower)
+    ) {
+      if (scheme.maxAge !== null && scheme.maxAge < 18) {
+        return -1000;
+      }
+    }
+  }
+
+
+  // Startup/Company hard rejection
+  if (occupation !== "startup" && occupation !== "widow") {
+    const schemeNameLower = (scheme.name || "").toLowerCase();
+    const schemeDescLower = (scheme.description || "").toLowerCase();
+    
+    if (
+      /startup|company|corporation|business|enterprise|incubator/i.test(schemeNameLower) &&
+      (scheme.allowedOccupations.includes("startup") || !scheme.allowedOccupations.includes("all"))
+    ) {
+      return -1000;
+    }
+  }
+
+
+  // Scientist/Technology hard rejection
+  if (occupation !== "student" && occupation !== "worker") {
+    const schemeNameLower = (scheme.name || "").toLowerCase();
+    const schemeDescLower = (scheme.description || "").toLowerCase();
+    
+    if (
+      /scientist|telecom|technology|tech|broadband|mobile service/i.test(schemeNameLower) ||
+      /scientist|telecom|technology|tech|broadband|mobile service/i.test(schemeDescLower)
+    ) {
+      return -1000;
+    }
+  }
+
+
+  // ✅ FIXED: Widow boost + effectiveGender
+  const effectiveGender = gender === "unknown" && occupation === "widow" ? "female" : gender;
+
+
+  if (occupation === "widow" || userMentionsWidow(rawMessage)) {
+    const schemeNameLower = (scheme.name || "").toLowerCase();
+    const schemeDescLower = (scheme.description || "").toLowerCase();
+    const schemeTagsLower = (scheme.tags || []).map(t => t.toLowerCase());
+    
+    const isWidowScheme =
+      /widow|patavya|bereaved|deceased husband|widow pension/i.test(schemeNameLower) ||
+      /widow|patavya|bereaved|widow pension/i.test(schemeDescLower) ||
+      /widow|patavya|bereaved/i.test(schemeTagsLower.join(" "));
+    
+    if (isWidowScheme) {
+      score += 50;
+    }
+  }
+
+
   if (primaryIntent && primaryIntent !== "unknown") {
     const intentCategories = INTENT_SCORE_CATEGORIES[primaryIntent] || [];
     const schemeCategory = scheme.category || "";
@@ -276,7 +355,7 @@ const scoreScheme = (scheme, profile, queryEmbedding, rawMessage) => {
     }
   }
 
-  // ── Occupation match/mismatch ────────────────────────────────────────────
+
   if (occupation && occupation !== "unknown") {
     if (
       scheme.allowedOccupations.includes(occupation) ||
@@ -288,11 +367,11 @@ const scoreScheme = (scheme, profile, queryEmbedding, rawMessage) => {
       scheme.allowedOccupations.length > 0 &&
       !scheme.allowedOccupations.includes(occupation)
     ) {
-      score -= 20;
+      score -= 10;
     }
   }
 
-  // ── Education level match/mismatch ───────────────────────────────────────
+
   if (educationLevel && educationLevel !== "unknown") {
     if (
       scheme.allowedEducationLevels.includes(educationLevel) ||
@@ -300,19 +379,18 @@ const scoreScheme = (scheme, profile, queryEmbedding, rawMessage) => {
     ) {
       score += 5;
     } else if (educationLevelConflicts(scheme.allowedEducationLevels, educationLevel)) {
-      score -= 20;
+      score -= 10;
     }
   }
 
-  // ── Caste category match ─────────────────────────────────────────────────
+
   if (casteCategory && casteCategory !== "unknown") {
     if (scheme.allowedCategories.includes(casteCategory)) {
       score += 5;
     }
   }
 
-  // ── State match/mismatch ─────────────────────────────────────────────────
-  // FIX: allowedStates:["all"] was getting -15 penalty. Now explicitly checked.
+
   if (state && state !== "unknown") {
     const normalizedState = normalizeState(state);
     const schemeStates = (scheme.allowedStates || []).map((s) =>
@@ -331,29 +409,30 @@ const scoreScheme = (scheme, profile, queryEmbedding, rawMessage) => {
     if (isNational || isStateMatch) {
       score += 4;
     } else {
-      score -= 15;
+      score -= 5;
     }
   }
 
-  // ── Gender match/mismatch ────────────────────────────────────────────────
-  if (gender === "female" && scheme.isFemaleOnly) {
+
+  // ✅ FIXED: Use effectiveGender
+  if (effectiveGender === "female" && scheme.isFemaleOnly) {
     score += 5;
   }
-  if (scheme.isFemaleOnly && gender !== "female") {
-    score -= 30;
+  if (scheme.isFemaleOnly && effectiveGender !== "female") {
+    score -= 20;
   }
   if (
-    gender &&
-    gender !== "unknown" &&
-    gender !== "other" &&
+    effectiveGender &&
+    effectiveGender !== "unknown" &&
+    effectiveGender !== "other" &&
     scheme.allowedGenders.length > 0 &&
-    !scheme.allowedGenders.includes(gender) &&
+    !scheme.allowedGenders.includes(effectiveGender) &&
     !scheme.allowedGenders.includes("all")
   ) {
     score -= 15;
   }
 
-  // ── Disability scheme penalty ────────────────────────────────────────────
+
   const schemeHasDisabilityContext =
     (scheme.tags || []).some((t) =>
       /disab|pwd|differently.?abled|handicap|divyang/i.test(t)
@@ -365,33 +444,25 @@ const scoreScheme = (scheme, profile, queryEmbedding, rawMessage) => {
     score -= 25;
   }
 
-  // ── Income eligibility penalty ───────────────────────────────────────────
+
   if (income !== null && scheme.maxIncome !== null) {
     if (income > scheme.maxIncome) {
       score -= 20;
     }
   }
 
-  // ── Age eligibility penalty ──────────────────────────────────────────────
-  if (age !== null) {
-    if (scheme.minAge !== null && age < scheme.minAge) score -= 15;
-    if (scheme.maxAge !== null && age > scheme.maxAge) score -= 15;
-  }
 
-  // ── Emotion re-ranking (max +3) ──────────────────────────────────────────
   if (emotion && emotion !== "unknown" && emotionConfidence > 0.6) {
     if (["urgent", "desperate", "worried", "anxious"].includes(emotion)) {
       score += 3 * emotionConfidence;
     }
   }
 
+
   return score;
 };
 
 
-// =============================================================================
-// MAIN ROUTE HANDLER
-// =============================================================================
 export const extractProfile = async (req, res) => {
   try {
     const { message } = req.body;
@@ -402,13 +473,8 @@ export const extractProfile = async (req, res) => {
 
     const trimmedMessage = message.trim();
 
-    // ── 1. Extract user profile via Groq ────────────────────────────────────
     let profile = await extractUserProfile(trimmedMessage);
 
-    // ── 1b. Keyword fallback ─────────────────────────────────────────────────
-    // If Groq returned "unknown" for key fields, scan the raw message ourselves.
-    // This handles Hinglish queries where the LLM misses obvious keywords like
-    // "kisan" (farmer) or "up" (Uttar Pradesh).
     profile = applyKeywordFallback(trimmedMessage, profile);
 
     const {
@@ -425,7 +491,6 @@ export const extractProfile = async (req, res) => {
       educationLevel,
     } = profile;
 
-    // ── 2. Build embedding query text ────────────────────────────────────────
     const queryParts = [
       trimmedMessage,
       occupation !== "unknown" ? occupation : "",
@@ -438,7 +503,6 @@ export const extractProfile = async (req, res) => {
 
     const queryText = queryParts.join(" ");
 
-    // ── 3. Generate embedding ─────────────────────────────────────────────────
     const extractor = await getExtractor();
     const output = await extractor(queryText, {
       pooling: "mean",
@@ -446,26 +510,25 @@ export const extractProfile = async (req, res) => {
     });
     const queryEmbedding = Array.from(output.data);
 
-    // ── 4. Build Prisma WHERE clause ──────────────────────────────────────────
     const dbWhere = {
       isActive: true,
       AND: [],
     };
 
-    // ── 4a. isFemaleOnly pre-filter ──────────────────────────────────────────
-    if (gender !== "female") {
+    if (
+      gender &&
+      gender !== "unknown" &&
+      gender !== "female"
+    ) {
       dbWhere.AND.push({ isFemaleOnly: false });
     }
 
-    // ── 4b. Income pre-filter ────────────────────────────────────────────────
     if (income !== null) {
       dbWhere.AND.push({
         OR: [{ maxIncome: null }, { maxIncome: { gte: income } }],
       });
     }
 
-    // ── 4c. State pre-filter ─────────────────────────────────────────────────
-    // FIX: Added { allowedStates: { has: "all" } } to include central schemes.
     if (state && state !== "unknown") {
       const normalizedState = normalizeState(state);
       dbWhere.AND.push({
@@ -477,7 +540,6 @@ export const extractProfile = async (req, res) => {
       });
     }
 
-    // ── 4d. Occupation pre-filter ────────────────────────────────────────────
     if (
       occupation &&
       occupation !== "unknown" &&
@@ -491,7 +553,6 @@ export const extractProfile = async (req, res) => {
       });
     }
 
-    // ── 4e. CasteCategory pre-filter ─────────────────────────────────────────
     if (casteCategory && casteCategory !== "unknown") {
       dbWhere.AND.push({
         OR: [
@@ -501,7 +562,6 @@ export const extractProfile = async (req, res) => {
       });
     }
 
-    // ── 4f. EducationLevel pre-filter ────────────────────────────────────────
     if (educationLevel && educationLevel !== "unknown") {
       dbWhere.AND.push({
         OR: [
@@ -511,7 +571,6 @@ export const extractProfile = async (req, res) => {
       });
     }
 
-    // ── 4g. Age pre-filter ───────────────────────────────────────────────────
     if (age !== null) {
       dbWhere.AND.push({
         OR: [{ minAge: null }, { minAge: { lte: age } }],
@@ -521,27 +580,8 @@ export const extractProfile = async (req, res) => {
       });
     }
 
-    // ── 4h. Intent-based category pre-filter ─────────────────────────────────
-    if (
-      primaryIntent &&
-      primaryIntent !== "unknown" &&
-      intentConfidence > 0.75
-    ) {
-      const intentCategories = INTENT_DB_CATEGORIES[primaryIntent];
-      if (intentCategories?.length) {
-        dbWhere.AND.push({
-          OR: [
-            { category: null },
-            { category: { in: intentCategories } },
-          ],
-        });
-      }
-    }
-
-    // Clean up empty AND
     if (dbWhere.AND.length === 0) delete dbWhere.AND;
 
-    // ── 5. Fetch candidate schemes ───────────────────────────────────────────
     const candidates = await prisma.scheme.findMany({
       where: dbWhere,
       select: {
@@ -574,7 +614,7 @@ export const extractProfile = async (req, res) => {
         externalId: true,
         sourceId: true,
       },
-      take: 1000,
+      take: 3000,
     });
 
     if (candidates.length === 0) {
@@ -585,18 +625,7 @@ export const extractProfile = async (req, res) => {
       });
     }
 
-    // ── 6. Score and rank ─────────────────────────────────────────────────────
-    // Threshold logic:
-    // - Profile fully known (intent confident) → 25
-    // - Profile partially known (fallback patched occupation/state) → 15
-    // - Profile completely unknown → 10 (show something rather than nothing)
-    const profileIsKnown = occupation !== "unknown" || state !== "unknown";
-    const threshold =
-      primaryIntent !== "unknown" && intentConfidence > 0.6
-        ? 25
-        : profileIsKnown
-        ? 15
-        : 10;
+    const threshold = 25;
 
     const scored = candidates
       .map((scheme) => ({
@@ -607,7 +636,6 @@ export const extractProfile = async (req, res) => {
       .sort((a, b) => b._score - a._score)
       .slice(0, 20);
 
-    // ── 7. Strip embedding from response ─────────────────────────────────────
     const results = scored.map(({ embedding: _emb, _score, ...rest }) => ({
       ...rest,
       relevanceScore: Math.round(_score),
@@ -620,10 +648,14 @@ export const extractProfile = async (req, res) => {
           primaryIntent,
           intentConfidence,
           emotion,
+          occupation,
+          gender,
+          effectiveGender: gender === "unknown" && occupation === "widow" ? "female" : gender,
           queryText,
           candidatesBeforeScoring: candidates.length,
           candidatesAfterScoring: results.length,
           threshold,
+          isWidow: occupation === "widow" || userMentionsWidow(trimmedMessage),
         },
       },
       schemes: results,
