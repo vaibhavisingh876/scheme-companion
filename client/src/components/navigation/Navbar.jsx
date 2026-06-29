@@ -1,8 +1,10 @@
-import React, { useContext } from "react";
+import React, { useContext, useState } from "react";
 import { AuthContext } from "../../context/AuthContext";
+import ThemeToggle from "../ThemeToggle";
 
 const Navbar = ({ activeTab, onTabChange }) => {
   const { user, logout } = useContext(AuthContext);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleAuthAction = () => {
     if (user?.loggedIn) {
@@ -10,54 +12,200 @@ const Navbar = ({ activeTab, onTabChange }) => {
     } else {
       onTabChange("auth");
     }
+    setMobileOpen(false);
   };
 
-  return (
-    <nav className="w-full bg-[#fdfbf7]/90 border-b border-[#d7ccc8] sticky top-0 z-50 backdrop-blur-md transition-all shadow-sm">
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-        
-        <div className="flex items-center gap-8">
-          <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => onTabChange("landing")}>
-            <span className="text-lg font-black tracking-tight text-[#3e2723]">
-              Scheme<span className="text-[#8d6e63] font-semibold">Companion</span>
-            </span>
-          </div>
+  const navItems = [
+    { id: "landing", label: "Home" },
+    { id: "search", label: "Find Schemes" },
+    { id: "saved", label: "Bookmarks" },
+  ];
 
-          <div className="hidden md:flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
-            <button onClick={() => onTabChange("landing")} className={`px-4 py-2.5 rounded-xl transition-all ${activeTab === "landing" ? "text-[#5d4037] bg-[#efebe9] font-black" : "text-[#8d6e63] hover:text-[#5d4037] hover:bg-[#f5f5f5]"}`}>
-              Home
-            </button>
-            <button onClick={() => onTabChange("search")} className={`px-4 py-2.5 rounded-xl transition-all ${activeTab === "search" ? "text-[#5d4037] bg-[#efebe9] font-black" : "text-[#8d6e63] hover:text-[#5d4037] hover:bg-[#f5f5f5]"}`}>
-              Find Schemes
-            </button>
-            <button onClick={() => onTabChange("saved")} className={`px-4 py-2.5 rounded-xl transition-all ${activeTab === "saved" ? "text-[#5d4037] bg-[#efebe9] font-black" : "text-[#8d6e63] hover:text-[#5d4037] hover:bg-[#f5f5f5]"}`}>
-              Bookmarked Schemes
-            </button>
+  return (
+    <nav
+      style={{
+        borderBottom: "1px solid var(--border)",
+        backgroundColor: "var(--nav-bg)",
+      }}
+      className="sticky top-0 z-50 backdrop-blur-md"
+    >
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 h-14 flex items-center justify-between">
+        {/* Logo */}
+        <button
+          onClick={() => onTabChange("landing")}
+          className="flex items-center gap-2 shrink-0"
+          style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+        >
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-black"
+            style={{ background: "var(--saffron)" }}
+          >
+            SC
           </div>
+          <span className="text-sm font-black tracking-tight" style={{ color: "var(--ink)" }}>
+            Scheme<span style={{ color: "var(--saffron)" }}>Companion</span>
+          </span>
+        </button>
+
+        {/* Desktop nav */}
+        <div className="hidden md:flex items-center gap-1">
+          {navItems.map((item) => {
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => onTabChange(item.id)}
+                className="relative px-4 py-1.5 text-xs font-semibold transition-colors"
+                style={{
+                  color: isActive ? "var(--saffron)" : "var(--muted)",
+                  fontFamily: "'Inter', sans-serif",
+                }}
+              >
+                {item.label}
+                {isActive && (
+                  <span
+                    className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full"
+                    style={{ background: "var(--saffron)" }}
+                  />
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        <div className="flex items-center gap-4">
+        {/* Desktop right actions */}
+        <div className="hidden md:flex items-center gap-3">
+          <ThemeToggle />
           {user?.loggedIn ? (
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2.5 bg-white border border-[#d7ccc8] px-3 py-1.5 rounded-full shadow-sm">
-                <div className="w-7 h-7 rounded-full bg-[#efebe9] text-[#5d4037] flex items-center justify-center font-black text-[11px] uppercase">
-                  {user.name.charAt(0)}
+            <>
+              <div
+                className="flex items-center gap-2.5 px-3 py-1.5 rounded-full"
+                style={{ border: "1px solid var(--border)", background: "var(--panel)" }}
+              >
+                <div
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-black"
+                  style={{ background: "var(--saffron)" }}
+                >
+                  {user.name.charAt(0).toUpperCase()}
                 </div>
-                <span className="text-xs font-bold text-[#5d4037] hidden sm:inline pr-2">
+                <span
+                  className="text-xs font-semibold pr-1"
+                  style={{ color: "var(--ink)", fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                >
                   {user.name}
                 </span>
               </div>
-              <button onClick={handleAuthAction} className="text-xs font-bold text-[#8d6e63] hover:text-[#5d4037] uppercase tracking-wider">
-                Logout
+              <button
+                onClick={handleAuthAction}
+                className="text-xs font-semibold transition-colors"
+                style={{ color: "var(--muted)" }}
+              >
+                Sign out
               </button>
-            </div>
+            </>
           ) : (
-            <button onClick={handleAuthAction} className="bg-[#5d4037] text-white text-xs font-bold px-5 py-2.5 rounded-xl hover:bg-[#4e342e] shadow-md transition-all uppercase tracking-wider">
-              Sign In
+            <button
+              onClick={handleAuthAction}
+              className="text-xs font-bold px-5 py-2 rounded-lg transition-all"
+              style={{
+                background: "var(--saffron)",
+                color: "#fff",
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+              }}
+            >
+              Sign in
             </button>
           )}
         </div>
+
+        {/* Mobile hamburger */}
+        <button
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className="md:hidden w-8 h-8 flex flex-col items-center justify-center gap-1.5"
+          aria-label="Toggle menu"
+        >
+          <span
+            className="w-5 h-0.5 rounded-full transition-all"
+            style={{
+              background: "var(--ink)",
+              transform: mobileOpen ? "rotate(45deg) translate(3px,3px)" : "none",
+            }}
+          />
+          <span
+            className="w-5 h-0.5 rounded-full transition-all"
+            style={{
+              background: "var(--ink)",
+              opacity: mobileOpen ? 0 : 1,
+            }}
+          />
+          <span
+            className="w-5 h-0.5 rounded-full transition-all"
+            style={{
+              background: "var(--ink)",
+              transform: mobileOpen ? "rotate(-45deg) translate(3px,-3px)" : "none",
+            }}
+          />
+        </button>
       </div>
+
+      {/* Mobile menu */}
+      {mobileOpen && (
+        <div
+          className="md:hidden border-t animate-fade-in"
+          style={{ borderColor: "var(--border)", background: "var(--panel)" }}
+        >
+          <div className="px-5 py-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold" style={{ color: "var(--ink)" }}>
+                Theme
+              </span>
+              <ThemeToggle />
+            </div>
+
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  onTabChange(item.id);
+                  setMobileOpen(false);
+                }}
+                className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors"
+                style={{
+                  color: activeTab === item.id ? "var(--saffron)" : "var(--ink)",
+                  background: activeTab === item.id ? "var(--saffron-lt)" : "transparent",
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+
+            <div className="pt-2 border-t mt-2" style={{ borderColor: "var(--border)" }}>
+              {user?.loggedIn ? (
+                <div className="flex items-center justify-between px-4 py-2">
+                  <span className="text-sm font-semibold" style={{ color: "var(--ink)" }}>
+                    {user.name}
+                  </span>
+                  <button
+                    onClick={handleAuthAction}
+                    className="text-xs font-semibold"
+                    style={{ color: "var(--red)" }}
+                  >
+                    Sign out
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleAuthAction}
+                  className="w-full text-center py-2.5 rounded-lg text-sm font-bold"
+                  style={{ background: "var(--saffron)", color: "#fff" }}
+                >
+                  Sign in
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 };

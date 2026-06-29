@@ -1,12 +1,15 @@
 import prisma from "../config/prisma.js";
 
 /**
- * 📄 GET ALL SCHEMES (WITH PAGINATION)
+ * GET /api/schemes — paginated list of all active schemes
  */
 export const getAllSchemes = async (req, res) => {
   try {
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+    const page = Math.max(1, parseInt(req.query.page,10) || 1);
+    const limit = Math.max(
+  1,
+  Math.min(parseInt(req.query.limit,10) || 50,100)
+);
     const skip = (page - 1) * limit;
 
     const [schemes, total] = await prisma.$transaction([
@@ -21,7 +24,6 @@ export const getAllSchemes = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      profile: null,
       schemes,
       count: schemes.length,
       meta: {
@@ -32,11 +34,10 @@ export const getAllSchemes = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Fetch Execution Error:", error);
+    console.error("getAllSchemes Error:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to load scheme repository items.",
-      profile: null,
+      message: "Failed to load schemes.",
       schemes: [],
       count: 0,
     });
@@ -44,85 +45,73 @@ export const getAllSchemes = async (req, res) => {
 };
 
 /**
- * 🔍 SEARCH SCHEMES (MANUAL FILTER MODE)
+ * POST /api/schemes/search — manual filter search
+ *
+ * FIX: Removed `{ allowedXxx: { isEmpty: true } }` from every OR block.
+ * That fallback caused schemes with no data in those fields to match every
+ * single query, flooding results with irrelevant schemes.
+ * Now only schemes that explicitly allow "all" or the specific value match.
  */
 export const searchSchemes = async (req, res) => {
   try {
-    const {
-      gender,
-      state,
-      occupation,
-      educationLevel,
-      income,
-      casteCategory,
-    } = req.body;
+    const { gender, state, occupation, educationLevel, income, casteCategory } = req.body;
 
     const andConditions = [{ isActive: true }];
 
-    // 1. Gender filter — use allowedGenders array (robust) not scalar gender field
     if (gender) {
       andConditions.push({
         OR: [
           { allowedGenders: { has: gender } },
           { allowedGenders: { has: "all" } },
-          { allowedGenders: { isEmpty: true } },
         ],
       });
     }
 
-    // 2. State filter — use allowedStates array (robust) not scalar state field.
-    // Includes "all" for central government schemes.
     if (state && state !== "All India" && state !== "unknown") {
       const normalizedState = state.toLowerCase().replace(/\s/g, "");
       andConditions.push({
         OR: [
-          { allowedStates: { isEmpty: true } },
           { allowedStates: { has: "all" } },
           { allowedStates: { has: normalizedState } },
         ],
       });
     }
 
-    // 3. Occupation filter — use allowedOccupations array (robust)
     if (occupation) {
       andConditions.push({
         OR: [
           { allowedOccupations: { has: occupation } },
           { allowedOccupations: { has: "all" } },
-          { allowedOccupations: { isEmpty: true } },
         ],
       });
     }
 
-    // 4. Education level filter — use allowedEducationLevels array (robust)
     if (educationLevel) {
       andConditions.push({
         OR: [
           { allowedEducationLevels: { has: educationLevel } },
           { allowedEducationLevels: { has: "all" } },
-          { allowedEducationLevels: { isEmpty: true } },
         ],
       });
     }
 
-    // 5. Income filter
-    if (income) {
+    if (income !== undefined && income !== null) {
       const targetIncome = parseInt(income, 10);
-      andConditions.push({
-        AND: [
-          { OR: [{ maxIncome: null }, { maxIncome: { gte: targetIncome } }] },
-          { OR: [{ minIncome: null }, { minIncome: { lte: targetIncome } }] },
-        ],
-      });
+      if (!isNaN(targetIncome)) {
+        andConditions.push({
+          AND: [
+            { OR: [{ maxIncome: null }, { maxIncome: { gte: targetIncome } }] },
+            { OR: [{ minIncome: null }, { minIncome: { lte: targetIncome } }] },
+          ],
+        });
+      }
     }
 
-    // 6. Caste category filter
     if (casteCategory) {
       andConditions.push({
         OR: [
           { allowedCategories: { has: casteCategory } },
           { allowedCategories: { has: "general" } },
-          { allowedCategories: { isEmpty: true } },
         ],
       });
     }
@@ -130,20 +119,19 @@ export const searchSchemes = async (req, res) => {
     const schemes = await prisma.scheme.findMany({
       where: { AND: andConditions },
       orderBy: { createdAt: "desc" },
+      take: 100,
     });
 
     return res.status(200).json({
       success: true,
-      profile: null,
       schemes,
       count: schemes.length,
     });
   } catch (error) {
-    console.error("Query Execution Exception:", error);
+    console.error("searchSchemes Error:", error);
     return res.status(500).json({
       success: false,
-      message: "Processing data filter structures encountered exceptions.",
-      profile: null,
+      message: "Search failed. Please try again.",
       schemes: [],
       count: 0,
     });

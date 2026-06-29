@@ -13,16 +13,6 @@ async function main() {
     }
   });
 
-  await prisma.schemeSource.upsert({
-    where: { name: "datagov" },
-    update: {},
-    create: {
-      id: "datagov",
-      name: "datagov",
-      sourceUrl: "https://data.gov.in"
-    }
-  });
-
   console.log("Sources seeded");
 }
 

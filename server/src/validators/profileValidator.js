@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const sanitizeString = (value) =>
-  typeof value === "string" ? value.toLowerCase().trim()||"unknown" : "unknown";
+  typeof value === "string" ? value.toLowerCase().trim() || "unknown" : "unknown";
 
 export const profileSchema = z.object({
   // ── Demographics ──────────────────────────────────────────────────────────
@@ -17,6 +17,7 @@ export const profileSchema = z.object({
       "worker",
       "housewife",
       "unemployed",
+      "widow",
       "unknown",
     ])
     .catch("unknown"),
@@ -32,9 +33,6 @@ export const profileSchema = z.object({
     .catch("unknown"),
 
   // ── Intent & Emotion ──────────────────────────────────────────────────────
-  // FIX: these three fields were missing → Zod was silently stripping them,
-  //      making the entire intent/emotion engine permanently return "unknown".
-
   primaryIntent: z
     .enum([
       "student",
@@ -51,25 +49,39 @@ export const profileSchema = z.object({
       "farmer",
       "unemployed",
       "startup-funding",
+      "widow-support",
+      "housing",          // 🆕
+      "sanitation",       // 🆕
+      "pension",          // 🆕
       "unknown",
     ])
     .catch("unknown")
     .default("unknown"),
 
-  secondaryIntents: z.array(z.enum([
-  "student","business","job",
-  "medical",
-  "treatment",
-  "loan",
-  "scholarship",
-  "marriage",
-  "death",
-  "disability",
-  "maternity",
-  "farmer",
-  "unemployed",
-  "startup-funding"
-])).default([]),
+  secondaryIntents: z
+    .array(
+      z.enum([
+        "student",
+        "business",
+        "job",
+        "medical",
+        "treatment",
+        "loan",
+        "scholarship",
+        "marriage",
+        "death",
+        "disability",
+        "maternity",
+        "farmer",
+        "unemployed",
+        "startup-funding",
+        "widow-support",
+        "housing",          // 🆕
+        "sanitation",       // 🆕
+        "pension",          // 🆕
+      ])
+    )
+    .default([]),
 
   emotion: z
     .enum([
@@ -85,7 +97,7 @@ export const profileSchema = z.object({
     .catch("unknown")
     .default("unknown"),
 
-  // ── Confidence gates (optional, used for partial boosting) ────────────────
+  // ── Confidence gates ──────────────────────────────────────────────────────
   intentConfidence: z.coerce.number().min(0).max(1).optional().default(0),
   emotionConfidence: z.coerce.number().min(0).max(1).optional().default(0),
 });

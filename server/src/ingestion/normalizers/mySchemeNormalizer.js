@@ -47,6 +47,42 @@ export const normalizeMyScheme = (raw) => {
   const name = (fields?.schemeName || "Untitled Scheme").trim();
   const description = (fields?.briefDescription || "").trim();
   const tags = normalizeTags(fields?.tags);
+
+  const textForTags = `${fields?.schemeName || ""} ${
+    fields?.briefDescription || ""
+  } ${fields?.benefits || ""} ${fields?.eligibility || ""}`.toLowerCase();
+
+  if (/widow|vidhwa|widowed|bereaved/i.test(textForTags)) {
+    tags.push("widow");
+  }
+
+  if (/farmer|kisan|agriculture/i.test(textForTags)) {
+    tags.push("farmer");
+  }
+
+  if (/student|scholarship|education/i.test(textForTags)) {
+    tags.push("student");
+  }
+
+  // ✅ NEW: Tag disability schemes explicitly so scoring can reliably detect them
+  if (
+    /disab|pwd|differently.?abled|handicap|divyang|saksham|specially.?abled|cerebral|autism|blind|deaf/i.test(
+      textForTags
+    )
+  ) {
+    tags.push("disability");
+    tags.push("pwd");
+  }
+
+  // ✅ NEW: Tag institutional schemes so scoring can hard-reject them for individuals
+  if (
+    /margdarshan|for institutions?|for colleges?|for universities|incubat|accredit|host institute|technical institution/i.test(
+      textForTags
+    )
+  ) {
+    tags.push("institutional");
+  }
+
   const benefitsText = (fields?.benefits || "").trim();
   const eligibilityText = (fields?.eligibility || "").trim();
 
@@ -86,8 +122,15 @@ export const normalizeMyScheme = (raw) => {
   if (/housewife|homemaker|grihini/i.test(textBlob)) {
     allowedOccupations.push("housewife");
   }
-  if (/jobless|unemployed|beroogzar/i.test(textBlob)) {
+  if (/jobless|unemployed|berogzar/i.test(textBlob)) {
     allowedOccupations.push("unemployed");
+  }
+  if (
+    /widow|vidhwa|widowed|bereaved|widow pension|deceased husband|women in distress/i.test(
+      textBlob
+    )
+  ) {
+    allowedOccupations.push("widow");
   }
   if (allowedOccupations.length === 0) {
     allowedOccupations.push("all");
@@ -115,7 +158,6 @@ export const normalizeMyScheme = (raw) => {
   }
 
   // ── 3. Genders ────────────────────────────────────────────────────────────
-  // Word boundaries prevent "men" matching inside "treatment", "government", etc.
   const hasFemaleKeywords =
     /women|woman|\bgirl\b|female|maternity|pregnancy|widow|vidhwa|ladki|beti|mahila|daughter|mother|sister/i.test(
       textBlob
@@ -170,7 +212,6 @@ export const normalizeMyScheme = (raw) => {
   }
 
   // ── 6. isScholarship ─────────────────────────────────────────────────────
-  // "financial assistance" only counts when paired with education context.
   const isScholarship =
     /\bscholarship\b|fee reimbursement|tuition fee|education (assistance|grant|support|loan)|student (aid|support)|stipend|fellowship|merit (scholarship|award)|\bpost.?matric\b|\bpre.?matric\b|\bjee\b|\bneet\b|\bgate\b|\bupsc\b|coaching (fee|grant|support)|hostel (fee|subsidy|allowance)|entrance exam fee|exam fee waiver|training grant|financial assistance.{1,40}(education|student|college|school|study|tuition)|financial aid|education support|tuition support|student assistance/i.test(
       textBlob
@@ -181,12 +222,41 @@ export const normalizeMyScheme = (raw) => {
   const maxAge = fields?.maximumAge ? parseInt(fields.maximumAge, 10) : null;
   const maxIncome = parseIncome(fields?.familyIncomeLimit);
 
+  // ── searchText boosters ───────────────────────────────────────────────────
+  const widowKeywords = allowedOccupations.includes("widow")
+    ? "widow widow pension widow assistance widow support women in distress"
+    : "";
+
+  // ✅ NEW: Disability keyword booster in searchText for better embedding separation
+  const disabilityKeywords = tags.includes("disability")
+    ? "disability disabled pwd differently abled specially abled handicap divyang saksham"
+    : "";
+
+  // ✅ NEW: Caste-exclusivity marker in searchText
+  // When a scheme is exclusively for SC/ST/OBC/Minority, embed that signal so cosine
+  // similarity naturally diverges from a general-category user's query embedding
+  const casteExclusiveKeywords = (() => {
+    const hasSC = /\bsc\b|scheduled caste/i.test(textBlob);
+    const hasST = /\bst\b|scheduled tribe/i.test(textBlob);
+    const hasOBC = /\bobc\b|backward class/i.test(textBlob);
+    const hasMinority = /minority|muslim|sikh|christian/i.test(textBlob);
+    const hasGeneral = /general|open category|everyone|all categories/i.test(textBlob);
+
+    if ((hasSC || hasST || hasOBC || hasMinority) && !hasGeneral) {
+      return "reserved category sc st obc minority exclusive not general";
+    }
+    return "";
+  })();
+
   // ── searchText (used for embedding) ──────────────────────────────────────
   const searchText = `
 ${name}
 ${description}
 ${benefitsText}
 ${eligibilityText}
+${widowKeywords}
+${disabilityKeywords}
+${casteExclusiveKeywords}
 occupation: ${allowedOccupations.join(" ")}
 education: ${allowedEducationLevels.join(" ")}
 gender: ${allowedGenders.join(" ")}
@@ -223,6 +293,7 @@ ${isScholarship ? "scholarship education student financial assistance stipend fe
     sourceUrl: fields?.sourceUrl || null,
     documentsRequired: fields?.documentsRequired || null,
     searchText,
+    tags,
   };
 
   const checksum = crypto

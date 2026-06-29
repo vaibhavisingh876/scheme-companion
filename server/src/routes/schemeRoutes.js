@@ -1,5 +1,5 @@
 import express from "express";
-import { getAllSchemes, searchSchemes, } from "../controllers/schemeController.js";
+import { getAllSchemes, searchSchemes, } from "../controllers/schemecontroller.js";
 
 const router = express.Router();
 

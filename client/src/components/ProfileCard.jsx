@@ -3,49 +3,79 @@ import React from "react";
 const ProfileCard = ({ profile }) => {
   if (!profile) return null;
 
-  const capitalizeString = (str) => {
-    if (!str) return "N/A";
+  const cap = (str) => {
+    if (!str || str === "unknown") return null;
     return String(str).charAt(0).toUpperCase() + String(str).slice(1);
   };
 
+  const fields = [
+    { label: "Age",        value: profile.age ?? null,         icon: "👤" },
+    { label: "Gender",     value: cap(profile.gender),          icon: "⚧"  },
+    { label: "Occupation", value: cap(profile.occupation),      icon: "💼" },
+    { label: "State",      value: cap(profile.state),           icon: "📍" },
+    {
+      label: "Income",
+      value: profile.income
+        ? `₹${Number(profile.income).toLocaleString("en-IN")}`
+        : null,
+      icon: "₹",
+    },
+    { label: "Education",  value: cap(profile.educationLevel),  icon: "🎓" },
+    { label: "Category",   value: cap(profile.casteCategory),   icon: "🏷"  },
+  ].filter((f) => f.value && f.value !== "Unknown");
+
+  if (fields.length === 0) return null;
+
   return (
-    <div className="relative overflow-hidden bg-[#faf6f0] border border-[#d7ccc8] rounded-3xl p-6 shadow-xl shadow-[#d7ccc8]/40 backdrop-blur-md mb-8">
-      <div className="absolute top-0 right-0 w-32 h-32 bg-[#efebe9] blur-3xl rounded-full pointer-events-none" />
-      
-      <div className="flex items-center gap-2.5 mb-5 relative z-10">
-        <span className="flex w-2.5 h-2.5 rounded-full bg-[#8d6e63] animate-pulse" />
-        <h2 className="text-xs font-bold uppercase tracking-widest text-[#5d4037]">
-          Normalized Processing Schema State
-        </h2>
+    <div
+      className="rounded-2xl p-5 mb-2 animate-fade-up"
+      style={{
+        background: "var(--panel)",
+        border: "1px solid var(--border)",
+        borderLeft: "3px solid var(--saffron)",
+      }}
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <span
+          className="w-2 h-2 rounded-full"
+          style={{ background: "var(--saffron)", boxShadow: "0 0 6px var(--saffron)" }}
+        />
+        <p
+          className="text-[10px] font-semibold uppercase tracking-widest"
+          style={{ color: "var(--muted)", fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+        >
+          Profile detected
+        </p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-y-5 gap-x-6 relative z-10">
-        <div className="space-y-1">
-          <p className="text-[10px] text-[#8d6e63] font-bold uppercase tracking-wider">Age Parameter</p>
-          <p className="text-sm font-semibold text-[#3e2723]">{profile.age || "Not Specified"}</p>
-        </div>
-        <div className="space-y-1">
-          <p className="text-[10px] text-[#8d6e63] font-bold uppercase tracking-wider">Gender Context</p>
-          <p className="text-sm font-semibold text-[#3e2723]">{capitalizeString(profile.gender)}</p>
-        </div>
-        <div className="space-y-1">
-          <p className="text-[10px] text-[#8d6e63] font-bold uppercase tracking-wider">Identity Focus</p>
-          <p className="text-sm font-semibold text-[#3e2723]">{capitalizeString(profile.occupation)}</p>
-        </div>
-        <div className="space-y-1">
-          <p className="text-[10px] text-[#8d6e63] font-bold uppercase tracking-wider">Territorial State</p>
-          <p className="text-sm font-semibold text-[#3e2723]">{profile.state || "All India Scope"}</p>
-        </div>
-        <div className="space-y-1">
-          <p className="text-[10px] text-[#8d6e63] font-bold uppercase tracking-wider">Economic Cap</p>
-          <p className="text-sm font-semibold text-[#3e2723]">
-            {profile.income ? `₹${Number(profile.income).toLocaleString()}` : "No Limit Criteria"}
-          </p>
-        </div>
-        <div className="space-y-1">
-          <p className="text-[10px] text-[#8d6e63] font-bold uppercase tracking-wider">Academic Level</p>
-          <p className="text-sm font-semibold text-[#3e2723]">{capitalizeString(profile.educationLevel)}</p>
-        </div>
+      <div className="flex flex-wrap gap-2">
+        {fields.map(({ label, value, icon }) => (
+          <div
+            key={label}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+            style={{
+              background: "var(--saffron-lt)",
+              border: "1px solid #F5D4B8",
+              color: "var(--saffron-dk)",
+              fontFamily: "'Inter', sans-serif",
+            }}
+          >
+            <span className="text-[11px]">{icon}</span>
+            <span
+              className="font-semibold"
+              style={{
+                color: "var(--muted)",
+                fontSize: "10px",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+              }}
+            >
+              {label}
+            </span>
+            {/* FIX: was hardcoded #1A0F00 (near-black) — invisible in dark mode */}
+            <span style={{ color: "var(--ink)" }}>{value}</span>
+          </div>
+        ))}
       </div>
     </div>
   );

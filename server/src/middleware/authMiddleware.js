@@ -1,16 +1,24 @@
 import jwt from "jsonwebtoken";
 
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error("FATAL: JWT_SECRET environment variable is not set.");
+  process.exit(1);
+}
+
 export const protect = (req, res, next) => {
-  const token = req.headers.authorization?.split(" ")[1];
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
+
   if (!token) {
     return res.status(401).json({ success: false, message: "Not authorized, token missing." });
   }
+
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "supersecret");
+    const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     next();
   } catch (error) {
-    console.error("Auth Middleware Error:", error);
-    res.status(401).json({ success: false, message: "Invalid or expired token." });
+    return res.status(401).json({ success: false, message: "Invalid or expired token." });
   }
 };

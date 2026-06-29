@@ -11,7 +11,19 @@ import dns from "dns";
 
 dns.setDefaultResultOrder("ipv4first"); // 👈 Bypasses Indian ISP blocks for Neon
 dotenv.config();
-
+const requiredEnvVars = [
+  "DATABASE_URL",
+  "JWT_SECRET",
+  "GROQ_API_KEY",
+  "MYSCHEME_API_KEY",
+];
+const missing = requiredEnvVars.filter((key) => !process.env[key]);
+if (missing.length > 0) {
+  console.error(
+    `❌ Missing required environment variables: ${missing.join(", ")}`
+  );
+  process.exit(1);
+}
 if (process.env.ENABLE_CRON === "true") {
   startMySchemeCron();
 }
