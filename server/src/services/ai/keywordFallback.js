@@ -182,10 +182,18 @@ export const applyKeywordFallback = (message, profile) => {
   }
 
   // 5. Maternity intent: "pregnant wife" + "delivery" → maternity
-  if (PATTERNS.special.pregnancy.test(message) && patched.primaryIntent === "unknown") {
+  // 5. Maternity intent – FORCE override when pregnancy is mentioned
+if (PATTERNS.special.pregnancy.test(message)) {
+  // Override common misinterpretations: loan, business, unknown
+  if (["loan", "unknown", "business", "startup-funding"].includes(patched.primaryIntent)) {
+    // Preserve the original intent as secondary
+    if (!patched.secondaryIntents.includes(patched.primaryIntent) && patched.primaryIntent !== "unknown") {
+      patched.secondaryIntents.push(patched.primaryIntent);
+    }
     patched.primaryIntent    = "maternity";
-    patched.intentConfidence = Math.max(patched.intentConfidence, 0.85);
+    patched.intentConfidence = Math.max(patched.intentConfidence, 0.95);
   }
+}
 
   // 6. Education loan for daughter → push toward scholarship intent
   if (

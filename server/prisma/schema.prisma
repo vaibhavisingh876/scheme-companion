@@ -46,13 +46,15 @@ model Scheme {
   isActive               Boolean      @default(true)
   lastSyncedAt           DateTime?
   isScholarship          Boolean      @default(false)
-  isFemaleOnly           Boolean      @default(false) // 🚀 ADDED MISSING FIELD
-  
+  isFemaleOnly           Boolean      @default(false)
+  schemeFor              String?      // "Individual", "Institution", "Both"
+
   source                 SchemeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   embedding              Float[]
   searchText             String?      @db.Text
   createdAt              DateTime     @default(now())
   updatedAt              DateTime     @updatedAt
+
   @@index([state])
   @@index([occupation])
   @@index([educationLevel])

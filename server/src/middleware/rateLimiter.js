@@ -1,5 +1,7 @@
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
+// req.ip is Express's resolved client IP, respecting app.set('trust proxy', ...).
+// Using ipKeyGenerator ensures IPv6 addresses are normalized correctly.
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 200,
@@ -9,7 +11,7 @@ export const apiLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.headers["x-forwarded-for"] || req.socket.remoteAddress,
+  keyGenerator: ipKeyGenerator, // ✅ uses req.ip internally with proper IPv6 handling
 });
 
 export const aiRouteLimiter = rateLimit({
@@ -21,5 +23,5 @@ export const aiRouteLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.headers["x-forwarded-for"] || req.socket.remoteAddress,
+  keyGenerator: ipKeyGenerator, // ✅ same
 });

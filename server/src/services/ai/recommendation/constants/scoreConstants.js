@@ -2,17 +2,7 @@
  * scoreConstants.js
  *
  * All numeric thresholds and score adjustments for the recommendation engine.
- *
- * IMPROVEMENT LOG:
- * - Added KEYWORD_OVERLAP_WEIGHT for new keyword-overlap scoring layer
- * - Added per-intent thresholds for housing, sanitation, pension, marriage, death
- * - Expanded INTENT_ALLOWED_CATEGORIES with new intents
- * - Added OCCUPATION_KEYWORD_BOOST for strong occupation-keyword alignment
- * - Added STATE_SPECIFIC_BOOST for state-scheme alignment
- * - Tightened WIDOW and DISABILITY thresholds (these are high-stakes, show fewer but better)
- * - Added HEALTH_INSURANCE_BOOST for insurance schemes in medical intent
  */
-
 export const SCORE = {
   // ── Base threshold ─────────────────────────────────────────────────────────
   DEFAULT_THRESHOLD: 45,
@@ -20,105 +10,103 @@ export const SCORE = {
   // ── Semantic similarity (cosine * 100 forms the base) ─────────────────────
   SEMANTIC_WEIGHT: 100,
 
-  // ── Keyword overlap layer (new) ────────────────────────────────────────────
-  // Each matching keyword from scheme text vs user query adds this to score
+  // ── Keyword overlap layer ─────────────────────────────────────────────────
   KEYWORD_OVERLAP_PER_HIT: 2.5,
-  KEYWORD_OVERLAP_MAX: 20,          // Cap so one very-specific query can't dominate
+  KEYWORD_OVERLAP_MAX: 20,
 
-  // ── State scoring ──────────────────────────────────────────────────────────
-  STATE_MATCH: 6,                   // Raised from 4 — state is very important in India
-  STATE_MISMATCH: -8,               // Raised penalty — wrong state is a big deal
-  STATE_UNKNOWN_NON_NATIONAL_PENALTY: -12,
+  // ── State scoring ─────────────────────────────────────────────────────────
+  STATE_MATCH: 8,
+  STATE_MISMATCH: -12,
+  STATE_UNKNOWN_NON_NATIONAL_PENALTY: -15,
 
-  // ── Intent scoring ─────────────────────────────────────────────────────────
-  INTENT_MATCH: 10,
-  HIGH_PRIORITY_INTENT: 24,         // Raised from 22
-  INTENT_CATEGORY_MATCH_MULTIPLIER: 1.2,  // Extra boost when category+intent align perfectly
+  // ── Intent scoring ────────────────────────────────────────────────────────
+  INTENT_MATCH: 12,
+  HIGH_PRIORITY_INTENT: 26,
+  INTENT_CATEGORY_MATCH_MULTIPLIER: 1.3,
 
-  // ── Occupation scoring ─────────────────────────────────────────────────────
-  OCCUPATION_MATCH: 7,              // Raised from 5
-  OCCUPATION_MISMATCH: -12,         // Raised from -10
-  OCCUPATION_KEYWORD_BOOST: 8,      // NEW: scheme text strongly matches user occupation keyword
+  // ── Occupation scoring ────────────────────────────────────────────────────
+  OCCUPATION_MATCH: 7,
+  OCCUPATION_MISMATCH: -12,
+  OCCUPATION_KEYWORD_BOOST: 8,
 
-  // ── Gender scoring ─────────────────────────────────────────────────────────
+  // ── Gender scoring ────────────────────────────────────────────────────────
   GENDER_MISMATCH: -15,
-  FEMALE_BONUS: 7,                  // Raised from 5 — female-specific schemes are very relevant
+  FEMALE_BONUS: 8,
 
   // ── Income ────────────────────────────────────────────────────────────────
   INCOME_PENALTY: -20,
-  INCOME_MATCH_BOOST: 5,            // NEW: user income is well within limit → slight boost
+  INCOME_MATCH_BOOST: 5,
 
   // ── Emotion ───────────────────────────────────────────────────────────────
-  EMOTION_BONUS: 4,                 // Raised from 3
+  EMOTION_BONUS: 4,
 
   // ── Age ───────────────────────────────────────────────────────────────────
-  AGE_MISMATCH: -1000,              // Hard reject
+  AGE_MISMATCH: -1000,
 
   // ── Medical intent ────────────────────────────────────────────────────────
-  MEDICAL_SEMANTIC_THRESHOLD: 50,   // Lowered slightly from 52 — catch more health schemes
-  HEALTH_INSURANCE_BOOST: 12,       // NEW: PMJAY/Ayushman type schemes for medical intent
+  MEDICAL_SEMANTIC_THRESHOLD: 50,
+  HEALTH_INSURANCE_BOOST: 12,
 
   // ── Widow scoring ─────────────────────────────────────────────────────────
-  WIDOW_BONUS: 55,                  // Raised from 50 — widow schemes must bubble to top
-  WIDOW_PENALTY: -35,               // Raised from -30 — non-widows must not see widow schemes
+  WIDOW_BONUS: 60,
+  WIDOW_PENALTY: -40,
 
   // ── Caste / Category ──────────────────────────────────────────────────────
-  CASTE_MATCH: 6,                   // Raised from 5
-  CATEGORY_MISMATCH: -22,
-  RESERVED_CATEGORY_PENALTY: -22,   // Raised from -20
+  CASTE_MATCH: 6,
+  CATEGORY_MISMATCH: -25,
+  RESERVED_CATEGORY_PENALTY: -25,
 
   // ── Education ─────────────────────────────────────────────────────────────
-  EDUCATION_MATCH: 6,               // Raised from 5
-  EDUCATION_CONFLICT: -30,
+  EDUCATION_MATCH: 6,
+  EDUCATION_CONFLICT: -35,
 
   // ── Finance × Health cross-penalty ────────────────────────────────────────
-  FINANCIAL_MISMATCH: -8,
-  HEALTH_FINANCE_PENALTY: -15,
+  FINANCIAL_MISMATCH: -10,
+  HEALTH_FINANCE_PENALTY: -18,
 
   // ── Disability ────────────────────────────────────────────────────────────
   DISABILITY_REJECT: -1000,
 
-  // ── Hard rejects (used as sentinel return values) ─────────────────────────
+  // ── Hard rejects ─────────────────────────────────────────────────────────
   SPECIAL_REJECT: -1000,
   STARTUP_NON_MATCH_PENALTY: -1000,
 
   // ── Misc boosts ───────────────────────────────────────────────────────────
-  DISEASE_KEYWORD_BOOST: 32,        // Raised from 30 — disease-specific schemes must rank high
-  UNRELATED_CATEGORY_PENALTY: -28,  // Raised from -25
+  DISEASE_KEYWORD_BOOST: 35,
+  UNRELATED_CATEGORY_PENALTY: -30,
+
+  // ── Generic scheme penalty ────────────────────────────────────────────────
+  GENERIC_SCHEME_PENALTY: -15,
 
   // ── Scholarship ───────────────────────────────────────────────────────────
-  SCHOLARSHIP_EXACT_MATCH_BOOST: 10, // NEW: scheme.isScholarship + scholarship intent
+  SCHOLARSHIP_EXACT_MATCH_BOOST: 12,
 
-  // ── Name-level keyword match ───────────────────────────────────────────────
-  NAME_KEYWORD_BOOST: 8,            // NEW: user query keyword found in scheme NAME (high signal)
-
-  // ── Benefit text match ────────────────────────────────────────────────────
-  BENEFIT_KEYWORD_BOOST: 4,         // NEW: keyword found in scheme benefits text
+  // ── Name / benefit keyword boost ─────────────────────────────────────────
+  NAME_KEYWORD_BOOST: 10,
+  BENEFIT_KEYWORD_BOOST: 5,
 
   // ── Per-intent thresholds ─────────────────────────────────────────────────
   THRESHOLD_MAP: {
-    treatment:         34,   // Lowered slightly — catch more health schemes
-    medical:           34,
-    "widow-support":   38,
-    death:             38,
-    disability:        38,
-    maternity:         38,
-    loan:              48,
-    scholarship:       46,
-    "startup-funding": 48,
-    farmer:            43,   // Lowered — agriculture schemes have sparse text
-    job:               46,
-    unemployed:        44,
-    housing:           40,
-    sanitation:        36,
-    pension:           40,
-    marriage:          40,
-    default:           45,
+    treatment:          34,
+    medical:            34,
+    "widow-support":    38,
+    death:              38,
+    disability:         38,
+    maternity:          60,
+    loan:               48,
+    scholarship:        46,
+    "startup-funding":  48,
+    farmer:             43,
+    job:                46,
+    unemployed:         44,
+    housing:            40,
+    sanitation:         36,
+    pension:            40,
+    marriage:           40,
+    default:            45,
   },
 
   // ── Intent → allowed scheme categories ────────────────────────────────────
-  // When intentConfidence > 0.6, schemes outside these categories are rejected.
-  // Using lowercase to match schemeCatLower comparisons.
   INTENT_ALLOWED_CATEGORIES: {
     farmer: new Set([
       "agriculture, rural & environment",

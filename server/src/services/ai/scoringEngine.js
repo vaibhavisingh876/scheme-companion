@@ -1,4 +1,4 @@
-import { normalizeState } from "../ai/groqService.js";
+import { normalizeState } from "./groqService.js";
 import { SCORE } from "./recommendation/constants/scoreConstants.js";
 import { PATTERNS } from "./recommendation/constants/patternConstants.js";
 
@@ -15,6 +15,24 @@ const cosineSimilarity = (a, b) => {
   const denom = Math.sqrt(normA) * Math.sqrt(normB);
   return denom === 0 ? 0 : dot / denom;
 };
+
+// ── Category string normalizer ─────────────────────────────────────────
+// FIX: scoreConstants.js mixes "comma+space" ("agriculture, rural & environment")
+// and "comma no-space" ("banking,financial services and insurance") formatting
+// for category names. Real scheme.category values from MyScheme (e.g.
+// "Business & Entrepreneurship", "Banking, Financial Services and Insurance")
+// use consistent comma+space formatting. Because the old code compared
+// schemeCatLower against these Sets with an EXACT match, any scheme whose
+// category used proper comma spacing (the real-world case) silently failed
+// to match every "banking,..." entry — hard-rejecting valid schemes across
+// almost every intent. This normalizer makes both sides canonical before
+// comparing, regardless of how either string was typed.
+const normalizeCategory = (s) =>
+  String(s || "")
+    .toLowerCase()
+    .replace(/\s*,\s*/g, ", ") // canonical: comma followed by exactly one space
+    .replace(/\s+/g, " ")
+    .trim();
 
 const INTENT_SCORE_CATEGORIES = {
   treatment: ["Health & Wellness", "Medical"],
@@ -33,11 +51,32 @@ const INTENT_SCORE_CATEGORIES = {
   death:     ["Social welfare & Empowerment"],
   "widow-support": ["Social welfare & Empowerment", "Women and Child"],
 };
+// Pre-normalized once at module load so per-scheme scoring doesn't redo this work.
+const NORMALIZED_INTENT_SCORE_CATEGORIES = Object.fromEntries(
+  Object.entries(INTENT_SCORE_CATEGORIES).map(([intent, cats]) => [
+    intent,
+    cats.map(normalizeCategory),
+  ])
+);
 
 const FINANCIALLY_RELEVANT_CATEGORIES = new Set([
   "banking,financial services and insurance",
   "skills & employment",
 ]);
+const NORMALIZED_FINANCIALLY_RELEVANT_CATEGORIES = new Set(
+  Array.from(FINANCIALLY_RELEVANT_CATEGORIES).map(normalizeCategory)
+);
+
+// SCORE.INTENT_ALLOWED_CATEGORIES ships with inconsistent comma spacing (see
+// comment above normalizeCategory). Build a normalized copy once at load time
+// rather than editing every hand-typed string in scoreConstants.js — this is
+// safe/additive and can't break anything that already matched.
+const NORMALIZED_INTENT_ALLOWED_CATEGORIES = Object.fromEntries(
+  Object.entries(SCORE.INTENT_ALLOWED_CATEGORIES || {}).map(([intent, set]) => [
+    intent,
+    new Set(Array.from(set).map(normalizeCategory)),
+  ])
+);
 
 const INTENT_OCCUPATION_MAP = {
   farmer: "farmer",
@@ -69,14 +108,9 @@ const educationLevelConflicts = (schemeEduLevels = [], userEduLevel = "") => {
   return false;
 };
 
-const isExclusivelyReservedCategory = (scheme) => {
-  const cats = toArray(scheme.allowedCategories);
-  if (cats.length === 0 || cats.includes("general")) return false;
-  return cats.every((c) => ["sc", "st", "obc", "minority"].includes(c));
-};
-
 const isInstitutionalScheme = (scheme) => {
-  const name = String(scheme.name        || "").toLowerCase();
+  if (scheme.schemeFor === "Institution") return true;
+  const name = String(scheme.name || "").toLowerCase();
   const desc = String(scheme.description || "").toLowerCase();
   const elig = String(scheme.eligibility || "").toLowerCase();
   return (
@@ -86,8 +120,6 @@ const isInstitutionalScheme = (scheme) => {
   );
 };
 
-// ── Occupation-exclusive scheme detection ────────────────────────────────────
-// Returns the exclusive occupation a scheme is locked to, or null if open to all.
 const getExclusiveOccupation = (scheme) => {
   const name = String(scheme.name || "").toLowerCase();
   const desc = String(scheme.description || "").toLowerCase();
@@ -128,7 +160,6 @@ const isGenericFinancialScheme = (scheme) => {
   return GENERIC_FINANCIAL_SCHEME_PATTERNS.some((p) => p.test(nd));
 };
 
-// ── Generic banking schemes that don't actually help with specific medical/treatment needs ──
 const GENERIC_BANKING_PATTERNS = [
   /pradhan mantri jan dhan|pmjdy|jan dhan yojana/i,
   /pradhan mantri jeevan jyoti bima|pmjjby/i,
@@ -194,7 +225,6 @@ const isChildFocusedScheme = (scheme) => {
   );
 };
 
-// ── Death-assistance scheme detector ─────────────────────────────────────────
 const isDeathAssistanceScheme = (scheme) => {
   const name = String(scheme.name || "").toLowerCase();
   const desc = String(scheme.description || "").toLowerCase();
@@ -246,7 +276,11 @@ export const scoreScheme = (
   const descLower      = String(scheme.description || "").toLowerCase();
   const eligLower      = String(scheme.eligibility || "").toLowerCase();
   const tagsStr        = toArray(scheme.tags).join(" ").toLowerCase();
-  const schemeCatLower = String(scheme.category    || "").toLowerCase();
+  // FIX: normalized (see normalizeCategory comment above) so comparisons
+  // against the Sets/arrays in scoreConstants.js don't silently fail due to
+  // comma-spacing differences between hand-typed constants and real category
+  // labels coming from the MyScheme API.
+  const schemeCatLower = normalizeCategory(scheme.category);
   const allowedOccupations      = toArray(scheme.allowedOccupations);
   const allowedEducationLevels  = toArray(scheme.allowedEducationLevels);
   const allowedCategories       = toArray(scheme.allowedCategories);
@@ -259,7 +293,6 @@ export const scoreScheme = (
   // HARD REJECTS
   // ══════════════════════════════════════════════════════════════════════
 
-  // Age bounds
   if (effectiveMinAge !== null) {
     if (scheme.minAge !== null && scheme.minAge !== undefined && effectiveMinAge < scheme.minAge) return SCORE.AGE_MISMATCH;
     if (scheme.maxAge !== null && scheme.maxAge !== undefined && effectiveMinAge > scheme.maxAge) return SCORE.AGE_MISMATCH;
@@ -269,7 +302,6 @@ export const scoreScheme = (
     if (scheme.maxAge !== null && scheme.maxAge !== undefined && effectiveMinAge !== null && effectiveMinAge > scheme.maxAge) return SCORE.AGE_MISMATCH;
   }
 
-  // Senior-only schemes
   if (
     /old age|senior citizen|vayoshreshtha|old age pension|aged person/i.test(nameLower) ||
     /senior citizen|old age pension|60 years and above|above 60/i.test(descLower)
@@ -278,7 +310,6 @@ export const scoreScheme = (
     if (!isOldEnough) return SCORE.AGE_MISMATCH;
   }
 
-  // ── Gender-based rejects ──────────────────────────────────────────────
   if (filterGender === "male") {
     if (
       /pregnant|maternity|pregnancy|delivery|antenatal|neonate|matritva|suman|miscarriage/i.test(nameLower) ||
@@ -293,8 +324,6 @@ export const scoreScheme = (
     if (/adolescent girl|girl child|kishori|balika/i.test(nameLower)) return SCORE.SPECIAL_REJECT;
   }
 
-  // FIX: Reject maternity/pregnancy schemes when gender is UNKNOWN and user
-  // hasn't mentioned pregnancy — prevents them flooding results for male workers.
   if (filterGender === "unknown" && !userMentionsPregnancy(rawMessage)) {
     const isMaternityScheme =
       /pregnant|maternity|pregnancy|delivery|antenatal|janani.*shishu|suman yojana|matritva/i.test(nameLower) ||
@@ -302,12 +331,10 @@ export const scoreScheme = (
     if (isMaternityScheme) return SCORE.SPECIAL_REJECT;
   }
 
-  // Child-focused schemes for adult beneficiaries
   if (effectiveMinAge !== null && effectiveMinAge >= 18 && isChildFocusedScheme(scheme)) {
     return SCORE.SPECIAL_REJECT;
   }
 
-  // Disability schemes — only show if user mentioned disability
   if (!userMentionsDisability(rawMessage)) {
     const hasDisabilityContext =
       PATTERNS.special.disability.test(tagsStr) ||
@@ -316,19 +343,14 @@ export const scoreScheme = (
     if (hasDisabilityContext) return SCORE.DISABILITY_REJECT;
   }
 
-  // ── Ex-servicemen schemes ─────────────────────────────────────────────
   const schemeIsExServicemen =
     /\brmewf\b|\baffdf\b|ex.?servicem(an|en|women)|ex-service|sainik welfare|defence personnel scheme|\bcapf\b|\bcrpf\b|\bbsf\b|\bcisf\b|\bitbp\b|\bssb\b|\brpf\b|\brpsf\b|railway protection force|central armed police force|coast guard personnel/i.test(nameLower) ||
     /\brmewf\b|\baffdf\b|ex.?servicem(an|en|women)|non.?pensioner ex.?service/i.test(descLower);
 
   if (schemeIsExServicemen && !userMentionsExServicemen(rawMessage)) {
-    // FIX: Previously the check allowed ex-servicemen schemes through for any widow.
-    // RMEWF/AFFDF are specifically for "widows of ex-servicemen", not widows in general.
-    // Now we only allow it through if the user EXPLICITLY mentions ex-servicemen context.
     return SCORE.SPECIAL_REJECT;
   }
 
-  // ── COVID health worker scheme — only for health workers ──────────────
   if (
     /pradhan mantri garib kalyan package.*insurance.*health worker|health worker.*covid|covid.*health worker insurance/i.test(nameLower) ||
     /insurance scheme for health workers.*covid|health workers fighting covid/i.test(descLower)
@@ -338,7 +360,6 @@ export const scoreScheme = (
     if (!userIsHealthWorker) return SCORE.SPECIAL_REJECT;
   }
 
-  // ── Niche group rejects ───────────────────────────────────────────────
   if (!userMentionsJournalist(rawMessage) && /journalist|accredited journalist|press worker|media welfare/i.test(nameLower))
     return SCORE.SPECIAL_REJECT;
   if (!userMentionsSports(rawMessage) && /national award.*sport|welfare fund.*sport|sportsperson fund|athletes? fund/i.test(nameLower))
@@ -348,7 +369,6 @@ export const scoreScheme = (
     !/transgender|kinnar|hijra/i.test(rawMessage)
   ) return SCORE.SPECIAL_REJECT;
 
-  // Speaker-specific child-scheme rejects
   if (!forSomeoneElse) {
     const userIsChild = age !== null && age !== undefined && age < 18;
     if (!userIsChild) {
@@ -370,11 +390,21 @@ export const scoreScheme = (
     }
   }
 
-  // Universal hard rejects
   if (isInstitutionalScheme(scheme)) return SCORE.SPECIAL_REJECT;
 
-  const casteIsUnknownOrGeneral = !casteCategory || casteCategory === "unknown" || casteCategory === "general";
-  if (casteIsUnknownOrGeneral && isExclusivelyReservedCategory(scheme)) return SCORE.CATEGORY_MISMATCH;
+  // ── CATEGORY / CASTE HARD REJECT (FIX) ──────────────────────────────────
+  // Agar user general hai (ya unknown), toh scheme ke allowedCategories mein
+  // "general" ya "all" hona chahiye. Agar nahi hai, toh reject karo.
+  const isGeneralUser = !casteCategory || casteCategory === "unknown" || casteCategory === "general";
+  if (isGeneralUser) {
+    const cats = toArray(scheme.allowedCategories);
+    // Agar list empty hai toh maano ki sabke liye hai (allow)
+    // Agar list mein "general" ya "all" hai toh allow
+    // Agar list mein kuch aur hai (nomadic, sc, st, obc, minority, etc.) toh reject
+    if (cats.length > 0 && !cats.includes("general") && !cats.includes("all")) {
+      return SCORE.CATEGORY_MISMATCH;
+    }
+  }
 
   if (isAwardScheme(scheme) && !userMentionsSports(rawMessage)) {
     if (!/award|recognition|achievement|excellence|puraskar/i.test(rawMessage)) return SCORE.SPECIAL_REJECT;
@@ -385,7 +415,6 @@ export const scoreScheme = (
 
   if (isUnrelatedDiseaseScheme(scheme, rawMessage)) return SCORE.SPECIAL_REJECT;
 
-  // ── Medical intent: filter irrelevant schemes ─────────────────────────
   const isMedicalIntent = primaryIntent === "treatment" || primaryIntent === "medical" || userMentionsMedical(rawMessage);
 
   if (isMedicalIntent && intentConfidence > 0.5) {
@@ -397,10 +426,8 @@ export const scoreScheme = (
       (scheme.isScholarship && /loan/i.test(nameLower))
     ) return SCORE.SPECIAL_REJECT;
 
-    // FIX: Reject death-assistance schemes when user needs medical help (alive)
     if (isDeathAssistanceScheme(scheme)) return SCORE.SPECIAL_REJECT;
 
-    // FIX: Reject generic banking products (Jan Dhan, PMJJBY) for medical queries
     if (isGenericBankingScheme(scheme) && !/health|medical|treatment|hospital|insurance.*health|health.*insurance/i.test(combinedText)) {
       return SCORE.SPECIAL_REJECT;
     }
@@ -415,7 +442,10 @@ export const scoreScheme = (
   }
 
   // ── Intent-based category filter ─────────────────────────────────────
-  const allowedCategoriesForIntent = SCORE.INTENT_ALLOWED_CATEGORIES?.[primaryIntent];
+  // FIX: use the pre-normalized Sets so comma/whitespace formatting
+  // differences between scoreConstants.js and real category labels can't
+  // cause a valid scheme to be hard-rejected.
+  const allowedCategoriesForIntent = NORMALIZED_INTENT_ALLOWED_CATEGORIES?.[primaryIntent];
   let intentCategoryPenalty = 0;
 
   if (allowedCategoriesForIntent && intentConfidence > 0.6) {
@@ -458,11 +488,25 @@ export const scoreScheme = (
   if (primaryIntent === "maternity" && /maternity|pregnancy|prenatal|delivery|janani|suman/i.test(combinedText))
     score += SCORE.HIGH_PRIORITY_INTENT;
 
-  // FIX: Strong maternity boost — ensure maternity schemes score very high
-  // for maternity intent. JNSK / SUMAN / PMMVY need to outrank generic health.
-  if (primaryIntent === "maternity") {
-    if (/janani.*shishu|suman|matru|jsy|jssk|pradhan mantri.*matru/i.test(nameLower)) {
-      score += SCORE.HIGH_PRIORITY_INTENT * 2;
+  // ── Maternity boost ──────────────────────────────────────────────────
+  if (primaryIntent === "maternity" || userMentionsPregnancy(rawMessage)) {
+    const isMaternityScheme = 
+      /maternity|pregnancy|delivery|prasav|janani|matru|shishu|garbh|garbhavati|antenatal|postnatal|matritva|maternal/.test(nameLower) ||
+      /maternity|pregnancy|delivery|prasav|janani|matru|garbhavati|antenatal|postnatal|matritva/.test(descLower) ||
+      /maternity|pregnancy|delivery/.test(tagsStr);
+    if (isMaternityScheme) {
+      // Stronger boost (2.5x) to beat generic loan schemes
+      score += SCORE.HIGH_PRIORITY_INTENT * 2.5;
+    }
+  }
+
+  // ── Penalty for award / fellowship / helpline schemes when intent is maternity ──
+  if (primaryIntent === "maternity" && intentConfidence > 0.7) {
+    const isAwardOrHelpline =
+      /award|puraskar|fellowship|post-doctoral|helpline|wise|nari shakti|vatsalya|protection|child/i.test(nameLower) ||
+      /award|puraskar|fellowship|helpline|wise|nari shakti/i.test(descLower);
+    if (isAwardOrHelpline) {
+      score -= 40; // heavy penalty to push them below maternity schemes
     }
   }
 
@@ -477,8 +521,10 @@ export const scoreScheme = (
 
   // ── Intent / category / occupation scoring ────────────────────────────
   if (primaryIntent && primaryIntent !== "unknown") {
-    const intentCategories = INTENT_SCORE_CATEGORIES[primaryIntent] || [];
-    const categoryMatch    = intentCategories.some((c) => schemeCatLower.includes(c.toLowerCase()));
+    // FIX: normalize both sides here too, so the includes() check isn't
+    // broken by the same comma-spacing inconsistency.
+    const intentCategories = NORMALIZED_INTENT_SCORE_CATEGORIES[primaryIntent] || [];
+    const categoryMatch    = intentCategories.some((c) => schemeCatLower.includes(c));
 
     if (categoryMatch) {
       score +=
@@ -493,40 +539,51 @@ export const scoreScheme = (
     }
 
     if ((primaryIntent === "scholarship" || primaryIntent === "student") && scheme.isScholarship) {
-      score += 6 * intentConfidence;
+      score += SCORE.SCHOLARSHIP_EXACT_MATCH_BOOST * intentConfidence;
     }
 
     for (const si of secondaryIntents) {
-      const siCats = INTENT_SCORE_CATEGORIES[si] || [];
-      if (siCats.some((c) => schemeCatLower.includes(c.toLowerCase()))) {
+      const siCats = NORMALIZED_INTENT_SCORE_CATEGORIES[si] || [];
+      if (siCats.some((c) => schemeCatLower.includes(c))) {
         score += 6;
         break;
       }
     }
 
     if (intentConfidence > 0.6 && intentCategories.length > 0 && !categoryMatch) {
-      const penalty = FINANCIALLY_RELEVANT_CATEGORIES.has(schemeCatLower) ? -5 : SCORE.CATEGORY_MISMATCH;
+      const penalty = NORMALIZED_FINANCIALLY_RELEVANT_CATEGORIES.has(schemeCatLower) ? -5 : SCORE.CATEGORY_MISMATCH;
       score += penalty;
     }
   }
 
-  // ── Occupation scoring ────────────────────────────────────────────────
+  // ── Occupation scoring (with extra boost for aligned intent) ──────
   if (occupation && occupation !== "unknown") {
-    if (allowedOccupations.includes(occupation) || allowedOccupations.includes("all")) {
-      score += SCORE.OCCUPATION_MATCH;
+    const occupationMatches = allowedOccupations.includes(occupation) || allowedOccupations.includes("all");
+    let occBonus = 0;
+    if (occupationMatches) {
+      occBonus = SCORE.OCCUPATION_MATCH;
+      // Extra boost if scheme is strongly relevant to primary intent
+      const intentRelevant = (
+        (primaryIntent === "maternity" && /maternity|pregnancy|delivery|prasav|garbh/i.test(combinedText)) ||
+        (primaryIntent === "farmer" && /farmer|agriculture|crop|kisan|kheti/i.test(combinedText)) ||
+        (primaryIntent === "scholarship" && /scholarship|student|education|fee/i.test(combinedText)) ||
+        (primaryIntent === "treatment" && /treatment|health|hospital|disease|surgery/i.test(combinedText)) ||
+        (primaryIntent === "widow-support" && /widow|bereaved|death|husband|pati/i.test(combinedText))
+      );
+      if (intentRelevant && intentConfidence > 0.6) {
+        occBonus *= 2; // double boost when occupation + intent align
+      }
+      score += occBonus;
     } else if (!allowedOccupations.includes("all") && allowedOccupations.length > 0) {
       const occPenalty = isMedicalIntent ? -15 : SCORE.OCCUPATION_MISMATCH;
       score += occPenalty;
     }
   }
 
-  // FIX: Penalize occupation-exclusive schemes when user's occupation doesn't match.
-  // This fixes construction worker schemes showing up for non-workers (Tests 2, 3).
   const exclusiveOcc = getExclusiveOccupation(scheme);
   if (exclusiveOcc && occupation !== exclusiveOcc && occupation !== "unknown") {
     score += SCORE.OCCUPATION_MISMATCH * 2;
   } else if (exclusiveOcc && occupation === "unknown" && !isMedicalIntent) {
-    // For unknown occupation, mildly penalize very specific occupational schemes
     score += SCORE.OCCUPATION_MISMATCH;
   }
 
@@ -539,8 +596,6 @@ export const scoreScheme = (
     }
   }
 
-  // FIX: Penalize niche/specific scholarship schemes when they have extra
-  // eligibility criteria clearly incompatible with the user (orphan, CPF ward, etc.)
   if ((primaryIntent === "scholarship" || primaryIntent === "student") && educationLevel === "school") {
     const isHigherEdOnly =
       /phd|research scholar|post.?doctoral|fellowship.*research|academician|cultural research/i.test(nameLower) ||
@@ -548,7 +603,7 @@ export const scoreScheme = (
     if (isHigherEdOnly) score += SCORE.EDUCATION_CONFLICT;
   }
 
-  // ── Caste / category scoring ──────────────────────────────────────────
+  // ── Caste / category scoring (soft scoring, not hard reject) ──────────
   if (casteCategory && casteCategory !== "unknown") {
     if (allowedCategories.includes(casteCategory)) score += SCORE.CASTE_MATCH;
     if (casteCategory === "general") {
@@ -559,11 +614,25 @@ export const scoreScheme = (
     }
   }
 
+  // ── Penalise generic banking/investment schemes for very specific intents ──
+  const SPECIFIC_INTENTS = new Set([
+    "treatment", "medical", "widow-support", "maternity", "disability",
+    "scholarship", "student", "job", "unemployed", "farmer", "housing",
+    "sanitation", "pension", "marriage", "death"
+  ]);
+  if (
+    SPECIFIC_INTENTS.has(primaryIntent) &&
+    intentConfidence > 0.4 &&
+    isGenericBankingScheme(scheme)
+  ) {
+    score += SCORE.GENERIC_SCHEME_PENALTY;
+  }
+
   // ── Finance × health cross-penalty ───────────────────────────────────
   if (
     isMedicalIntent &&
     intentConfidence > 0.5 &&
-    FINANCIALLY_RELEVANT_CATEGORIES.has(schemeCatLower) &&
+    NORMALIZED_FINANCIALLY_RELEVANT_CATEGORIES.has(schemeCatLower) &&
     !/health|medical|treatment|hospital|patient|cancer|insurance|illness|disease/i.test(combinedText)
   ) {
     score += SCORE.HEALTH_FINANCE_PENALTY;

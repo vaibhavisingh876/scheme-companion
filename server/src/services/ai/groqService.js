@@ -1,20 +1,12 @@
 /**
  * groqService.js
  *
- * LLM-powered profile extraction + query expansion.
- *
- * IMPROVEMENT LOG:
- * - Massively expanded system prompt with more Hindi/Hinglish examples
- * - Added housing, sanitation, pension, marriage, death as primary intents
- * - Added explicit age signal extraction examples
- * - Added income parsing examples (monthly → annual, lakh, crore)
- * - Improved query expansion prompt to produce scheme-corpus-aligned vocabulary
- * - Added caste-category extraction examples
- * - Added secondary intent extraction guidance
+ * LLM-powered profile extraction + query expansion + scheme detail fetching.
  */
 
 import Groq from "groq-sdk";
 import { profileSchema } from "../../validators/profileValidator.js";
+import axios from "axios";   // needed for fetchSchemeDetail
 
 const groqClientInstance = new Groq({
   apiKey: process.env.GROQ_API_KEY,
@@ -65,13 +57,13 @@ const stateMap = {
 };
 
 const occupationMap = {
-  student:    ["student","engineeringstudent","medicalstudent","learner","college","school","btech","mtech","bsc","msc","ba","ma","bcom","mcom","mba","bca","mca","university","vidyarthi","chhatra"],
-  farmer:     ["farmer","agriculture","agricultureworker","kisan","kisaan","cultivator","farming","khet","fasal","krishak","annadata","kisaan","kheti"],
-  startup:    ["startup","entrepreneur","business","businessman","businesswoman","shopowner","trader","merchant","msme","selfemployed","self-employed","vyapari","dukandaar","udyog","vyavsayi"],
-  worker:     ["worker","labour","labourer","mazdoor","employee","constructionworker","artisan","craftsman","carpenter","welder","shramik","majdoor","kamgar","mistri"],
-  unemployed: ["jobless","unemployed","jobseeker","lookingforjob","berozgaar","naukri","berozgaari"],
-  housewife:  ["housewife","homemaker","grihini","gharelu","gruhini"],
-  widow:      ["widow","patavya","bereaved","bereavedwife","deceasedhusband","widowed","vidhwa"],
+  student:     ["student","engineeringstudent","medicalstudent","learner","college","school","btech","mtech","bsc","msc","ba","ma","bcom","mcom","mba","bca","mca","university","vidyarthi","chhatra"],
+  farmer:      ["farmer","agriculture","agricultureworker","kisan","kisaan","cultivator","farming","khet","fasal","krishak","annadata","kisaan","kheti"],
+  startup:     ["startup","entrepreneur","business","businessman","businesswoman","shopowner","trader","merchant","msme","selfemployed","self-employed","vyapari","dukandaar","udyog","vyavsayi"],
+  worker:      ["worker","labour","labourer","mazdoor","employee","constructionworker","artisan","craftsman","carpenter","welder","shramik","majdoor","kamgar","mistri"],
+  unemployed:  ["jobless","unemployed","jobseeker","lookingforjob","berozgaar","naukri","berozgaari"],
+  housewife:   ["housewife","homemaker","grihini","gharelu","gruhini"],
+  widow:       ["widow","patavya","bereaved","bereavedwife","deceasedhusband","widowed","vidhwa"],
 };
 
 export const normalizeState = (state = "") => {
@@ -104,7 +96,6 @@ const defaultProfile = () =>
     intentConfidence: 0, emotionConfidence: 0,
   });
 
-// ── System prompt (the most important part of LLM extraction quality) ─────────
 const SYSTEM_PROMPT = `You are an expert profile extraction engine for an Indian Government Schemes Recommendation System.
 You MUST understand English, Hindi, Hinglish, and regional Indian language transliterations equally well.
 Always extract every possible signal from the message.
@@ -221,7 +212,7 @@ export const extractUserProfile = async (message) => {
   try {
     const response = await groqClientInstance.chat.completions.create({
       model: "llama-3.1-8b-instant",
-      temperature: 0.15,   // Slightly lower temperature for more consistent extraction
+      temperature: 0.15,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
@@ -260,7 +251,6 @@ export const extractUserProfile = async (message) => {
   }
 };
 
-// ── Query expansion for better embedding matching ─────────────────────────────
 export const expandQueryForEmbedding = async (rawMessage, profile) => {
   try {
     const prompt = `You are a search query rewriter for an Indian government scheme recommendation system.
@@ -298,11 +288,39 @@ Rewritten query (English only, government vocabulary, keyword-rich):`;
     });
 
     const result = response?.choices?.[0]?.message?.content?.trim() || "";
-    // Reject if the model returned something too short or in JSON format
     if (result.length < 30 || result.startsWith("{")) return rawMessage;
     return result;
   } catch (err) {
     console.warn("Query expansion failed, using original message.", err.message);
     return rawMessage;
+  }
+};
+
+// ── Fetch full detail of a scheme from the v6 public endpoint ────────────────
+// Returns the RAW data.en object unmodified. mySchemeNormalizer.js is the
+// single source of truth for converting this into a DB-ready scheme.
+// (Previously this function flattened the response into {name, description, ...}
+// itself, which threw away basicDetails/schemeContent before normalizeMyScheme
+// ever saw them — that was the cause of every scheme saving as "Untitled Scheme".)
+export const fetchSchemeDetail = async (slug) => {
+  try {
+    const response = await axios.get(
+      `https://api.myscheme.gov.in/schemes/v6/public/schemes?slug=${slug}&lang=en`,
+      {
+        headers: {
+          "x-api-key": process.env.MYSCHEME_API_KEY,
+          Origin: "https://www.myscheme.gov.in",
+          Referer: "https://www.myscheme.gov.in/",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          Accept: "application/json",
+        },
+        timeout: 10000,
+      }
+    );
+
+    return response.data?.data?.en || null;
+  } catch (err) {
+    console.error(`[fetchSchemeDetail] Error fetching ${slug}:`, err.message);
+    return null;
   }
 };

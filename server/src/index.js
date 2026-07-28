@@ -29,7 +29,7 @@ if (process.env.ENABLE_CRON === "true") {
 }
 
 const app = express();
-
+app.set("trust proxy", 1);
 // Safe array checks allowing cross-ports connections smoothly
 const allowedOrigins = [
   "http://localhost:5173",
