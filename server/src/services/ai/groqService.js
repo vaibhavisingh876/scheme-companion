@@ -6,7 +6,9 @@
 
 import Groq from "groq-sdk";
 import { profileSchema } from "../../validators/profileValidator.js";
-import axios from "axios";   // needed for fetchSchemeDetail
+import axios from "axios";
+import { profileCache } from "../../utils/cache.js";
+import { logger } from "../../utils/logger.js";
 
 const groqClientInstance = new Groq({
   apiKey: process.env.GROQ_API_KEY,
@@ -100,6 +102,25 @@ const SYSTEM_PROMPT = `You are an expert profile extraction engine for an Indian
 You MUST understand English, Hindi, Hinglish, and regional Indian language transliterations equally well.
 Always extract every possible signal from the message.
 
+═══ CRITICAL: CASTE CATEGORY EXTRACTION ═══
+**RULES:**
+1. If user says "general", "unreserved", "open category", "general category" → casteCategory MUST be "general"
+2. If user says "SC", "scheduled caste", "dalit" → casteCategory MUST be "sc"
+3. If user says "ST", "scheduled tribe", "tribal", "adivasi" → casteCategory MUST be "st"
+4. If user says "OBC", "other backward class", "backward class" → casteCategory MUST be "obc"
+5. If user says "minority", "muslim", "sikh", "christian", "jain", "buddhist", "parsi" → casteCategory MUST be "minority"
+6. If not mentioned → "unknown"
+
+⚠️ DO NOT assume "general" means "sc" or "st". They are different categories.
+
+═══ CRITICAL: EDUCATION LEVEL ═══
+**RULES:**
+1. If user mentions "college", "university", "degree", "B.Sc", "B.A", "B.Com", "B.Tech", "M.Sc", "M.A", "MBA", "PG", "postgraduate", "higher education", "undergraduate", "final year", "pursuing" → educationLevel MUST be "higher_education"
+2. If user mentions "school", "10th", "12th", "class 8", "class 9", "class 10", "class 11", "class 12", "matric", "secondary" → educationLevel MUST be "school"
+3. If not mentioned → "unknown"
+
+⚠️ BA final year, B.Sc, B.Com, B.Tech → ALL are "higher_education". NOT "school".
+
 ═══ HINDI/HINGLISH VOCABULARY ═══
 
 OCCUPATIONS (extract from these signals):
@@ -158,20 +179,6 @@ AGE EXTRACTION:
 - "baccha" / "child" without number → age: null
 - "budha" / "elderly" without number → age: 65 (approximate)
 
-EDUCATION LEVEL:
-- engineering, btech, b.tech, college, degree, graduation, university, mtech, mba, phd, UG, PG, postgraduate → "higher_education"
-- ITI, polytechnic, diploma → "higher_education"
-- school, 10th, 12th, matric, intermediate, secondary → "school"
-- Not mentioned → "unknown"
-
-CASTE CATEGORY:
-- SC, dalit, scheduled caste, "main SC hu" → "sc"
-- ST, tribal, adivasi, "main ST hu" → "st"
-- OBC, other backward class, "OBC hu" → "obc"
-- minority, muslim, sikh, christian, jain, buddhist → "minority"
-- general, open category, unreserved → "general"
-- Not mentioned → "unknown"
-
 GENDER EXTRACTION:
 - "main ek aurat hu", "mai ladki hu", "mai mahila hu" → gender: "female"
 - "main ek aadmi hu", "mai mard hu", "mai ladka hu" → gender: "male"
@@ -209,6 +216,16 @@ Return ONLY valid JSON with these exact fields:
 }`;
 
 export const extractUserProfile = async (message) => {
+  // 🆕 Cache repeated/identical messages (common when a user re-sends after
+  // a network hiccup, or during testing) to avoid paying for another Groq
+  // call and to shave real latency off the response.
+  const cacheKey = normalize(message).slice(0, 500) || message;
+  const cachedProfile = profileCache.get(cacheKey);
+  if (cachedProfile) {
+    logger.debug("Profile cache hit");
+    return cachedProfile;
+  }
+
   try {
     const response = await groqClientInstance.chat.completions.create({
       model: "llama-3.1-8b-instant",
@@ -237,16 +254,71 @@ export const extractUserProfile = async (message) => {
       if (Number.isNaN(parsed.income) || parsed.income < 0) parsed.income = null;
     }
 
-    parsed.secondaryIntents  = Array.isArray(parsed.secondaryIntents) ? parsed.secondaryIntents : [];
+    // ─── FORCE OVERRIDES ─────────────────────────────────────────────────────
+    const msgLower = message.toLowerCase();
+
+    // CASTE – if user explicitly mentions general, force it
+    if (/general\s*(category)?|unreserved|open\s*category|gen\s*cat|general category/i.test(msgLower)) {
+      parsed.casteCategory = "general";
+    } else if (/\bsc\b|scheduled\s*caste|dalit/i.test(msgLower)) {
+      parsed.casteCategory = "sc";
+    } else if (/\bst\b|scheduled\s*tribe|tribal|adivasi/i.test(msgLower)) {
+      parsed.casteCategory = "st";
+    } else if (/\bobc\b|other\s*backward\s*class|backward\s*class/i.test(msgLower)) {
+      parsed.casteCategory = "obc";
+    }
+
+    // EDUCATION – if user mentions college/university/degree, force higher_education
+    if (/college|university|b\.?sc|b\.?a|b\.?com|b\.?tech|m\.?sc|m\.?a|m\.?ba|m\.?tech|pg|postgrad|degree|engineering|final\s*year|pursuing|graduation|undergraduate|postgraduate/i.test(msgLower)) {
+      parsed.educationLevel = "higher_education";
+    } else if (/school\b|class\s*[8-9]|class\s*1[0-2]|10th|12th|matric|secondary/i.test(msgLower)) {
+      // Only if no higher-ed keywords present
+      if (!/college|university|b\.?sc|b\.?a|b\.?com|degree|engineering/i.test(msgLower)) {
+        parsed.educationLevel = "school";
+      }
+    }
+
+    // ─── Filter invalid secondary intents ──────────────────────────────────
+    const VALID_INTENTS = new Set([
+      "student", "business", "job", "medical", "treatment", "loan", "scholarship",
+      "marriage", "death", "disability", "maternity", "farmer", "unemployed",
+      "startup-funding", "widow-support", "housing", "sanitation", "pension"
+    ]);
+
+    if (Array.isArray(parsed.secondaryIntents)) {
+      parsed.secondaryIntents = parsed.secondaryIntents
+        .map(item => String(item).toLowerCase().trim())
+        .filter(item => VALID_INTENTS.has(item));
+    } else {
+      parsed.secondaryIntents = [];
+    }
+
+    if (parsed.primaryIntent && !VALID_INTENTS.has(parsed.primaryIntent)) {
+      parsed.primaryIntent = "unknown";
+    }
+
     parsed.intentConfidence  = Math.min(1, Math.max(0, Number(parsed.intentConfidence)  || 0.5));
     parsed.emotionConfidence = Math.min(1, Math.max(0, Number(parsed.emotionConfidence) || 0.5));
 
     parsed.state      = normalizeState(parsed.state);
     parsed.occupation = normalizeOccupation(parsed.occupation);
 
-    return profileSchema.parse(parsed);
+    logger.debug("Extracted Profile:", JSON.stringify({
+      age: parsed.age,
+      gender: parsed.gender,
+      occupation: parsed.occupation,
+      state: parsed.state,
+      educationLevel: parsed.educationLevel,
+      casteCategory: parsed.casteCategory,
+      primaryIntent: parsed.primaryIntent,
+      secondaryIntents: parsed.secondaryIntents,
+    }));
+
+    const result = profileSchema.parse(parsed);
+    profileCache.set(cacheKey, result);
+    return result;
   } catch (err) {
-    console.error("[Groq Profile Extraction Error]", err);
+    logger.error("[Groq Profile Extraction Error]", err);
     return defaultProfile();
   }
 };
@@ -291,17 +363,12 @@ Rewritten query (English only, government vocabulary, keyword-rich):`;
     if (result.length < 30 || result.startsWith("{")) return rawMessage;
     return result;
   } catch (err) {
-    console.warn("Query expansion failed, using original message.", err.message);
+    logger.warn("Query expansion failed, using original message.", err.message);
     return rawMessage;
   }
 };
 
 // ── Fetch full detail of a scheme from the v6 public endpoint ────────────────
-// Returns the RAW data.en object unmodified. mySchemeNormalizer.js is the
-// single source of truth for converting this into a DB-ready scheme.
-// (Previously this function flattened the response into {name, description, ...}
-// itself, which threw away basicDetails/schemeContent before normalizeMyScheme
-// ever saw them — that was the cause of every scheme saving as "Untitled Scheme".)
 export const fetchSchemeDetail = async (slug) => {
   try {
     const response = await axios.get(
@@ -320,7 +387,7 @@ export const fetchSchemeDetail = async (slug) => {
 
     return response.data?.data?.en || null;
   } catch (err) {
-    console.error(`[fetchSchemeDetail] Error fetching ${slug}:`, err.message);
+    logger.error(`[fetchSchemeDetail] Error fetching ${slug}:`, err.message);
     return null;
   }
 };

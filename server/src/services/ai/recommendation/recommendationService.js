@@ -11,6 +11,9 @@ import prisma from "../../../config/prisma.js";
 import { scoreScheme } from "../scoringEngine.js";
 import { safeArray, safeString, normalizeSpaces } from "./utils.js";
 import { SCORE } from "./constants/scoreConstants.js";
+import { buildSchemeFilters } from "../../../services/filterBuilder.js";
+import { embeddingCache } from "../../../utils/cache.js";
+import { logger } from "../../../utils/logger.js";
 
 const MAX_DB_CANDIDATES = 2000;
 const MAX_RESULTS = 40;
@@ -23,9 +26,6 @@ const INTENT_MAX_PER_CATEGORY = {
   loan: 5,
   "startup-funding": 5,
 };
-
-// (Removed: unused/dead INTENT_VOCAB placeholder block — was never referenced
-// anywhere in this file and contained only a literal "..." string.)
 
 const buildQueryText = (message, profile, expandedQuery = null) => {
   if (expandedQuery && expandedQuery.trim()) {
@@ -49,80 +49,27 @@ const buildQueryText = (message, profile, expandedQuery = null) => {
   return result || "government scheme citizen welfare assistance";
 };
 
-const buildDbWhere = (message, profile, forSomeoneElse = false) => {
-  const { gender, income, state, occupation, casteCategory, educationLevel, age, primaryIntent } = profile;
-  const dbWhere = { isActive: true, AND: [] };
-
-  if (!forSomeoneElse) {
-    if (gender && gender !== "unknown" && gender !== "female") {
-      dbWhere.AND.push({ isFemaleOnly: false });
-    }
-    if (age !== null && age !== undefined) {
-      dbWhere.AND.push({ OR: [{ minAge: null }, { minAge: { lte: age } }] });
-      dbWhere.AND.push({ OR: [{ maxAge: null }, { maxAge: { gte: age } }] });
-    }
-    if (occupation && occupation !== "unknown" && occupation !== "all" && hasOccupationEvidence(message, occupation)) {
-      dbWhere.AND.push({
-        OR: [
-          { allowedOccupations: { has: occupation } },
-          { allowedOccupations: { has: "all" } },
-        ],
-      });
-    }
-    if (casteCategory && casteCategory !== "unknown" && casteCategory !== "general") {
-      dbWhere.AND.push({
-        OR: [
-          { allowedCategories: { has: casteCategory } },
-          { allowedCategories: { has: "general" } },
-        ],
-      });
-    }
-    const hasEduEvidence = !educationLevel || educationLevel === "unknown" || EDUCATION_LEVEL_PATTERNS.some(({ pattern }) => pattern.test(message));
-    if (educationLevel && educationLevel !== "unknown" && hasEduEvidence) {
-      dbWhere.AND.push({
-        OR: [
-          { allowedEducationLevels: { has: educationLevel } },
-          { allowedEducationLevels: { has: "all" } },
-        ],
-      });
-    }
-    if (primaryIntent === "scholarship") {
-      dbWhere.AND.push({ isScholarship: true });
-    }
-    if (primaryIntent === "farmer" && (occupation === "unknown" || occupation === "all")) {
-      dbWhere.AND.push({
-        OR: [
-          { allowedOccupations: { has: "farmer" } },
-          { allowedOccupations: { has: "all" } },
-        ],
-      });
-    }
-  }
-
-  if (income !== null && income !== undefined) {
-    dbWhere.AND.push({ OR: [{ maxIncome: null }, { maxIncome: { gte: income } }] });
-  }
-  if (state && state !== "unknown") {
-    const normalizedState = normalizeState(state);
-    dbWhere.AND.push({
-      OR: [
-        { allowedStates: { has: "all" } },
-        { allowedStates: { has: normalizedState } },
-      ],
-    });
-  }
-
-  if (dbWhere.AND.length === 0) delete dbWhere.AND;
-  return dbWhere;
-};
-
 const getQueryEmbedding = async (queryText) => {
   if (!queryText || queryText.trim() === "") {
     queryText = "government scheme citizen welfare assistance";
   }
+
+  // 🆕 Cache embeddings by normalized query text. The local transformer
+  // (all-MiniLM-L6-v2) is CPU-bound and re-run on every single request even
+  // for near-identical prompts (e.g. multiple users asking "farmer scheme
+  // up") — this avoids repeating that work within the TTL window.
+  const cacheKey = queryText.toLowerCase().trim();
+  const cached = embeddingCache.get(cacheKey);
+  if (cached) {
+    logger.debug("Embedding cache hit");
+    return cached;
+  }
+
   const extractor = await getExtractor();
   const output = await extractor(queryText, { pooling: "mean", normalize: true });
-  return Array.from(output.data);
+  const embedding = Array.from(output.data);
+  embeddingCache.set(cacheKey, embedding);
+  return embedding;
 };
 
 const applyDiversityFilter = (results, primaryIntent) => {
@@ -162,7 +109,8 @@ export const recommendSchemes = async (message) => {
   const queryText = buildQueryText(trimmedMessage, profile, expandedQuery);
   const queryEmbedding = await getQueryEmbedding(queryText);
 
-  const dbWhere = buildDbWhere(trimmedMessage, profile, forSomeoneElse);
+  const dbWhere = buildSchemeFilters(profile, { forSomeoneElse });
+
   const dbCandidates = await prisma.scheme.findMany({
     where: dbWhere,
     select: {
@@ -197,6 +145,13 @@ export const recommendSchemes = async (message) => {
   }));
 
   const diverse = applyDiversityFilter(results, profile.primaryIntent);
+
+  logger.debug("Recommendation summary", {
+    primaryIntent: profile.primaryIntent,
+    candidatesBeforeScoring: dbCandidates.length,
+    candidatesAfterScoring: results.length,
+    candidatesAfterDiversity: diverse.length,
+  });
 
   return {
     profile: {

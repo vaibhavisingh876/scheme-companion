@@ -25,7 +25,10 @@ const runSyncLogicManually = async () => {
   }
 };
 
-export const startMySchemeCron = () => {
+// 🔥 IMPORTANT: Added 'async' here
+export const startMySchemeCron = async () => {
+  console.log("⏰ [CRON] Initializing MyScheme Cron Scheduler...");
+
   cron.schedule("0 */6 * * *", async () => {
     if (isSyncRunning) {
       console.warn("⚠️ Previous sync still running.");
@@ -52,5 +55,10 @@ export const startMySchemeCron = () => {
 
   console.log("✅ MyScheme Cron Started");
 
-  runSyncLogicManually();
+  // 🔥 Run manually immediately – try-catch se wrap kiya
+  try {
+    await runSyncLogicManually();
+  } catch (err) {
+    console.error("❌ Manual sync failed:", err);
+  }
 };

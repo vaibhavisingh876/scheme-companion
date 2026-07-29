@@ -1,4 +1,5 @@
 import prisma from "../config/prisma.js";
+import { buildSchemeFilters } from "../services/filterBuilder.js";
 
 /**
  * GET /api/schemes — paginated list of all active schemes
@@ -46,78 +47,17 @@ export const getAllSchemes = async (req, res) => {
 
 /**
  * POST /api/schemes/search — manual filter search
- *
- * FIX: Removed `{ allowedXxx: { isEmpty: true } }` from every OR block.
- * That fallback caused schemes with no data in those fields to match every
- * single query, flooding results with irrelevant schemes.
- * Now only schemes that explicitly allow "all" or the specific value match.
+ * Now uses the central filterBuilder for consistency with AI recommendations.
  */
 export const searchSchemes = async (req, res) => {
   try {
     const { gender, state, occupation, educationLevel, income, casteCategory } = req.body;
 
-    const andConditions = [{ isActive: true }];
-
-    if (gender) {
-      andConditions.push({
-        OR: [
-          { allowedGenders: { has: gender } },
-          { allowedGenders: { has: "all" } },
-        ],
-      });
-    }
-
-    if (state && state !== "All India" && state !== "unknown") {
-      const normalizedState = state.toLowerCase().replace(/\s/g, "");
-      andConditions.push({
-        OR: [
-          { allowedStates: { has: "all" } },
-          { allowedStates: { has: normalizedState } },
-        ],
-      });
-    }
-
-    if (occupation) {
-      andConditions.push({
-        OR: [
-          { allowedOccupations: { has: occupation } },
-          { allowedOccupations: { has: "all" } },
-        ],
-      });
-    }
-
-    if (educationLevel) {
-      andConditions.push({
-        OR: [
-          { allowedEducationLevels: { has: educationLevel } },
-          { allowedEducationLevels: { has: "all" } },
-        ],
-      });
-    }
-
-    if (income !== undefined && income !== null) {
-      const targetIncome = parseInt(income, 10);
-      if (!isNaN(targetIncome)) {
-        andConditions.push({
-          AND: [
-            { OR: [{ maxIncome: null }, { maxIncome: { gte: targetIncome } }] },
-            { OR: [{ minIncome: null }, { minIncome: { lte: targetIncome } }] },
-          ],
-        });
-      }
-    }
-
-    if (casteCategory) {
-      andConditions.push({
-        OR: [
-          { allowedCategories: { has: casteCategory } },
-          { allowedCategories: { has: "general" } },
-        ],
-      });
-    }
+    const profile = { gender, state, occupation, educationLevel, income, casteCategory };
+    const where = buildSchemeFilters(profile, { strictOccupation: true });
 
     const schemes = await prisma.scheme.findMany({
-      where: { AND: andConditions },
+      where,
       orderBy: { createdAt: "desc" },
       take: 100,
     });

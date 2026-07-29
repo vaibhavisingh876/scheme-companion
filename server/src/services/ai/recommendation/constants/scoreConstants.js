@@ -4,88 +4,73 @@
  * All numeric thresholds and score adjustments for the recommendation engine.
  */
 export const SCORE = {
-  // ── Base threshold ─────────────────────────────────────────────────────────
   DEFAULT_THRESHOLD: 45,
 
-  // ── Semantic similarity (cosine * 100 forms the base) ─────────────────────
   SEMANTIC_WEIGHT: 100,
 
-  // ── Keyword overlap layer ─────────────────────────────────────────────────
   KEYWORD_OVERLAP_PER_HIT: 2.5,
   KEYWORD_OVERLAP_MAX: 20,
 
-  // ── State scoring ─────────────────────────────────────────────────────────
   STATE_MATCH: 8,
   STATE_MISMATCH: -12,
   STATE_UNKNOWN_NON_NATIONAL_PENALTY: -15,
 
-  // ── Intent scoring ────────────────────────────────────────────────────────
   INTENT_MATCH: 12,
   HIGH_PRIORITY_INTENT: 26,
   INTENT_CATEGORY_MATCH_MULTIPLIER: 1.3,
 
-  // ── Occupation scoring ────────────────────────────────────────────────────
   OCCUPATION_MATCH: 7,
   OCCUPATION_MISMATCH: -12,
   OCCUPATION_KEYWORD_BOOST: 8,
 
-  // ── Gender scoring ────────────────────────────────────────────────────────
   GENDER_MISMATCH: -15,
   FEMALE_BONUS: 8,
 
-  // ── Income ────────────────────────────────────────────────────────────────
   INCOME_PENALTY: -20,
   INCOME_MATCH_BOOST: 5,
 
-  // ── Emotion ───────────────────────────────────────────────────────────────
   EMOTION_BONUS: 4,
 
-  // ── Age ───────────────────────────────────────────────────────────────────
   AGE_MISMATCH: -1000,
 
-  // ── Medical intent ────────────────────────────────────────────────────────
   MEDICAL_SEMANTIC_THRESHOLD: 50,
   HEALTH_INSURANCE_BOOST: 12,
 
-  // ── Widow scoring ─────────────────────────────────────────────────────────
   WIDOW_BONUS: 60,
-  WIDOW_PENALTY: -40,
+  WIDOW_PENALTY: -100,
 
-  // ── Caste / Category ──────────────────────────────────────────────────────
   CASTE_MATCH: 6,
   CATEGORY_MISMATCH: -25,
-  RESERVED_CATEGORY_PENALTY: -25,
 
-  // ── Education ─────────────────────────────────────────────────────────────
+  RESERVED_CATEGORY_PENALTY: -100,
+
   EDUCATION_MATCH: 6,
-  EDUCATION_CONFLICT: -35,
+  EDUCATION_CONFLICT: -100,
 
-  // ── Finance × Health cross-penalty ────────────────────────────────────────
   FINANCIAL_MISMATCH: -10,
   HEALTH_FINANCE_PENALTY: -18,
 
-  // ── Disability ────────────────────────────────────────────────────────────
   DISABILITY_REJECT: -1000,
 
-  // ── Hard rejects ─────────────────────────────────────────────────────────
   SPECIAL_REJECT: -1000,
   STARTUP_NON_MATCH_PENALTY: -1000,
 
-  // ── Misc boosts ───────────────────────────────────────────────────────────
   DISEASE_KEYWORD_BOOST: 35,
   UNRELATED_CATEGORY_PENALTY: -30,
 
-  // ── Generic scheme penalty ────────────────────────────────────────────────
-  GENERIC_SCHEME_PENALTY: -15,
+  // 🔧 Was -15. Real traffic showed this wasn't strong enough: generic
+  // savings/insurance products (Kisan Vikas Patra, PMJJBY, a community-toilet
+  // loan scheme) were outranking on-topic results because their semantic
+  // score alone (40-90) easily absorbed a -15 penalty. Bumped to make it a
+  // near-hard-reject for generic financial products when the user has a
+  // specific, high-confidence intent.
+  GENERIC_SCHEME_PENALTY: -45,
 
-  // ── Scholarship ───────────────────────────────────────────────────────────
   SCHOLARSHIP_EXACT_MATCH_BOOST: 12,
 
-  // ── Name / benefit keyword boost ─────────────────────────────────────────
   NAME_KEYWORD_BOOST: 10,
   BENEFIT_KEYWORD_BOOST: 5,
 
-  // ── Per-intent thresholds ─────────────────────────────────────────────────
   THRESHOLD_MAP: {
     treatment:          34,
     medical:            34,
@@ -94,7 +79,7 @@ export const SCORE = {
     disability:         38,
     maternity:          60,
     loan:               48,
-    scholarship:        46,
+    scholarship:        50,  // increased from 46 to filter more
     "startup-funding":  48,
     farmer:             43,
     job:                46,
@@ -106,7 +91,6 @@ export const SCORE = {
     default:            45,
   },
 
-  // ── Intent → allowed scheme categories ────────────────────────────────────
   INTENT_ALLOWED_CATEGORIES: {
     farmer: new Set([
       "agriculture, rural & environment",

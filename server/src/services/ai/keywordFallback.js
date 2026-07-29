@@ -13,6 +13,13 @@
  * - Added NRI / overseas scheme exclusion pattern
  * - More robust income-to-intent signals (e.g. "bpl" → low income flag)
  * - Added age-from-text extraction as a fallback
+ * - 🆕 Forced BPL → income=60000 fallback (LLM extraction of this was
+ *   inconsistent — worked for "I am BPL" but not "Main BPL category mein hoon")
+ * - 🆕 Loosened third-party detection to tolerate words between the
+ *   family-member mention and the medical term (e.g. "father (age 64) ko
+ *   lung cancer hai" was not matching the old rigid patterns)
+ * - 🆕 Explicit age extraction for the beneficiary, instead of always
+ *   falling back to a coarse age range
  */
 
 import { PATTERNS } from "./recommendation/constants/patternConstants.js";
@@ -75,6 +82,13 @@ const CASTE_CATEGORY_PATTERNS = [
   { pattern: /general category|general caste|open category|unreserved|upper caste/i,  value: "general" },
 ];
 
+// 🔧 The old THIRD_PARTY_PATTERNS required the family-member word to sit
+// *directly* next to the medical term ("father ka ilaaj"). Real messages
+// like "Mere father (age 64) ko lung cancer hai" break that — there's a
+// parenthetical age in between. Kept the original tight patterns (still
+// useful for precision) and added a looser one that tolerates up to ~30
+// characters of anything in between, anchored on a family-member word and a
+// medical/need term appearing near each other.
 const THIRD_PARTY_PATTERNS = [
   /for my (father|dad|mother|mom|brother|sister|husband|wife|son|daughter|child|children|family member)/i,
   /for (his|her|their) (father|mother|treatment|cancer|surgery)/i,
@@ -84,6 +98,9 @@ const THIRD_PARTY_PATTERNS = [
   /need loan for (my|his|her|their) (father|mother|dad|mom|husband|wife|child|children|family) ('s)? (treatment|cancer|surgery)/i,
   /my (pregnant|wife|patni).*(delivery|hospital|baby|newborn)/i,
   /(meri|mere) (patni|biwi).*(prasav|delivery|hospital|baby)/i,
+  // 🆕 loose fallback: family-member word ... (up to ~30 chars of anything,
+  // including a parenthetical age) ... medical/need term
+  /\b(father|dad|papa|pitaji|mother|mom|mummy|matashree|husband|pati|wife|patni|son|beta|daughter|beti|brother|bhai|sister|behen)\b[^.!?\n]{0,30}\b(cancer|ilaaj|treatment|operation|surgery|hospital|bimari|dawai|chemo|tumou?r)\b/i,
 ];
 
 export const isThirdPartyRequest = (message) =>
@@ -111,6 +128,21 @@ export const extractBeneficiaryProfile = (message) => {
   } else if (/(wife|patni|biwi|pregnant wife)\b/i.test(message)) {
     profile.minAge = 18;
     profile.maxAge = 45;
+  }
+
+  // 🆕 If an explicit age is stated anywhere in the message (e.g. "father
+  // (age 64)", "62 saal ke", "aged 70"), prefer that exact number over the
+  // coarse relation-based range above — it's strictly more accurate.
+  const explicitAgeMatch =
+    message.match(/age\s*[:\-]?\s*(\d{1,3})/i) ||
+    message.match(/\b(\d{1,3})\s*(saal|salaa|years?\s*old|yrs?\s*old)\b/i) ||
+    message.match(/\baged?\s*(\d{1,3})\b/i);
+  if (explicitAgeMatch) {
+    const explicitAge = parseInt(explicitAgeMatch[1], 10);
+    if (!Number.isNaN(explicitAge) && explicitAge > 0 && explicitAge <= 120) {
+      profile.minAge = explicitAge;
+      profile.maxAge = explicitAge;
+    }
   }
 
   return profile;
@@ -285,6 +317,19 @@ if (PATTERNS.special.pregnancy.test(message)) {
     } else if (/\bkisan\b|\bkisaan\b|\bfarmer\b.*\b(main|mai|mera|meri)\b|\b(main|mai)\b.*\bkisan\b/i.test(message)) {
       // Don't assume gender for farmer — leave as unknown (many female farmers)
     }
+  }
+
+  // 🆕 15. BPL → income estimate fallback. The LLM's own income parsing
+  // instructions cover this ("below poverty line / bpl → estimate 60000"),
+  // but in practice it fired inconsistently across phrasings (worked for
+  // "I am BPL", missed "Main BPL category mein hoon"). Force it here so
+  // income-based filtering/scoring always has a number when BPL is stated,
+  // regardless of how the LLM handled it.
+  if (
+    (patched.income === null || patched.income === undefined) &&
+    /\bbpl\b|below\s*poverty\s*line|\bgarib\b|\bgareeb\b/i.test(message)
+  ) {
+    patched.income = 60000;
   }
 
   return patched;
