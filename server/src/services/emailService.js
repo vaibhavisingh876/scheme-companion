@@ -39,3 +39,5 @@ export const sendMail = async ({ to, subject, html }) => {
     html,
   });
 };
+// emailService.js (add this export)
+export const canSendEmails = () => !!transporter;

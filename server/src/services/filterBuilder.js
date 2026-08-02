@@ -1,126 +1,77 @@
-// src/services/filterBuilder.js
-import { normalizeState } from "./ai/groqService.js";
+// searchTextBuilder.js
 
-export const buildSchemeFilters = (profile, options = {}) => {
-  const { forSomeoneElse = false, strictOccupation = false } = options;
-  const {
-    gender, age, occupation, state, income, casteCategory,
-    educationLevel, primaryIntent
-  } = profile;
+/**
+ * Build a concise searchText for embedding generation.
+ *
+ * The searchText is used exclusively for semantic similarity (cosine).
+ * It should be a dense, keyword‑rich representation of the scheme,
+ * but NOT a dump of the entire eligibility document.
+ *
+ * We include:
+ *   - Title (repeated 2x for emphasis)
+ *   - Description
+ *   - Benefits
+ *   - Short Eligibility Summary (first 200 chars, cleaned)
+ *   - Tags
+ *   - Category
+ *   - State (normalised to match query normalisation)
+ *
+ * All fields are taken from structured database columns.
+ * No text inference, no regex, no keyword extraction.
+ */
+export const buildSearchText = (scheme) => {
+  // If a precomputed searchText exists and is substantial, use it
+  if (scheme.searchText && scheme.searchText.trim().length > 50) {
+    return scheme.searchText.trim();
+  }
 
-  const andConditions = [{ isActive: true }];
+  // Otherwise, build from available fields
+  const name = scheme.name || "";
+  const description = scheme.description || "";
+  const benefits = scheme.benefits || "";
+  let eligibility = scheme.eligibility || "";
 
-  // 1. GENDER (exclude female-only if user is male)
-  if (gender && gender !== "unknown") {
-    if (gender === "male") {
-      andConditions.push({ isFemaleOnly: false });
+  // Truncate eligibility to a short summary (200 chars) to avoid diluting signal
+  if (eligibility.length > 200) {
+    eligibility = eligibility.substring(0, 200).trim();
+    // Try to cut at last complete sentence/word
+    const lastSpace = eligibility.lastIndexOf(" ");
+    if (lastSpace > 100) {
+      eligibility = eligibility.substring(0, lastSpace);
     }
-    // If female, we let female-only pass (no filter)
+    eligibility += "...";
   }
 
-  // 2. AGE
-  if (age !== null && age !== undefined) {
-    andConditions.push({
-      OR: [
-        { minAge: null },
-        { minAge: { lte: age } }
-      ]
-    });
-    andConditions.push({
-      OR: [
-        { maxAge: null },
-        { maxAge: { gte: age } }
-      ]
-    });
+  const tags = (scheme.tags || []).join(" ");
+  const category = scheme.category || "";
+  const state = scheme.state || "";
+
+  // Normalise state exactly the same way as in groqService.js
+  const normalisedState = String(state).toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  // Repeat name for stronger signal (but not excessively)
+  const nameRepeated = [name, name].filter(Boolean).join(" ");
+
+  // Build a concise, keyword‑rich string
+  const parts = [
+    nameRepeated,
+    description,
+    benefits,
+    eligibility,
+    `tags: ${tags}`,
+    `category: ${category}`,
+    `state: ${normalisedState}`,
+  ];
+
+  let result = parts.filter(Boolean).join(" ").toLowerCase();
+
+  // Collapse whitespace
+  result = result.replace(/\s+/g, " ").trim();
+
+  // Ultimate safety: never return empty
+  if (!result) {
+    result = "scheme for citizen welfare";
   }
 
-  // 3. OCCUPATION (Skip if forSomeoneElse or no evidence)
-  if (occupation && occupation !== "unknown" && occupation !== "all") {
-    if (!forSomeoneElse || strictOccupation) {
-      andConditions.push({
-        OR: [
-          { allowedOccupations: { has: occupation } },
-          { allowedOccupations: { has: "all" } }
-        ]
-      });
-    }
-  }
-
-  // 4. STATE
-  if (state && state !== "unknown") {
-    const normalized = normalizeState(state);
-    andConditions.push({
-      OR: [
-        { allowedStates: { has: "all" } },
-        { allowedStates: { has: normalized } }
-      ]
-    });
-  }
-
-  // 5. INCOME
-  if (income !== null && income !== undefined) {
-    andConditions.push({
-      OR: [{ maxIncome: null }, { maxIncome: { gte: income } }]
-    });
-    // Min income is less critical, but keeping it safe
-    andConditions.push({
-      OR: [{ minIncome: null }, { minIncome: { lte: income } }]
-    });
-  }
-
-  // 6. CASTE
-  if (casteCategory && casteCategory !== "unknown" && casteCategory !== "general") {
-    // Specific reserved-category user: allow schemes for their category, general, or all.
-    andConditions.push({
-      OR: [
-        { allowedCategories: { has: casteCategory } },
-        { allowedCategories: { has: "general" } },
-        { allowedCategories: { has: "all" } }
-      ]
-    });
-  } else if (casteCategory === "general") {
-    // 🆕 DEFENSE IN DEPTH: previously general users had NO hard filter here at
-    // all and relied entirely on scoringEngine's text-based reject — which
-    // was silently broken (see scoringEngine.js comments). Now, at the DB
-    // query level itself, general-category users never even fetch a scheme
-    // that has declared a restricted allowedCategories list not including
-    // "general"/"all". Schemes with an *empty* allowedCategories array are
-    // treated as unrestricted and still pass through (the scoring-layer
-    // text/name reject in scoringEngine.js is the safety net for those).
-    andConditions.push({
-      OR: [
-        { allowedCategories: { isEmpty: true } },
-        { allowedCategories: { has: "general" } },
-        { allowedCategories: { has: "all" } }
-      ]
-    });
-  }
-
-  // 7. EDUCATION
-  // NOTE: this is intentionally strict — a scheme with an empty
-  // allowedEducationLevels array is EXCLUDED once the user has a known
-  // education level, not treated as "unrestricted". That's what makes
-  // "higher-ed users never see school-level schemes" hold even for schemes
-  // whose ingestion pipeline never populated this array. The tradeoff is
-  // that some genuinely unrestricted schemes with an empty array will be
-  // hidden too — safer default, but worth knowing about (see write-up).
-  if (educationLevel && educationLevel !== "unknown") {
-    andConditions.push({
-      OR: [
-        { allowedEducationLevels: { has: educationLevel } },
-        { allowedEducationLevels: { has: "all" } }
-      ]
-    });
-  }
-
-  // 8. INTENT (Scholarship flag boost)
-  if (primaryIntent === "scholarship") {
-    andConditions.push({ isScholarship: true });
-  }
-
-  // Remove empty AND
-  if (andConditions.length === 0) return {};
-  if (andConditions.length === 1 && andConditions[0].isActive) return { isActive: true };
-
-  return { AND: andConditions };
+  return result;
 };

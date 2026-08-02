@@ -1,3 +1,4 @@
+// AuthPage.jsx (complete – GeometricPanel included)
 import React, { useState, useContext } from "react";
 import { loginUser, registerUser } from "../services/api";
 import { AuthContext } from "../context/AuthContext";
@@ -126,7 +127,7 @@ const Field = ({ label, type, value, onChange, placeholder, autoComplete }) => (
 );
 
 /* ── Main component ──────────────────────────────────────────────── */
-const AuthPage = ({ onAuthSuccess }) => {
+const AuthPage = ({ onAuthSuccess, switchToForgot }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -149,9 +150,10 @@ const AuthPage = ({ onAuthSuccess }) => {
       if (isLogin) {
         const data = await loginUser(email, password);
         if (data.success) {
-          localStorage.setItem("userEmail", email);
-          setToken(data.token);
+          setToken(data.accessToken);
           onAuthSuccess();
+        } else {
+          setError(data.message || "Login failed.");
         }
       } else {
         const data = await registerUser(email, password);
@@ -161,6 +163,8 @@ const AuthPage = ({ onAuthSuccess }) => {
           setPassword("");
           setConfirmPassword("");
           setError("__success__Account created! Please sign in.");
+        } else {
+          setError(data.message || "Registration failed.");
         }
       }
     } catch (err) {
@@ -191,7 +195,6 @@ const AuthPage = ({ onAuthSuccess }) => {
       {/* Right form panel */}
       <div className="flex-1 flex items-center justify-center px-6 py-16">
         <div className="w-full max-w-md animate-fade-up">
-
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2 mb-10">
             <div
@@ -281,6 +284,19 @@ const AuthPage = ({ onAuthSuccess }) => {
                 : (isLogin ? "Sign in" : "Create account")}
             </button>
           </form>
+
+          {/* Forgot password link */}
+          {isLogin && switchToForgot && (
+            <div className="text-center mt-4">
+              <button
+                onClick={switchToForgot}
+                className="text-xs font-semibold underline underline-offset-2"
+                style={{ color: "var(--saffron)" }}
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
 
           <p className="text-sm text-center mt-6" style={{ color: "var(--muted)" }}>
             {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}

@@ -1,9 +1,9 @@
+// FindSchemes.jsx (updated – full file)
 import { useState, useCallback } from "react";
-import axios from "axios";
+import { getAIRecommendations, searchSchemes } from "../services/api";
 import ProfileCard from "../components/ProfileCard.jsx";
 import RecommendationCard from "../components/RecommendationCard.jsx";
 
-// How many results to show at once before "Load more"
 const PAGE_SIZE = 8;
 
 const FindSchemes = ({ onSaveScheme, savedIds = [] }) => {
@@ -13,30 +13,60 @@ const FindSchemes = ({ onSaveScheme, savedIds = [] }) => {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [searchMode, setSearchMode] = useState("ai"); // "ai" or "manual"
+
+  // Manual filter states
+  const [filters, setFilters] = useState({
+    gender: "",
+    state: "",
+    occupation: "",
+    educationLevel: "",
+    income: "",
+    casteCategory: "",
+  });
 
   const focusInput = (e) => (e.target.style.borderColor = "var(--saffron)");
   const blurInput  = (e) => (e.target.style.borderColor = "var(--border)");
 
-  const handleSearch = async (e) => {
+  const handleAISearch = async (e) => {
     e.preventDefault();
     if (!aiMessage.trim()) return;
-
+    setLoading(true);
+    setHasSearched(true);
+    setProfile(null);
+    setSchemes([]);
+    setVisibleCount(PAGE_SIZE);
     try {
-      setLoading(true);
-      setHasSearched(true);
-      setProfile(null);
-      setSchemes([]);
-      setVisibleCount(PAGE_SIZE); // reset pagination on new search
-
-      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-      const response = await axios.post(`${API_URL}/api/ai/extract-profile`, {
-        message: aiMessage,
-      });
-
-      setProfile(response.data.profile || null);
-      setSchemes(response.data.schemes || []);
+      const response = await getAIRecommendations(aiMessage);
+      setProfile(response.profile || null);
+      setSchemes(response.schemes || []);
     } catch (error) {
-      console.error("Search failed:", error);
+      console.error("AI search failed:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleManualSearch = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setHasSearched(true);
+    setProfile(null);
+    setSchemes([]);
+    setVisibleCount(PAGE_SIZE);
+    try {
+      // Build filters object – only send defined values
+      const reqFilters = {};
+      if (filters.gender) reqFilters.gender = filters.gender;
+      if (filters.state) reqFilters.state = filters.state;
+      if (filters.occupation) reqFilters.occupation = filters.occupation;
+      if (filters.educationLevel) reqFilters.educationLevel = filters.educationLevel;
+      if (filters.casteCategory) reqFilters.casteCategory = filters.casteCategory;
+      if (filters.income) reqFilters.income = Number(filters.income);
+      const response = await searchSchemes(reqFilters);
+      setSchemes(response.schemes || []);
+    } catch (error) {
+      console.error("Manual search failed:", error);
     } finally {
       setLoading(false);
     }
@@ -49,70 +79,145 @@ const FindSchemes = ({ onSaveScheme, savedIds = [] }) => {
   const visibleSchemes = schemes.slice(0, visibleCount);
   const remaining = schemes.length - visibleCount;
 
+  // Quick options (can be extended)
+  const states = ["", "uttarpradesh", "maharashtra", "gujarat", "rajasthan", "karnataka", "delhi", "bihar", "westbengal", "tamilnadu"];
+  const occupations = ["", "student", "farmer", "worker", "startup", "housewife", "unemployed", "widow"];
+  const genders = ["", "male", "female", "other"];
+  const educationLevels = ["", "higher_education", "school"];
+  const casteCategories = ["", "general", "sc", "st", "obc", "minority"];
+
   return (
     <div className="max-w-3xl mx-auto space-y-8 animate-fade-up">
-
-      {/* ── Page header ──────────────────────────────────────────────── */}
       <div>
-        <h1
-          className="text-2xl font-black tracking-tight"
-          style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", color: "var(--ink)" }}
-        >
-          Find Schemes
-        </h1>
-        <p className="text-sm mt-1" style={{ color: "var(--muted)" }}>
-          Describe your situation and our AI will match you with relevant government schemes.
-        </p>
+        <h1 className="text-2xl font-black" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", color: "var(--ink)" }}>Find Schemes</h1>
+        <p className="text-sm mt-1" style={{ color: "var(--muted)" }}>Describe your situation or use advanced filters.</p>
       </div>
 
-      {/* ── Search panel ─────────────────────────────────────────────── */}
-      <div
-        className="rounded-2xl p-6"
-        style={{ background: "var(--panel)", border: "1px solid var(--border)" }}
-      >
-        <form onSubmit={handleSearch} className="space-y-4">
-          <p className="text-sm" style={{ color: "var(--muted)" }}>
-            Mention your state, occupation, age, income, caste category, and what kind of help you need.
-            The more detail, the better the match.
-          </p>
-          <textarea
-            value={aiMessage}
-            onChange={(e) => setAiMessage(e.target.value)}
-            placeholder="e.g. I am a 22-year-old engineering student from Punjab, general category, family income around 3 lakh. I want to pursue higher studies but don't have money."
-            rows={4}
-            className="w-full resize-none text-sm rounded-xl px-4 py-3 transition-all outline-none"
-            style={{
-              background: "var(--surface)",
-              border: "1.5px solid var(--border)",
-              color: "var(--ink)",
-              fontFamily: "'Inter', sans-serif",
-              lineHeight: "1.6",
-            }}
-            onFocus={focusInput}
-            onBlur={blurInput}
-          />
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={loading || !aiMessage.trim()}
-              className="text-sm font-bold px-8 py-3 rounded-xl transition-all"
+      {/* Mode toggle */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setSearchMode("ai")}
+          className={`text-xs font-bold px-4 py-2 rounded-lg ${searchMode === "ai" ? "text-white" : ""}`}
+          style={{
+            background: searchMode === "ai" ? "var(--saffron)" : "var(--panel)",
+            border: "1px solid var(--border)",
+            color: searchMode === "ai" ? "#fff" : "var(--ink)",
+          }}
+        >
+          AI Assistant
+        </button>
+        <button
+          onClick={() => setSearchMode("manual")}
+          className={`text-xs font-bold px-4 py-2 rounded-lg ${searchMode === "manual" ? "text-white" : ""}`}
+          style={{
+            background: searchMode === "manual" ? "var(--saffron)" : "var(--panel)",
+            border: "1px solid var(--border)",
+            color: searchMode === "manual" ? "#fff" : "var(--ink)",
+          }}
+        >
+          Advanced Filters
+        </button>
+      </div>
+
+      {/* Search panel */}
+      <div className="rounded-2xl p-6" style={{ background: "var(--panel)", border: "1px solid var(--border)" }}>
+        {searchMode === "ai" ? (
+          <form onSubmit={handleAISearch} className="space-y-4">
+            <p className="text-sm" style={{ color: "var(--muted)" }}>Mention your state, occupation, age, income, caste category, and what kind of help you need. The more detail, the better the match.</p>
+            <textarea
+              value={aiMessage}
+              onChange={(e) => setAiMessage(e.target.value)}
+              placeholder="e.g. I am a 22-year-old engineering student from Punjab, general category, family income around 3 lakh. I want to pursue higher studies but don't have money."
+              rows={4}
+              className="w-full resize-none text-sm rounded-xl px-4 py-3 transition-all outline-none"
               style={{
-                background: loading || !aiMessage.trim() ? "#C5A88A" : "var(--saffron)",
-                color: "#fff",
-                fontFamily: "'Plus Jakarta Sans', sans-serif",
-                cursor: loading || !aiMessage.trim() ? "not-allowed" : "pointer",
+                background: "var(--surface)",
+                border: "1.5px solid var(--border)",
+                color: "var(--ink)",
+                fontFamily: "'Inter', sans-serif",
+                lineHeight: "1.6",
               }}
-              onMouseEnter={(e) => {
-                if (!loading && aiMessage.trim()) e.target.style.background = "var(--saffron-dk)";
-              }}
-              onMouseLeave={(e) => {
-                if (!loading && aiMessage.trim()) e.target.style.background = "var(--saffron)";
-              }}
-            >
-              {loading ? "Searching…" : "Find matching schemes →"}
-            </button>
-          </div>
-        </form>
+              onFocus={focusInput}
+              onBlur={blurInput}
+            />
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={loading || !aiMessage.trim()}
+                className="text-sm font-bold px-8 py-3 rounded-xl transition-all"
+                style={{
+                  background: loading || !aiMessage.trim() ? "#C5A88A" : "var(--saffron)",
+                  color: "#fff",
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
+                  cursor: loading || !aiMessage.trim() ? "not-allowed" : "pointer",
+                }}
+              >
+                {loading ? "Searching…" : "Find matching schemes →"}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={handleManualSearch} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-semibold" style={{ color: "var(--muted)" }}>Gender</label>
+                <select value={filters.gender} onChange={(e) => setFilters({...filters, gender: e.target.value})} className="w-full rounded-xl px-3 py-2.5 text-sm border" style={{ border: "1.5px solid var(--border)", background: "var(--surface)", color: "var(--ink)" }}>
+                  {genders.map(g => <option key={g} value={g}>{g || "Any"}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold" style={{ color: "var(--muted)" }}>State</label>
+                <select value={filters.state} onChange={(e) => setFilters({...filters, state: e.target.value})} className="w-full rounded-xl px-3 py-2.5 text-sm border" style={{ border: "1.5px solid var(--border)", background: "var(--surface)", color: "var(--ink)" }}>
+                  {states.map(s => <option key={s} value={s}>{s || "Any"}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold" style={{ color: "var(--muted)" }}>Occupation</label>
+                <select value={filters.occupation} onChange={(e) => setFilters({...filters, occupation: e.target.value})} className="w-full rounded-xl px-3 py-2.5 text-sm border" style={{ border: "1.5px solid var(--border)", background: "var(--surface)", color: "var(--ink)" }}>
+                  {occupations.map(o => <option key={o} value={o}>{o || "Any"}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold" style={{ color: "var(--muted)" }}>Education</label>
+                <select value={filters.educationLevel} onChange={(e) => setFilters({...filters, educationLevel: e.target.value})} className="w-full rounded-xl px-3 py-2.5 text-sm border" style={{ border: "1.5px solid var(--border)", background: "var(--surface)", color: "var(--ink)" }}>
+                  {educationLevels.map(el => <option key={el} value={el}>{el || "Any"}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold" style={{ color: "var(--muted)" }}>Caste Category</label>
+                <select value={filters.casteCategory} onChange={(e) => setFilters({...filters, casteCategory: e.target.value})} className="w-full rounded-xl px-3 py-2.5 text-sm border" style={{ border: "1.5px solid var(--border)", background: "var(--surface)", color: "var(--ink)" }}>
+                  {casteCategories.map(c => <option key={c} value={c}>{c || "Any"}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold" style={{ color: "var(--muted)" }}>Annual Income (₹)</label>
+                <input
+                  type="number"
+                  placeholder="e.g. 500000"
+                  value={filters.income}
+                  onChange={(e) => setFilters({...filters, income: e.target.value})}
+                  className="w-full rounded-xl px-3 py-2.5 text-sm border"
+                  style={{ border: "1.5px solid var(--border)", background: "var(--surface)", color: "var(--ink)" }}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={loading}
+                className="text-sm font-bold px-8 py-3 rounded-xl transition-all"
+                style={{
+                  background: loading ? "#C5A88A" : "var(--saffron)",
+                  color: "#fff",
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
+                  cursor: loading ? "not-allowed" : "pointer",
+                }}
+              >
+                {loading ? "Searching…" : "Search Schemes →"}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
 
       {/* ── Loading state ────────────────────────────────────────────── */}

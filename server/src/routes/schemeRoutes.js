@@ -3,7 +3,7 @@ import { getAllSchemes, searchSchemes, } from "../controllers/schemecontroller.j
 import { protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
-router.use(protect); 
+
 router.get("/", getAllSchemes);
 router.post("/search", searchSchemes);
 

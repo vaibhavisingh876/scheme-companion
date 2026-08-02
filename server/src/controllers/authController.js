@@ -2,7 +2,7 @@ import prisma from "../config/prisma.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "node:crypto";
-import { sendMail } from "../services/emailService.js";
+import { sendMail,canSendEmails } from "../services/emailService.js";
 import { logger } from "../utils/logger.js";
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -45,24 +45,42 @@ export const register = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const verificationToken = crypto.randomBytes(32).toString("hex");
-    const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+    
+    // Determine if we can actually send emails
+    const emailEnabled = canSendEmails();
+    
+    const verificationToken = emailEnabled ? crypto.randomBytes(32).toString("hex") : null;
+    const verificationExpiry = emailEnabled ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null;
+    const isVerified = !emailEnabled; // auto-verify if no SMTP
 
-    await prisma.user.create({
-      data: { email, password: hashedPassword, verificationToken, verificationExpiry },
+    const user = await prisma.user.create({
+      data: { 
+        email, 
+        password: hashedPassword, 
+        verificationToken, 
+        verificationExpiry,
+        isVerified
+      },
     });
 
-    const verifyUrl = `${CLIENT_URL}/verify-email?token=${verificationToken}`;
-    await sendMail({
-      to: email,
-      subject: "Verify your email",
-      html: `<p>Welcome! Click <a href="${verifyUrl}">here</a> to verify your email. This link expires in 24 hours.</p>`,
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: "Registration successful. Please check your email to verify your account.",
-    });
+    if (emailEnabled) {
+      const verifyUrl = `${CLIENT_URL}/verify-email?token=${verificationToken}`;
+      await sendMail({
+        to: email,
+        subject: "Verify your email",
+        html: `<p>Welcome! Click <a href="${verifyUrl}">here</a> to verify your email. This link expires in 24 hours.</p>`,
+      });
+      return res.status(201).json({
+        success: true,
+        message: "Registration successful. Please check your email to verify your account.",
+      });
+    } else {
+      // No SMTP: user is already verified
+      return res.status(201).json({
+        success: true,
+        message: "Registration successful. You can log in now.",
+      });
+    }
   } catch (error) {
     logger.error("Registration Error:", error);
     if (error.code === "P2002") {
