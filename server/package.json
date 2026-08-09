@@ -5,13 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon src/index.js",
-    "start": "node src/index.js",
+    "start": "npx prisma db push && node src/index.js",
     "postinstall": "prisma generate",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "prisma": {
-  "seed": "node prisma/seed.js"
-},
+    "seed": "node prisma/seed.js"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -34,6 +34,7 @@
     "node-cron": "^4.2.1",
     "nodemailer": "^9.0.4",
     "openai": "^6.39.0",
+    "pg": "^8.23.0",
     "prisma": "^5.22.0",
     "zod": "^4.4.3"
   },
