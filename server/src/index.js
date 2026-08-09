@@ -12,7 +12,7 @@ import bookmarkRoutes from "./routes/bookmarkRoutes.js";
 import { apiLimiter } from "./middleware/rateLimiter.js";
 import dns from "dns";
 
-dns.setDefaultResultOrder("ipv4first");
+// dns.setDefaultResultOrder("ipv4first");
 
 // ─── Validate required environment variables ────────────────────────────
 const requiredEnvVars = [

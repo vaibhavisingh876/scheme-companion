@@ -1,77 +1,74 @@
-// searchTextBuilder.js
+// Inline education mapping
+const getEducationValues = (level) => {
+  if (!level || level === "unknown") return [];
+  const l = level.toLowerCase();
+  if (l === "higher_education") return ["graduate", "post graduate", "phd", "professional", "diploma"];
+  if (l === "school") return ["10th", "12th", "iti", "below 10th"];
+  return [l];
+};
 
-/**
- * Build a concise searchText for embedding generation.
- *
- * The searchText is used exclusively for semantic similarity (cosine).
- * It should be a dense, keyword‑rich representation of the scheme,
- * but NOT a dump of the entire eligibility document.
- *
- * We include:
- *   - Title (repeated 2x for emphasis)
- *   - Description
- *   - Benefits
- *   - Short Eligibility Summary (first 200 chars, cleaned)
- *   - Tags
- *   - Category
- *   - State (normalised to match query normalisation)
- *
- * All fields are taken from structured database columns.
- * No text inference, no regex, no keyword extraction.
- */
-export const buildSearchText = (scheme) => {
-  // If a precomputed searchText exists and is substantial, use it
-  if (scheme.searchText && scheme.searchText.trim().length > 50) {
-    return scheme.searchText.trim();
+export const buildSchemeFilters = (profile, options = {}) => {
+  const conditions = [];
+  conditions.push({ isActive: true });
+
+  // ── STATE ──────────────────────────────
+  if (profile.state && profile.state !== "unknown") {
+    const userState = profile.state.toLowerCase().replace(/[^a-z0-9]/g, "");
+    conditions.push({
+      OR: [
+        { allowedStates: { has: "all" } },
+        { allowedStates: { has: userState } },
+        { allowedStates: { isEmpty: true } },
+      ],
+    });
   }
 
-  // Otherwise, build from available fields
-  const name = scheme.name || "";
-  const description = scheme.description || "";
-  const benefits = scheme.benefits || "";
-  let eligibility = scheme.eligibility || "";
+  // ── GENDER ─────────────────────────────
+  if (profile.gender && profile.gender !== "unknown") {
+    conditions.push({
+      OR: [
+        { allowedGenders: { has: "all" } },
+        { allowedGenders: { has: profile.gender.toLowerCase() } },
+        { allowedGenders: { isEmpty: true } },
+      ],
+    });
+  }
 
-  // Truncate eligibility to a short summary (200 chars) to avoid diluting signal
-  if (eligibility.length > 200) {
-    eligibility = eligibility.substring(0, 200).trim();
-    // Try to cut at last complete sentence/word
-    const lastSpace = eligibility.lastIndexOf(" ");
-    if (lastSpace > 100) {
-      eligibility = eligibility.substring(0, lastSpace);
+  // ── EDUCATION ─────────────────────────
+  if (profile.educationLevel && profile.educationLevel !== "unknown") {
+    const eduValues = getEducationValues(profile.educationLevel);
+    if (eduValues.length > 0) {
+      conditions.push({
+        OR: [
+          { allowedEducationLevels: { hasSome: eduValues } },
+          { allowedEducationLevels: { has: "all" } },
+          { allowedEducationLevels: { isEmpty: true } },
+        ],
+      });
     }
-    eligibility += "...";
   }
 
-  const tags = (scheme.tags || []).join(" ");
-  const category = scheme.category || "";
-  const state = scheme.state || "";
-
-  // Normalise state exactly the same way as in groqService.js
-  const normalisedState = String(state).toLowerCase().replace(/[^a-z0-9]/g, "");
-
-  // Repeat name for stronger signal (but not excessively)
-  const nameRepeated = [name, name].filter(Boolean).join(" ");
-
-  // Build a concise, keyword‑rich string
-  const parts = [
-    nameRepeated,
-    description,
-    benefits,
-    eligibility,
-    `tags: ${tags}`,
-    `category: ${category}`,
-    `state: ${normalisedState}`,
-  ];
-
-  let result = parts.filter(Boolean).join(" ").toLowerCase();
-
-  // Collapse whitespace
-  result = result.replace(/\s+/g, " ").trim();
-
-  // Ultimate safety: never return empty
-  if (!result) {
-    result = "scheme for citizen welfare";
+  // ── CASTE ──────────────────────────────
+  if (profile.casteCategory && profile.casteCategory !== "unknown") {
+    conditions.push({
+      OR: [
+        { allowedCategories: { has: "all" } },
+        { allowedCategories: { has: profile.casteCategory.toLowerCase() } },
+        { allowedCategories: { isEmpty: true } },
+      ],
+    });
   }
 
-  return result;
+  // ── OCCUPATION (ONLY when explicitly asked) ──
+  if (profile.occupation && profile.occupation !== "unknown" && options.strictOccupation) {
+    conditions.push({
+      OR: [
+        { allowedOccupations: { has: profile.occupation.toLowerCase() } },
+        { allowedOccupations: { has: "all" } },
+        { allowedOccupations: { isEmpty: true } },
+      ],
+    });
+  }
+
+  return { AND: conditions };
 };

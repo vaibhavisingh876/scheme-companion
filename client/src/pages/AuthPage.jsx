@@ -1,9 +1,7 @@
-// AuthPage.jsx (complete – GeometricPanel included)
 import React, { useState, useContext } from "react";
 import { loginUser, registerUser } from "../services/api";
 import { AuthContext } from "../context/AuthContext";
 
-/* ── Geometric SVG panel ─────────────────────────────────────────── */
 const GeometricPanel = () => (
   <div
     className="hidden lg:flex relative flex-col justify-between p-12 overflow-hidden"
@@ -18,13 +16,12 @@ const GeometricPanel = () => (
       {Array.from({ length: 24 }).map((_, i) => {
         const angle = (i * 360) / 24;
         const rad = (angle * Math.PI) / 180;
-        const x2 = 300 + 280 * Math.cos(rad);
-        const y2 = 300 + 280 * Math.sin(rad);
         return (
           <line
             key={i}
             x1="300" y1="300"
-            x2={x2} y2={y2}
+            x2={300 + 280 * Math.cos(rad)}
+            y2={300 + 280 * Math.sin(rad)}
             stroke="#E07B39"
             strokeWidth={i % 3 === 0 ? 1.5 : 0.5}
           />
@@ -34,15 +31,6 @@ const GeometricPanel = () => (
       <circle cx="300" cy="300" r="140" fill="none" stroke="#E07B39" strokeWidth="0.5" />
       <circle cx="300" cy="300" r="220" fill="none" stroke="#E07B39" strokeWidth="0.5" />
     </svg>
-
-    <div
-      className="absolute top-8 right-8 w-16 h-16 rounded-xl opacity-30"
-      style={{ background: "var(--saffron)", transform: "rotate(15deg)" }}
-    />
-    <div
-      className="absolute bottom-24 left-8 w-10 h-10 rounded-lg opacity-20"
-      style={{ background: "var(--saffron)", transform: "rotate(-10deg)" }}
-    />
 
     <div className="relative z-10">
       <div
@@ -97,7 +85,6 @@ const GeometricPanel = () => (
   </div>
 );
 
-/* ── Input field ─────────────────────────────────────────────────── */
 const Field = ({ label, type, value, onChange, placeholder, autoComplete }) => (
   <div className="space-y-1.5">
     <label
@@ -126,8 +113,7 @@ const Field = ({ label, type, value, onChange, placeholder, autoComplete }) => (
   </div>
 );
 
-/* ── Main component ──────────────────────────────────────────────── */
-const AuthPage = ({ onAuthSuccess, switchToForgot }) => {
+const AuthPage = ({ onAuthSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -151,6 +137,7 @@ const AuthPage = ({ onAuthSuccess, switchToForgot }) => {
         const data = await loginUser(email, password);
         if (data.success) {
           setToken(data.accessToken);
+          localStorage.setItem("userEmail", email);
           onAuthSuccess();
         } else {
           setError(data.message || "Login failed.");
@@ -187,15 +174,12 @@ const AuthPage = ({ onAuthSuccess, switchToForgot }) => {
 
   return (
     <div className="min-h-screen flex items-stretch" style={{ background: "var(--surface)" }}>
-      {/* Left panel */}
       <div className="lg:w-1/2 xl:w-2/5">
         <GeometricPanel />
       </div>
 
-      {/* Right form panel */}
       <div className="flex-1 flex items-center justify-center px-6 py-16">
         <div className="w-full max-w-md animate-fade-up">
-          {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2 mb-10">
             <div
               className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-black"
@@ -284,19 +268,6 @@ const AuthPage = ({ onAuthSuccess, switchToForgot }) => {
                 : (isLogin ? "Sign in" : "Create account")}
             </button>
           </form>
-
-          {/* Forgot password link */}
-          {isLogin && switchToForgot && (
-            <div className="text-center mt-4">
-              <button
-                onClick={switchToForgot}
-                className="text-xs font-semibold underline underline-offset-2"
-                style={{ color: "var(--saffron)" }}
-              >
-                Forgot password?
-              </button>
-            </div>
-          )}
 
           <p className="text-sm text-center mt-6" style={{ color: "var(--muted)" }}>
             {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}

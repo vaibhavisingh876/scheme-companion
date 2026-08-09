@@ -1,74 +1,87 @@
-// searchTextBuilder.js
+/**
+ * Builds the query text for embedding from the user's profile and raw message.
+ */
+export const buildQueryText = (profile, rawMessage = "") => {
+  const parts = [];
+
+  if (profile.occupation && profile.occupation !== "unknown") {
+    parts.push(`occupation: ${profile.occupation}`);
+  }
+
+  if (profile.state && profile.state !== "unknown") {
+    parts.push(`state: ${profile.state}`);
+  }
+
+  if (profile.educationLevel && profile.educationLevel !== "unknown") {
+    const label = profile.educationLevel === "higher_education" ? "higher education" : "school level";
+    parts.push(`education: ${label}`);
+  }
+
+  if (profile.primaryIntent && profile.primaryIntent !== "unknown") {
+    parts.push(`intent: ${profile.primaryIntent.replace(/-/g, " ")}`);
+  }
+
+  if (profile.gender && profile.gender !== "unknown") {
+    parts.push(`gender: ${profile.gender}`);
+  }
+
+  if (profile.income !== null && profile.income !== undefined) {
+    parts.push(`income: ${profile.income}`);
+  }
+
+  if (profile.age !== null && profile.age !== undefined) {
+    parts.push(`age: ${profile.age}`);
+  }
+
+  if (profile.casteCategory && profile.casteCategory !== "unknown") {
+    parts.push(`caste: ${profile.casteCategory.toUpperCase()}`);
+  }
+
+  if (rawMessage && rawMessage.trim()) {
+    parts.push(`query: ${rawMessage.toLowerCase().trim()}`);
+  }
+
+  return parts.join(" | ").toLowerCase().replace(/\s+/g, " ").trim() || "government scheme citizen welfare";
+};
 
 /**
- * Build a concise searchText for embedding generation.
- *
- * The searchText is used exclusively for semantic similarity (cosine).
- * It should be a dense, keyword‑rich representation of the scheme,
- * but NOT a dump of the entire eligibility document.
- *
- * We include:
- *   - Title (repeated 2x for emphasis)
- *   - Description
- *   - Benefits
- *   - Short Eligibility Summary (first 200 chars, cleaned)
- *   - Tags
- *   - Category
- *   - State (if state‑specific)
- *
- * All fields are taken from structured database columns.
- * No text inference, no regex, no keyword extraction.
+ * Builds the search text for a scheme to create its embedding.
+ * Uses pre-generated searchText if available (length > 50), otherwise builds from fields.
  */
 export const buildSearchText = (scheme) => {
-  // If a precomputed searchText exists and is substantial, use it
   if (scheme.searchText && scheme.searchText.trim().length > 50) {
     return scheme.searchText.trim();
   }
 
-  // Otherwise, build from available fields
   const name = scheme.name || "";
   const description = scheme.description || "";
-  const benefits = scheme.benefits || "";
-  let eligibility = scheme.eligibility || "";
-
-  // Truncate eligibility to a short summary (200 chars) to avoid diluting signal
-  if (eligibility.length > 200) {
-    eligibility = eligibility.substring(0, 200).trim();
-    // Try to cut at last complete sentence/word
-    const lastSpace = eligibility.lastIndexOf(" ");
-    if (lastSpace > 100) {
-      eligibility = eligibility.substring(0, lastSpace);
-    }
-    eligibility += "...";
-  }
+  const benefits = (scheme.benefits || "").substring(0, 300);
+  let eligibility = (scheme.eligibility || "").substring(0, 300);
 
   const tags = (scheme.tags || []).join(" ");
   const category = scheme.category || "";
-  const state = scheme.state || "";
+  const ministry = scheme.ministry || "";
+  const schemeFor = scheme.schemeFor || "";
 
-  // Repeat name for stronger signal (but not excessively)
-  const nameRepeated = [name, name].filter(Boolean).join(" ");
+  const allowedOccupations = (scheme.allowedOccupations || []).join(" ");
+  const allowedStates = (scheme.allowedStates || []).join(" ");
+  const allowedEducation = (scheme.allowedEducationLevels || []).join(" ");
+  const allowedCategories = (scheme.allowedCategories || []).join(" ");
 
-  // Build a concise, keyword‑rich string
   const parts = [
-    nameRepeated,
-    description,
-    benefits,
-    eligibility,
+    `name: ${name}`,
+    `description: ${description}`,
+    `benefits: ${benefits}`,
+    `eligibility: ${eligibility}`,
     `tags: ${tags}`,
     `category: ${category}`,
-    `state: ${state}`,
+    `ministry: ${ministry}`,
+    `for: ${schemeFor}`,
+    `occupations: ${allowedOccupations}`,
+    `states: ${allowedStates}`,
+    `education: ${allowedEducation}`,
+    `categories: ${allowedCategories}`,
   ];
 
-  let result = parts.filter(Boolean).join(" ").toLowerCase();
-
-  // Collapse whitespace
-  result = result.replace(/\s+/g, " ").trim();
-
-  // Ultimate safety: never return empty
-  if (!result) {
-    result = "scheme for citizen welfare";
-  }
-
-  return result;
+  return parts.filter(p => p && p.trim()).join(" | ").toLowerCase().replace(/\s+/g, " ").trim() || "scheme for citizen welfare";
 };

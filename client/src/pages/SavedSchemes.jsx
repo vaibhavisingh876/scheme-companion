@@ -1,11 +1,10 @@
 import RecommendationCard from "../components/RecommendationCard.jsx";
 
-const SavedSchemes = ({ savedList = [], onRemoveScheme }) => {
+const SavedSchemes = ({ savedList = [], onRemoveScheme, onViewDetails }) => {
   const activeList = Array.isArray(savedList) ? savedList : [];
 
   return (
     <div className="max-w-3xl mx-auto space-y-8 animate-fade-up">
-
       {/* Header */}
       <div className="flex items-end justify-between">
         <div>
@@ -57,7 +56,7 @@ const SavedSchemes = ({ savedList = [], onRemoveScheme }) => {
               className="relative animate-fade-up"
               style={{ animationDelay: `${idx * 0.04}s` }}
             >
-              <RecommendationCard scheme={scheme} />
+              <RecommendationCard scheme={scheme} onViewDetails={onViewDetails} />
               <button
                 onClick={() => onRemoveScheme(scheme.id)}
                 className="absolute top-5 right-5 text-[10px] font-bold px-3 py-1.5 rounded-lg uppercase tracking-wide transition-all"

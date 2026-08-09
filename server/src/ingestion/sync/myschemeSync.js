@@ -1,24 +1,23 @@
 import prisma from "../../config/prisma.js";
 import { fetchAllMySchemes } from "../connectors/mySchemeBulkfetcher.js";
 import { normalizeMyScheme } from "../normalizers/mySchemeNormalizer.js";
-import { fetchSchemeDetail } from "../../services/ai/groqService.js";
+import { fetchSchemeDetail } from "../connectors/mySchemeDetailFetcher.js";
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Helper to retry a detail fetch on 429 / server errors
-const fetchWithRetry = async (slug, retries = 3) => {
-  for (let attempt = 1; attempt <= retries; attempt++) {
+const connectWithRetry = async (retries = 5, delayMs = 2000) => {
+  for (let i = 0; i < retries; i++) {
     try {
-      return await fetchSchemeDetail(slug);
+      await prisma.$connect();
+      await prisma.$queryRaw`SELECT 1`;
+      console.log("✅ Database connected successfully.");
+      return;
     } catch (err) {
-      if (
-        attempt < retries &&
-        (err.response?.status === 429 || err.response?.status >= 500)
-      ) {
-        console.warn(
-          `⏳ Rate limit / server error on ${slug} – retrying in ${attempt * 2}s (attempt ${attempt + 1}/${retries})`
-        );
-        await delay(attempt * 2000);
+      console.warn(`⚠️ DB connection attempt ${i+1}/${retries} failed: ${err.message}`);
+      if (i < retries - 1) {
+        const wait = delayMs * Math.pow(2, i);
+        console.log(`⏳ Waiting ${wait}ms before retry...`);
+        await delay(wait);
       } else {
         throw err;
       }
@@ -27,206 +26,122 @@ const fetchWithRetry = async (slug, retries = 3) => {
 };
 
 export const syncMyScheme = async () => {
-  console.log("⏰ Sending wake-up ping to Neon Database...");
+  console.log("⏰ Sync Started...");
+
   try {
-    await prisma.$queryRaw`SELECT 1`;
-    console.log("🟢 Neon Database is awake and connection pool is ready!");
-  } catch (e) {
-    console.log("⚠️ Database is taking a moment to wake up, moving forward...");
+    await connectWithRetry();
+  } catch (err) {
+    console.error("❌ Failed to connect to database after multiple retries.", err.message);
+    return { success: false, error: err.message };
   }
 
-  // Ensure parent source exists
-  try {
-    await prisma.schemeSource.upsert({
-      where: { id: "myscheme" },
-      update: { lastSyncAt: new Date() },
-      create: {
-        id: "myscheme",
-        name: "MyScheme Portal",
-        sourceUrl: "https://www.myscheme.gov.in",
-        lastSyncAt: new Date(),
-      },
-    });
-    console.log("✅ Ensured 'myscheme' Parent Source identity exists.");
-  } catch (sourceError) {
-    console.error("🛑 Failed to verify parent source record.", sourceError);
-    return { success: false, error: "Parent Source Verification Failed" };
-  }
+  await prisma.schemeSource.upsert({
+    where: { id: "myscheme" },
+    update: { lastSyncAt: new Date() },
+    create: { id: "myscheme", name: "MyScheme Portal", sourceUrl: "https://www.myscheme.gov.in", lastSyncAt: new Date() },
+  });
 
-  // 1. Fetch all search hits (basic fields + slug)
   let searchHits = [];
   try {
     searchHits = await fetchAllMySchemes();
-  } catch (fetchError) {
-    console.error("🛑 Sync Aborted: Data extraction failed.", fetchError.message);
-    return { success: false, error: fetchError.message };
+  } catch (e) {
+    console.error("Fetch failed:", e.message);
+    await prisma.$disconnect();
+    return { success: false };
   }
 
-  // Build slug → searchFields map, deduplicate
+  if (searchHits.length < 1000) {
+    console.error(`🚨 Low count: ${searchHits.length}`);
+    await prisma.$disconnect();
+    return { success: false };
+  }
+
   const slugMap = new Map();
   for (const hit of searchHits) {
     const fields = hit.fields || hit;
     const slug = fields.slug || fields.schemeSlug;
-    if (!slug) continue;
-    if (slugMap.has(slug)) {
-      console.warn(`⚡ Duplicate slug ${slug} in search results, skipping.`);
-      continue;
-    }
+    if (!slug || slugMap.has(slug)) continue;
     slugMap.set(slug, fields);
   }
 
   const slugs = Array.from(slugMap.keys());
-  console.log(`🔍 Total unique slugs to enrich: ${slugs.length}`);
+  console.log(`🔍 ${slugs.length} slugs to enrich`);
 
-  // 2. Fetch detail for each slug in parallel batches (gentle rate limiting)
-  const BATCH_SIZE = 2;         // low concurrency
-  const BATCH_DELAY = 2000;     // 2 seconds between batches
+  // ✅ Fast – pehle wale jaisa concurrency
+  const BATCH_SIZE = 8;
+  const BATCH_DELAY = 2000;
   const enrichedSchemes = [];
 
   for (let i = 0; i < slugs.length; i += BATCH_SIZE) {
     const batch = slugs.slice(i, i + BATCH_SIZE);
-    const batchResults = await Promise.allSettled(
+
+    // ✅ Har batch ke liye progress log (taaki pata chale ruk kahan raha hai)
+    console.log(`📦 Processing batch ${Math.floor(i/BATCH_SIZE)+1}/${Math.ceil(slugs.length/BATCH_SIZE)} (${i+1}-${Math.min(i+BATCH_SIZE, slugs.length)}/${slugs.length})`);
+
+    const results = await Promise.allSettled(
       batch.map(async (slug) => {
-        const detail = await fetchWithRetry(slug);
+        const detail = await fetchSchemeDetail(slug);
         if (!detail) return null;
-        const searchFields = slugMap.get(slug);
-        const normalized = normalizeMyScheme(detail, searchFields);
-        return normalized;
+        return normalizeMyScheme(detail, slugMap.get(slug));
       })
     );
 
-    batchResults.forEach((res) => {
-      if (res.status === "fulfilled" && res.value) {
-        enrichedSchemes.push(res.value);
-      }
+    results.forEach(r => {
+      if (r.status === "fulfilled" && r.value) enrichedSchemes.push(r.value);
     });
 
-    console.log(
-      `📥 Enriched ${Math.min(i + BATCH_SIZE, slugs.length)} / ${slugs.length}`
-    );
-
-    if (i + BATCH_SIZE < slugs.length) {
-      await delay(BATCH_DELAY);
+    // ✅ DB ping – connection alive rakho
+    if (i % 200 === 0 && i > 0) {
+      try {
+        await prisma.$queryRaw`SELECT 1`;
+      } catch (pingErr) {
+        console.warn("⚠️ Ping failed, reconnecting...");
+        await prisma.$disconnect();
+        await connectWithRetry(3, 1000);
+      }
     }
+
+    if (i + BATCH_SIZE < slugs.length) await delay(BATCH_DELAY);
   }
 
-  console.log(`📊 Total schemes ready for sync: ${enrichedSchemes.length}`);
+  console.log(`📊 Enriched: ${enrichedSchemes.length}`);
 
-  // 3. Load existing DB records
-  console.log("🔍 Loading existing DB schemes...");
-  let existingSchemes = [];
-  const READ_CHUNK_SIZE = 100;
-  let lastId = undefined;
+  const existingSchemes = await prisma.scheme.findMany({
+    where: { sourceId: "myscheme" },
+    select: { id: true, externalId: true, checksum: true, isActive: true },
+  });
 
-  while (true) {
-    let chunk = [];
-    try {
-      chunk = await prisma.scheme.findMany({
-        where: { sourceId: "myscheme" },
-        select: { id: true, externalId: true, checksum: true, version: true, isActive: true },
-        take: READ_CHUNK_SIZE,
-        skip: lastId ? 1 : 0,
-        cursor: lastId ? { id: lastId } : undefined,
-        orderBy: { id: "asc" },
-      });
-    } catch (error) {
-      console.warn("DB read chunk error, retrying...", error);
-      await delay(2000);
-      continue;
-    }
-    if (chunk.length === 0) break;
-    existingSchemes.push(...chunk);
-    lastId = chunk[chunk.length - 1].id;
-  }
+  const existingMap = new Map(existingSchemes.map(s => [s.externalId, s]));
 
-  const dbMap = new Map(existingSchemes.map((s) => [s.externalId, s]));
-
-  // 4. Classify: create / update / skip
   const createBatch = [];
   const updateBatch = [];
-  let skipped = 0;
 
   for (const scheme of enrichedSchemes) {
-    const existing = dbMap.get(scheme.externalId);
+    const existing = existingMap.get(scheme.externalId);
     if (!existing) {
-      createBatch.push({
-        ...scheme,
-        version: 1,
-        lastSyncedAt: new Date(),
-        isActive: true,
-      });
-    } else {
-      const dataChanged = existing.checksum !== scheme.checksum;
-      const wasInactive = !existing.isActive;
-      if (!dataChanged && !wasInactive) {
-        skipped++;
-        continue;
-      }
+      createBatch.push({ ...scheme, version: 1, lastSyncedAt: new Date(), isActive: true });
+    } else if (existing.checksum !== scheme.checksum || !existing.isActive) {
       updateBatch.push({
         id: existing.id,
-        data: {
-          ...scheme,
-          version: dataChanged ? existing.version + 1 : existing.version,
-          lastSyncedAt: new Date(),
-          isActive: true,
-        },
+        data: { ...scheme, version: existing.version + 1, lastSyncedAt: new Date(), isActive: true },
       });
     }
   }
 
-  // 5. DB writes
   if (createBatch.length) {
-    console.log(`📥 Bulk inserting ${createBatch.length} new schemes...`);
-    const CHUNK = 500;
-    for (let i = 0; i < createBatch.length; i += CHUNK) {
-      const chunk = createBatch.slice(i, i + CHUNK);
-      await prisma.scheme.createMany({ data: chunk, skipDuplicates: true });
-      console.log(`✅ Created sub-batch ${i + chunk.length}`);
-      await delay(1000);
+    for (let i = 0; i < createBatch.length; i += 500) {
+      await prisma.scheme.createMany({ data: createBatch.slice(i, i + 500), skipDuplicates: true });
     }
   }
 
   if (updateBatch.length) {
-    console.log(`⚙️ Updating ${updateBatch.length} schemes...`);
-    for (let i = 0; i < updateBatch.length; i++) {
-      const u = updateBatch[i];
-      try {
-        await prisma.scheme.update({ where: { id: u.id }, data: u.data });
-      } catch (err) {
-        console.error(`❌ Failed to update ${u.id}:`, err.message);
-      }
-      if (i % 50 === 0) await delay(2000);
+    for (let i = 0; i < updateBatch.length; i += 50) {
+      const chunk = updateBatch.slice(i, i + 50);
+      await Promise.allSettled(chunk.map(u => prisma.scheme.update({ where: { id: u.id }, data: u.data })));
     }
   }
 
-  // Soft deletes
-  const incomingIds = new Set(enrichedSchemes.map((s) => s.externalId));
-  const toDeactivate = existingSchemes.filter(
-    (s) => s.isActive && !incomingIds.has(s.externalId)
-  );
-  let deactivatedCount = 0;
-  if (toDeactivate.length > 0) {
-    const thresholdExceeded = toDeactivate.length > existingSchemes.length * 0.4;
-    if (thresholdExceeded) {
-      console.error("🚨 ANOMALOUS deletion rate detected. Skipping soft-delete.");
-    } else {
-      const res = await prisma.scheme.updateMany({
-        where: { id: { in: toDeactivate.map((s) => s.id) } },
-        data: { isActive: false, lastSyncedAt: new Date() },
-      });
-      deactivatedCount = res.count;
-      console.log(`♻️ Soft-deactivated ${deactivatedCount} stale schemes.`);
-    }
-  }
-
-  console.log(
-    `🏁 Pipeline Report -> Added: ${createBatch.length} | Updated: ${updateBatch.length} | Unchanged: ${skipped} | Deactivated: ${deactivatedCount}`
-  );
-
-  return {
-    added: createBatch.length,
-    updated: updateBatch.length,
-    skipped,
-    deactivated: deactivatedCount,
-  };
+  console.log(`🏁 Created: ${createBatch.length} | Updated: ${updateBatch.length}`);
+  await prisma.$disconnect();
+  return { added: createBatch.length, updated: updateBatch.length };
 };

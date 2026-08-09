@@ -14,7 +14,6 @@ model Scheme {
   benefits               String       @db.Text
   eligibility            String       @db.Text
 
-  // Legacy Scalar Fields
   category               String?
   ministry               String?
   state                  String?
@@ -22,7 +21,6 @@ model Scheme {
   occupation             String?
   educationLevel         String?
 
-  // Robust Array Intersection Fields
   allowedCategories      String[]
   allowedStates          String[]
   allowedGenders         String[]
@@ -47,7 +45,7 @@ model Scheme {
   lastSyncedAt           DateTime?
   isScholarship          Boolean      @default(false)
   isFemaleOnly           Boolean      @default(false)
-  schemeFor              String?      // "Individual", "Institution", "Both"
+  schemeFor              String?
 
   source                 SchemeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   embedding              Float[]
@@ -109,20 +107,7 @@ model SyncJob {
 model User {
   id        String     @id @default(cuid())
   email     String     @unique
-  password  String     // Hashed password
-
-  // 🆕 Email verification
-  isVerified         Boolean   @default(false)
-  verificationToken  String?   @unique
-  verificationExpiry DateTime?
-
-  // 🆕 Password reset
-  resetToken  String?   @unique
-  resetExpiry DateTime?
-
-  // 🆕 Refresh token (hashed, single active session per user — see authController.js)
-  refreshTokenHash String?
-
+  password  String
   bookmarks Bookmark[]
   createdAt DateTime   @default(now())
 }

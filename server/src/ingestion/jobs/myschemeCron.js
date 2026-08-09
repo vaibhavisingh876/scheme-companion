@@ -25,7 +25,6 @@ const runSyncLogicManually = async () => {
   }
 };
 
-// 🔥 IMPORTANT: Added 'async' here
 export const startMySchemeCron = async () => {
   console.log("⏰ [CRON] Initializing MyScheme Cron Scheduler...");
 
@@ -55,7 +54,6 @@ export const startMySchemeCron = async () => {
 
   console.log("✅ MyScheme Cron Started");
 
-  // 🔥 Run manually immediately – try-catch se wrap kiya
   try {
     await runSyncLogicManually();
   } catch (err) {

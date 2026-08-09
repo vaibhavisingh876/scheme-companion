@@ -21,11 +21,13 @@ const SchemeDetailsView = ({ scheme, onBackNavigate }) => {
     );
   }
 
-  const finalVerificationUrl = `https://www.myscheme.gov.in/search?q=${encodeURIComponent(scheme.name)}`;
+  const applyUrl =
+    scheme.applicationLink?.trim() ||
+    scheme.sourceUrl?.trim() ||
+    `https://www.myscheme.gov.in/search?q=${encodeURIComponent(scheme.name)}`;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 pb-16 animate-fade-up">
-
+    <div className="max-w-3xl mx-auto space-y-6 animate-fade-up">
       {/* Back */}
       <button
         onClick={onBackNavigate}
@@ -82,10 +84,7 @@ const SchemeDetailsView = ({ scheme, onBackNavigate }) => {
         </div>
 
         {/* Description */}
-        <div
-          className="pt-5"
-          style={{ borderTop: "1px solid var(--border)" }}
-        >
+        <div className="pt-5" style={{ borderTop: "1px solid var(--border)" }}>
           <h3
             className="text-[11px] font-semibold uppercase tracking-widest mb-2"
             style={{ color: "var(--muted)", fontFamily: "'Plus Jakarta Sans', sans-serif" }}
@@ -99,10 +98,7 @@ const SchemeDetailsView = ({ scheme, onBackNavigate }) => {
 
         {/* Eligibility */}
         {scheme.eligibility && (
-          <div
-            className="pt-5"
-            style={{ borderTop: "1px solid var(--border)" }}
-          >
+          <div className="pt-5" style={{ borderTop: "1px solid var(--border)" }}>
             <h3
               className="text-[11px] font-semibold uppercase tracking-widest mb-2"
               style={{ color: "var(--muted)", fontFamily: "'Plus Jakarta Sans', sans-serif" }}
@@ -117,10 +113,7 @@ const SchemeDetailsView = ({ scheme, onBackNavigate }) => {
 
         {/* Benefits */}
         {scheme.benefits && (
-          <div
-            className="pt-5"
-            style={{ borderTop: "1px solid var(--border)" }}
-          >
+          <div className="pt-5" style={{ borderTop: "1px solid var(--border)" }}>
             <h3
               className="text-[11px] font-semibold uppercase tracking-widest mb-2"
               style={{ color: "var(--muted)", fontFamily: "'Plus Jakarta Sans', sans-serif" }}
@@ -170,7 +163,7 @@ const SchemeDetailsView = ({ scheme, onBackNavigate }) => {
           </p>
         </div>
         <a
-          href={finalVerificationUrl}
+          href={applyUrl}
           target="_blank"
           rel="noreferrer"
           className="shrink-0 text-sm font-bold px-7 py-3 rounded-xl transition-all"

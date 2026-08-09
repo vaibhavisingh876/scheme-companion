@@ -7,6 +7,9 @@
     "dev": "nodemon src/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "prisma": {
+  "seed": "node prisma/seed.js"
+},
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -27,6 +30,7 @@
     "jsonwebtoken": "^9.0.3",
     "node-cache": "^5.1.2",
     "node-cron": "^4.2.1",
+    "nodemailer": "^9.0.4",
     "openai": "^6.39.0",
     "prisma": "^5.22.0",
     "zod": "^4.4.3"
