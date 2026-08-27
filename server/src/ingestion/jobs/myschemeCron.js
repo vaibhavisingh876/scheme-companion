@@ -4,28 +4,7 @@ import { updateMissingEmbeddings } from "../../services/ai/embeddingService.js";
 
 let isSyncRunning = false;
 
-const runSyncLogicManually = async () => {
-  if (isSyncRunning) return;
-
-  try {
-    isSyncRunning = true;
-
-    console.log("🚀 Startup Sync Started...");
-
-    await syncMyScheme();
-
-    console.log("🤖 Checking Missing Embeddings...");
-    await updateMissingEmbeddings();
-
-    console.log("🏁 Startup Sync Completed.");
-  } catch (error) {
-    console.error("❌ Startup Error:", error);
-  } finally {
-    isSyncRunning = false;
-  }
-};
-
-export const startMySchemeCron = async () => {
+export const startMySchemeCron = () => {
   console.log("⏰ [CRON] Initializing MyScheme Cron Scheduler...");
 
   cron.schedule("0 */6 * * *", async () => {
@@ -53,10 +32,4 @@ export const startMySchemeCron = async () => {
   });
 
   console.log("✅ MyScheme Cron Started");
-
-  try {
-    await runSyncLogicManually();
-  } catch (err) {
-    console.error("❌ Manual sync failed:", err);
-  }
 };
