@@ -95,10 +95,10 @@ export const extractUserProfile = async (message) => {
     console.log("Profile cache hit");
     return cached;
   }
-
+  
   try {
     const response = await groqClientInstance.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-120b",
       temperature: 0.1,
       response_format: { type: "json_object" },
       messages: [
@@ -131,7 +131,14 @@ export const extractUserProfile = async (message) => {
     profileCache.set(cacheKey, result);
     return result;
   } catch (err) {
-    console.error("[Groq Profile Extraction Error]", err);
-    return defaultProfile();
+    console.error("====================================");
+    console.error("[Groq Profile Extraction Error]");
+    console.error("Message:", err?.message);
+    console.error("Status:", err?.status);
+    console.error("Code:", err?.code);
+    console.error("Error:", err);
+    console.error("====================================");
+
+    throw err;
   }
 };

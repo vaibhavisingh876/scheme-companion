@@ -136,8 +136,8 @@ const AuthPage = ({ onAuthSuccess }) => {
       if (isLogin) {
         const data = await loginUser(email, password);
         if (data.success) {
-          setToken(data.accessToken);
-          localStorage.setItem("userEmail", email);
+          setToken(data.accessToken, email);
+          
           onAuthSuccess();
         } else {
           setError(data.message || "Login failed.");
