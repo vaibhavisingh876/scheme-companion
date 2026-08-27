@@ -51,7 +51,7 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (Postman, server-to-server, etc.)
+      // Allow requests without an origin
       if (!origin) {
         return callback(null, true);
       }
@@ -77,13 +77,10 @@ app.use(
   })
 );
 
-// ─── Handle CORS Preflight Requests ─────────────────────────────────────
-app.options("*", cors());
-
 // ─── Body Parser ─────────────────────────────────────────────────────────
 app.use(express.json());
 
-// ─── Rate Limiter ────────────────────────────────────────────────────────
+// ─── Rate Limiter ───────────────────────────────────────────────────────
 app.use(apiLimiter);
 
 // ─── Request Logger (only in development) ──────────────────────────────
@@ -126,7 +123,6 @@ app.use((err, req, res, next) => {
 // ─── Start Cron Scheduler ───────────────────────────────────────────────
 if (process.env.ENABLE_CRON === "true") {
   console.log("⏰ Cron enabled – starting scheduler...");
-
   startMySchemeCron();
 } else {
   console.log(
