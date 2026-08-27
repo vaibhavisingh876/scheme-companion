@@ -98,7 +98,7 @@ export const extractUserProfile = async (message) => {
 
   try {
     const response = await groqClientInstance.chat.completions.create({
-      model: "llama-3.1-8b-instant",
+      model: "llama-3.3-70b-versatile",
       temperature: 0.1,
       response_format: { type: "json_object" },
       messages: [
