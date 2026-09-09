@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect } from "react";
 import { getAIRecommendations, searchSchemes } from "../services/api";
 import ProfileCard from "../components/ProfileCard.jsx";
@@ -13,7 +12,13 @@ const FieldLabel = ({ children, hint }) => (
   </div>
 );
 
-const FilterSelect = ({ label, value, onChange, options, placeholder }) => (
+const FilterSelect = ({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+}) => (
   <div className="sc-filter-field">
     <FieldLabel>{label}</FieldLabel>
 
@@ -25,6 +30,7 @@ const FilterSelect = ({ label, value, onChange, options, placeholder }) => (
           </option>
         ))}
       </select>
+
       <span>⌄</span>
     </div>
   </div>
@@ -44,6 +50,7 @@ const FindSchemes = ({
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const [loading, setLoading] = useState(false);
+
   const [hasSearched, setHasSearched] = useState(
     !!initialResults?.length
   );
@@ -65,6 +72,7 @@ const FindSchemes = ({
       setSchemes(initialResults);
       setProfile(initialProfile || null);
       setHasSearched(true);
+      setVisibleCount(PAGE_SIZE);
     }
   }, [initialResults, initialProfile]);
 
@@ -123,8 +131,14 @@ const FindSchemes = ({
     try {
       const reqFilters = {};
 
-      if (filters.gender) reqFilters.gender = filters.gender;
-      if (filters.state) reqFilters.state = filters.state;
+      if (filters.gender) {
+        reqFilters.gender = filters.gender;
+      }
+
+      if (filters.state) {
+        reqFilters.state = filters.state;
+      }
+
       if (filters.occupation) {
         reqFilters.occupation = filters.occupation;
       }
@@ -215,7 +229,7 @@ const FindSchemes = ({
   return (
     <div className="sc-page sc-search-page">
 
-      {/* ───────────────────────── HERO ───────────────────────── */}
+      {/* HERO */}
 
       <section className="sc-discovery-hero">
 
@@ -257,14 +271,8 @@ const FindSchemes = ({
               <span>matching</span>
             </div>
 
-            <div className="sc-trust-divider" />
-
-            <div className="sc-trust-item">
-              <strong>28+</strong>
-              <span>states</span>
-            </div>
-
           </div>
+
         </div>
 
         <div className="sc-discovery-orbit">
@@ -300,7 +308,7 @@ const FindSchemes = ({
 
       </section>
 
-      {/* ───────────────────── SEARCH MODE ───────────────────── */}
+      {/* SEARCH */}
 
       <div className="sc-search-shell">
 
@@ -319,7 +327,9 @@ const FindSchemes = ({
             </span>
 
             {searchMode === "ai" && (
-              <span className="sc-active-check">✓</span>
+              <span className="sc-active-check">
+                ✓
+              </span>
             )}
           </button>
 
@@ -336,13 +346,15 @@ const FindSchemes = ({
             </span>
 
             {searchMode === "manual" && (
-              <span className="sc-active-check">✓</span>
+              <span className="sc-active-check">
+                ✓
+              </span>
             )}
           </button>
 
         </div>
 
-        {/* ───────────────────── AI SEARCH ───────────────────── */}
+        {/* AI SEARCH */}
 
         {searchMode === "ai" && (
           <section
@@ -393,6 +405,7 @@ const FindSchemes = ({
                 />
 
                 <div className="sc-prompt-footer">
+
                   <span>
                     ✦ AI understands natural language
                   </span>
@@ -400,6 +413,7 @@ const FindSchemes = ({
                   <span>
                     {aiMessage.length}/1000
                   </span>
+
                 </div>
 
               </div>
@@ -427,7 +441,9 @@ const FindSchemes = ({
               <button
                 className="sc-primary-btn sc-search-btn"
                 type="submit"
-                disabled={loading || !aiMessage.trim()}
+                disabled={
+                  loading || !aiMessage.trim()
+                }
               >
                 <span>
                   {loading
@@ -443,7 +459,7 @@ const FindSchemes = ({
           </section>
         )}
 
-        {/* ─────────────────── MANUAL SEARCH ─────────────────── */}
+        {/* MANUAL SEARCH */}
 
         {searchMode === "manual" && (
           <section className="sc-search-card sc-filter-card">
@@ -479,7 +495,10 @@ const FindSchemes = ({
                   label="Gender"
                   value={filters.gender}
                   onChange={(e) =>
-                    updateFilter("gender", e.target.value)
+                    updateFilter(
+                      "gender",
+                      e.target.value
+                    )
                   }
                   options={genders}
                   placeholder="Any gender"
@@ -489,7 +508,10 @@ const FindSchemes = ({
                   label="State"
                   value={filters.state}
                   onChange={(e) =>
-                    updateFilter("state", e.target.value)
+                    updateFilter(
+                      "state",
+                      e.target.value
+                    )
                   }
                   options={states}
                   placeholder="Any state"
@@ -541,6 +563,7 @@ const FindSchemes = ({
                   </FieldLabel>
 
                   <div className="sc-income-input">
+
                     <span>₹</span>
 
                     <input
@@ -554,6 +577,7 @@ const FindSchemes = ({
                         )
                       }
                     />
+
                   </div>
 
                 </div>
@@ -562,8 +586,11 @@ const FindSchemes = ({
 
               <div className="sc-filter-note">
                 <span>✦</span>
-                You don't need to fill every field.
-                We'll search with whatever information you provide.
+                <span>
+                  You don't need to fill every field.
+                  We'll search with whatever information
+                  you provide.
+                </span>
               </div>
 
               <button
@@ -587,7 +614,7 @@ const FindSchemes = ({
 
       </div>
 
-      {/* ───────────────────── LOADING ───────────────────── */}
+      {/* LOADING */}
 
       {loading && (
         <div className="sc-loading-panel">
@@ -603,14 +630,14 @@ const FindSchemes = ({
 
           </div>
 
-          <div>
+          <div className="sc-loading-copy">
             <h3>
               Finding your best matches
             </h3>
 
             <p>
-              Comparing your profile with thousands of
-              government schemes...
+              Comparing your profile with thousands
+              of government schemes...
             </p>
           </div>
 
@@ -623,7 +650,7 @@ const FindSchemes = ({
         </div>
       )}
 
-      {/* ───────────────────── PROFILE ───────────────────── */}
+      {/* PROFILE */}
 
       {!loading && hasSearched && profile && (
         <section className="sc-profile-section">
@@ -638,12 +665,11 @@ const FindSchemes = ({
         </section>
       )}
 
-      {/* ───────────────────── RESULTS ───────────────────── */}
+      {/* RESULTS */}
 
       {!loading &&
         hasSearched &&
         schemes.length > 0 && (
-
           <section className="sc-results-section">
 
             <div className="sc-results-head">
@@ -667,58 +693,71 @@ const FindSchemes = ({
 
               <div className="sc-count-pill">
                 <strong>{schemes.length}</strong>
-                matches found
+                <span>matches found</span>
               </div>
 
             </div>
 
             <div className="sc-results-list">
 
-              {visibleSchemes.map((scheme, index) => (
+              {visibleSchemes.map((scheme, index) => {
 
-                <div
-                  key={`${scheme.id}-${index}`}
-                  className="sc-result-item"
-                  style={{
-                    animationDelay: `${
-                      Math.min(index, 7) * 0.06
-                    }s`,
-                  }}
-                >
+                const isSaved = savedIds.includes(
+                  scheme.id
+                );
 
-                  <RecommendationCard
-                    scheme={scheme}
-                    onViewDetails={onViewDetails}
-                  />
-
-                  <button
-                    className={`sc-save-float ${
-                      savedIds.includes(scheme.id)
-                        ? "saved"
-                        : ""
-                    }`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSaveScheme(scheme);
+                return (
+                  <div
+                    key={`${scheme.id}-${index}`}
+                    className="sc-result-item"
+                    style={{
+                      animationDelay: `${
+                        Math.min(index, 7) * 0.06
+                      }s`,
                     }}
-                    disabled={savedIds.includes(scheme.id)}
                   >
-                    {savedIds.includes(scheme.id)
-                      ? "✓ Saved"
-                      : "＋ Save"}
-                  </button>
 
-                </div>
+                    <RecommendationCard
+                      scheme={scheme}
+                      onViewDetails={onViewDetails}
+                    />
 
-              ))}
+                    <div className="sc-save-row">
+
+                      <button
+                        type="button"
+                        className={`sc-save-float ${
+                          isSaved ? "saved" : ""
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+
+                          if (!isSaved) {
+                            onSaveScheme(scheme);
+                          }
+                        }}
+                        disabled={isSaved}
+                      >
+                        {isSaved
+                          ? "✓ Saved"
+                          : "＋ Save scheme"}
+                      </button>
+
+                    </div>
+
+                  </div>
+                );
+              })}
 
             </div>
 
             {remaining > 0 && (
-
               <div className="sc-load-more">
 
-                <button onClick={loadMore}>
+                <button
+                  type="button"
+                  onClick={loadMore}
+                >
                   Load{" "}
                   {Math.min(remaining, PAGE_SIZE)}
                   {" "}more
@@ -726,30 +765,31 @@ const FindSchemes = ({
                 </button>
 
                 <small>
-                  Showing {visibleCount} of {schemes.length}
+                  Showing{" "}
+                  {Math.min(
+                    visibleCount,
+                    schemes.length
+                  )}{" "}
+                  of {schemes.length}
                 </small>
 
               </div>
-
             )}
 
           </section>
         )}
 
-      {/* ───────────────────── EMPTY ───────────────────── */}
+      {/* EMPTY */}
 
       {!loading &&
         hasSearched &&
         schemes.length === 0 && (
-
           <div className="sc-empty-state">
 
             <div className="sc-empty-visual">
-
               <div className="sc-empty-circle">
                 ?
               </div>
-
             </div>
 
             <div className="sc-section-marker">
@@ -767,8 +807,12 @@ const FindSchemes = ({
             </p>
 
             <button
+              type="button"
               className="sc-secondary-btn"
-              onClick={() => setSearchMode("ai")}
+              onClick={() => {
+                setSearchMode("ai");
+                setHasSearched(false);
+              }}
             >
               Try AI search →
             </button>
@@ -776,7 +820,7 @@ const FindSchemes = ({
           </div>
         )}
 
-      {/* ───────────────────── INITIAL STATE ───────────────────── */}
+      {/* INITIAL STATE */}
 
       {!hasSearched && !loading && (
         <section className="sc-discovery-tips">
@@ -794,8 +838,12 @@ const FindSchemes = ({
 
             <div className="sc-tip-card">
               <span>01</span>
+
               <div>
-                <strong>Describe your situation</strong>
+                <strong>
+                  Describe your situation
+                </strong>
+
                 <p>
                   Tell the AI about your goals,
                   background and what you need.
@@ -805,8 +853,12 @@ const FindSchemes = ({
 
             <div className="sc-tip-card">
               <span>02</span>
+
               <div>
-                <strong>Get personalized matches</strong>
+                <strong>
+                  Get personalized matches
+                </strong>
+
                 <p>
                   Your profile is matched against
                   thousands of government schemes.
@@ -816,8 +868,12 @@ const FindSchemes = ({
 
             <div className="sc-tip-card">
               <span>03</span>
+
               <div>
-                <strong>Explore & apply</strong>
+                <strong>
+                  Explore & apply
+                </strong>
+
                 <p>
                   Open the scheme details and
                   follow the official application link.
@@ -835,4 +891,3 @@ const FindSchemes = ({
 };
 
 export default FindSchemes;
-
