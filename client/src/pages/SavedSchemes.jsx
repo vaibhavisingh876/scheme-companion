@@ -1,3 +1,4 @@
+
 import RecommendationCard from "../components/RecommendationCard.jsx";
 
 const SavedSchemes = ({
@@ -10,166 +11,367 @@ const SavedSchemes = ({
     : [];
 
   return (
-    <div className="max-w-5xl mx-auto px-5 sm:px-8 py-10 md:py-14">
+    <div className="relative min-h-[calc(100vh-68px)] overflow-hidden">
+      {/* BACKGROUND */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(circle at 85% 8%, rgba(224,123,57,0.10), transparent 28%), radial-gradient(circle at 5% 45%, rgba(224,123,57,0.05), transparent 25%)",
+        }}
+      />
 
-      {/* HEADER */}
+      <div
+        className="absolute top-0 right-0 w-[420px] h-[420px] rounded-full pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(circle, rgba(224,123,57,0.07), transparent 68%)",
+          filter: "blur(30px)",
+        }}
+      />
 
-      <div className="mb-9 animate-fade-up">
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-          <div>
-            <p
-              className="text-[10px] font-bold uppercase tracking-[0.2em] mb-2"
-              style={{
-                color: "var(--saffron)",
-              }}
-            >
-              Your collection
-            </p>
+      {/* PAGE */}
+      <div className="relative max-w-6xl mx-auto px-5 sm:px-8 py-10 md:py-14">
 
-            <h1
-              className="text-3xl md:text-4xl font-black tracking-tight"
-              style={{
-                fontFamily:
-                  "'Plus Jakarta Sans', sans-serif",
-                color: "var(--ink)",
-              }}
-            >
-              Bookmarks
-            </h1>
+        {/* =================================================
+            HERO HEADER
+        ================================================= */}
+        <section className="mb-12">
+          <div className="grid lg:grid-cols-[1fr_auto] gap-8 items-end">
 
-            <p
-              className="text-sm mt-2"
-              style={{
-                color: "var(--muted)",
-              }}
-            >
-              Schemes you've shortlisted for later.
-            </p>
-          </div>
-
-          {activeList.length > 0 && (
-            <span
-              className="self-start sm:self-auto text-[10px] font-bold px-3.5 py-2 rounded-full"
-              style={{
-                background:
-                  "var(--saffron-lt)",
-                color:
-                  "var(--saffron-dk)",
-                fontFamily:
-                  "'JetBrains Mono', monospace",
-              }}
-            >
-              {activeList.length} saved
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* EMPTY */}
-
-      {activeList.length === 0 ? (
-        <div
-          className="rounded-3xl py-20 px-6 text-center animate-fade-up"
-          style={{
-            background: "var(--panel)",
-            border:
-              "1px dashed var(--border)",
-          }}
-        >
-          <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5 text-2xl"
-            style={{
-              background:
-                "var(--saffron-lt)",
-              border:
-                "1px solid var(--border)",
-            }}
-          >
-            🔖
-          </div>
-
-          <h3
-            className="text-lg font-black mb-2"
-            style={{
-              fontFamily:
-                "'Plus Jakarta Sans', sans-serif",
-              color: "var(--ink)",
-            }}
-          >
-            No bookmarks yet
-          </h3>
-
-          <p
-            className="text-sm max-w-sm mx-auto leading-6"
-            style={{
-              color: "var(--muted)",
-            }}
-          >
-            Use "Find Schemes" and save any
-            result you want to shortlist here.
-          </p>
-        </div>
-      ) : (
-        <div className="grid md:grid-cols-2 gap-5">
-          {activeList.map((scheme, idx) => (
-            <div
-              key={`${scheme.id}-${idx}`}
-              className="animate-fade-up"
-              style={{
-                animationDelay:
-                  `${idx * 0.05}s`,
-              }}
-            >
-              <RecommendationCard
-                scheme={scheme}
-                onViewDetails={
-                  onViewDetails
-                }
-              />
-
-              {/* Remove stays OUTSIDE card */}
-
-              <div className="flex justify-end pt-2">
-                <button
-                  onClick={() =>
-                    onRemoveScheme(
-                      scheme.id
-                    )
-                  }
-                  className="text-[10px] font-bold px-3 py-1.5 rounded-lg uppercase tracking-wide transition-all"
+            <div className="animate-fade-up">
+              <div className="flex items-center gap-2 mb-4">
+                <span
+                  className="w-8 h-px"
                   style={{
                     background:
-                      "transparent",
-                    border:
-                      "1px solid var(--border)",
-                    color: "var(--muted)",
-                    fontFamily:
-                      "'Plus Jakarta Sans', sans-serif",
+                      "var(--saffron)",
                   }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color =
-                      "var(--red)";
-                    e.currentTarget.style.borderColor =
-                      "var(--red)";
-                    e.currentTarget.style.background =
-                      "var(--red-lt)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color =
-                      "var(--muted)";
-                    e.currentTarget.style.borderColor =
-                      "var(--border)";
-                    e.currentTarget.style.background =
-                      "transparent";
+                />
+
+                <span
+                  className="text-[10px] font-black uppercase tracking-[0.22em]"
+                  style={{
+                    color:
+                      "var(--saffron)",
                   }}
                 >
-                  Remove bookmark
-                </button>
+                  Your collection
+                </span>
+              </div>
+
+              <h1
+                className="text-4xl md:text-5xl font-black tracking-tight leading-[1.05]"
+                style={{
+                  fontFamily:
+                    "'Plus Jakarta Sans', sans-serif",
+                  color: "var(--ink)",
+                }}
+              >
+                Schemes worth
+                <br />
+
+                <span
+                  style={{
+                    color:
+                      "var(--saffron)",
+                  }}
+                >
+                  remembering.
+                </span>
+              </h1>
+
+              <p
+                className="text-sm md:text-base mt-5 max-w-xl leading-7"
+                style={{
+                  color: "var(--muted)",
+                }}
+              >
+                Keep the government schemes that
+                matter to you in one place. Come back
+                whenever you're ready to explore them.
+              </p>
+            </div>
+
+            {/* SAVED COUNT */}
+            <div
+              className="animate-fade-up stagger-2 premium-card rounded-3xl px-6 py-5 min-w-[190px]"
+            >
+              <div className="flex items-center justify-between gap-5">
+                <div>
+                  <p
+                    className="text-[9px] font-bold uppercase tracking-[0.18em]"
+                    style={{
+                      color: "var(--muted)",
+                    }}
+                  >
+                    Saved schemes
+                  </p>
+
+                  <p
+                    className="text-4xl font-black mt-1"
+                    style={{
+                      fontFamily:
+                        "'JetBrains Mono', monospace",
+                      color:
+                        "var(--saffron)",
+                    }}
+                  >
+                    {String(activeList.length).padStart(
+                      2,
+                      "0"
+                    )}
+                  </p>
+                </div>
+
+                <div
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center text-xl"
+                  style={{
+                    background:
+                      "var(--saffron-lt)",
+                    border:
+                      "1px solid var(--border)",
+                  }}
+                >
+                  🔖
+                </div>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+
+          {/* DECORATIVE LINE */}
+          <div
+            className="mt-9 h-px w-full"
+            style={{
+              background:
+                "linear-gradient(90deg, var(--saffron), var(--border), transparent)",
+            }}
+          />
+        </section>
+
+        {/* =================================================
+            EMPTY STATE
+        ================================================= */}
+        {activeList.length === 0 ? (
+          <section className="animate-fade-up">
+            <div
+              className="relative rounded-[32px] overflow-hidden px-6 py-20 md:py-24 text-center"
+              style={{
+                background: "var(--panel)",
+                border:
+                  "1px solid var(--border)",
+                boxShadow:
+                  "var(--shadow-soft)",
+              }}
+            >
+              {/* Glow */}
+              <div
+                className="absolute w-72 h-72 rounded-full left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                style={{
+                  background:
+                    "radial-gradient(circle, rgba(224,123,57,0.10), transparent 68%)",
+                  filter: "blur(15px)",
+                }}
+              />
+
+              <div className="relative">
+                <div
+                  className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-7 text-3xl animate-float"
+                  style={{
+                    background:
+                      "var(--saffron-lt)",
+                    border:
+                      "1px solid var(--border)",
+                    boxShadow:
+                      "0 12px 35px rgba(224,123,57,0.10)",
+                  }}
+                >
+                  🔖
+                </div>
+
+                <p
+                  className="text-[10px] font-black uppercase tracking-[0.22em] mb-3"
+                  style={{
+                    color:
+                      "var(--saffron)",
+                  }}
+                >
+                  Nothing saved yet
+                </p>
+
+                <h2
+                  className="text-2xl md:text-3xl font-black tracking-tight"
+                  style={{
+                    fontFamily:
+                      "'Plus Jakarta Sans', sans-serif",
+                    color: "var(--ink)",
+                  }}
+                >
+                  Your shortlist is waiting.
+                </h2>
+
+                <p
+                  className="text-sm leading-6 max-w-md mx-auto mt-3"
+                  style={{
+                    color: "var(--muted)",
+                  }}
+                >
+                  Find schemes that match your profile
+                  and save the ones you want to come back
+                  to later.
+                </p>
+
+                <div className="mt-7">
+                  <span
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-black"
+                    style={{
+                      background:
+                        "var(--saffron)",
+                      color: "#fff",
+                      fontFamily:
+                        "'Plus Jakarta Sans', sans-serif",
+                      boxShadow:
+                        "0 8px 25px rgba(224,123,57,0.18)",
+                    }}
+                  >
+                    Go to Find Schemes
+                    <span>→</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
+        ) : (
+          <>
+            {/* =================================================
+                COLLECTION LABEL
+            ================================================= */}
+            <div
+              className="flex items-center justify-between mb-5 animate-fade-up stagger-2"
+            >
+              <div>
+                <p
+                  className="text-[10px] font-black uppercase tracking-[0.18em]"
+                  style={{
+                    color:
+                      "var(--muted)",
+                  }}
+                >
+                  Your shortlist
+                </p>
+
+                <p
+                  className="text-sm font-bold mt-1"
+                  style={{
+                    color:
+                      "var(--ink)",
+                  }}
+                >
+                  {activeList.length}{" "}
+                  {activeList.length === 1
+                    ? "scheme"
+                    : "schemes"}{" "}
+                  saved
+                </p>
+              </div>
+
+              <div className="hidden sm:flex items-center gap-2">
+                <span
+                  className="w-1.5 h-1.5 rounded-full animate-blink"
+                  style={{
+                    background:
+                      "var(--saffron)",
+                  }}
+                />
+
+                <span
+                  className="text-[9px] font-bold uppercase tracking-widest"
+                  style={{
+                    color:
+                      "var(--muted)",
+                  }}
+                >
+                  Your collection
+                </span>
+              </div>
+            </div>
+
+            {/* =================================================
+                CARDS
+            ================================================= */}
+            <div className="grid md:grid-cols-2 gap-6">
+              {activeList.map(
+                (scheme, idx) => (
+                  <div
+                    key={`${scheme.id}-${idx}`}
+                    className="group animate-fade-up"
+                    style={{
+                      animationDelay: `${
+                        0.08 + idx * 0.07
+                      }s`,
+                    }}
+                  >
+                    <RecommendationCard
+                      scheme={scheme}
+                      onViewDetails={
+                        onViewDetails
+                      }
+                    />
+
+                    {/* REMOVE ACTION */}
+                    <div className="flex justify-between items-center px-2 pt-2.5">
+                      <span
+                        className="text-[9px] uppercase tracking-widest font-semibold"
+                        style={{
+                          color:
+                            "var(--muted)",
+                        }}
+                      >
+                        Saved to bookmarks
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onRemoveScheme(
+                            scheme.id
+                          )
+                        }
+                        className="group/remove inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-lg transition-all duration-200"
+                        style={{
+                          color:
+                            "var(--muted)",
+                          border:
+                            "1px solid transparent",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color =
+                            "var(--red)";
+                          e.currentTarget.style.background =
+                            "var(--red-lt)";
+                          e.currentTarget.style.borderColor =
+                            "var(--red)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color =
+                            "var(--muted)";
+                          e.currentTarget.style.background =
+                            "transparent";
+                          e.currentTarget.style.borderColor =
+                            "transparent";
+                        }}
+                      >
+                        <span>×</span>
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 };

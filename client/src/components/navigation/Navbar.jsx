@@ -1,3 +1,4 @@
+
 import React, {
   useContext,
   useState,
@@ -77,24 +78,14 @@ const Navbar = ({
           }
           className="group flex items-center gap-3"
         >
-          <div
-            className="relative w-9 h-9 rounded-xl flex items-center justify-center overflow-hidden brand-mark"
-            style={{
-              background:
-                "var(--saffron)",
-            }}
-          >
+          <div className="relative w-9 h-9 rounded-xl flex items-center justify-center overflow-hidden brand-mark">
             <div className="absolute inset-0 brand-shine" />
 
-            <span
-              className="relative text-white text-[11px] font-black"
-              style={{
-                fontFamily:
-                  "'Plus Jakarta Sans', sans-serif",
-              }}
-            >
-              SC
-            </span>
+            <img
+              src="/logo.png"
+              alt="Scheme Companion"
+              className="relative w-full h-full object-contain"
+            />
           </div>
 
           <div className="text-left leading-none">
@@ -412,3 +403,4 @@ const Navbar = ({
 };
 
 export default Navbar;
+

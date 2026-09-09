@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from "react";
 import { getAIRecommendations, searchSchemes } from "../services/api";
 import ProfileCard from "../components/ProfileCard.jsx";
@@ -275,33 +276,177 @@ const FindSchemes = ({
 
         </div>
 
-        <div className="sc-discovery-orbit">
+        {/* LANDING-STYLE CHAKRA / SOLAR SYSTEM */}
 
-          <div className="sc-orbit-ring ring-one" />
-          <div className="sc-orbit-ring ring-two" />
-          <div className="sc-orbit-ring ring-three" />
+        <div className="sc-discovery-orbit sc-chakra-wrap">
 
-          <div className="sc-orbit-core">
-            <div className="sc-orbit-core-inner">
-              <span>✦</span>
-              <small>AI</small>
+          <div className="sc-chakra-halo" />
+          <div className="sc-chakra-halo sc-chakra-halo-two" />
+
+          <div className="sc-chakra-orbit sc-chakra-orbit-one">
+            <span className="sc-chakra-dot sc-dot-one" />
+            <span className="sc-chakra-dot sc-dot-two" />
+          </div>
+
+          <div className="sc-chakra-orbit sc-chakra-orbit-two">
+            <span className="sc-chakra-dot sc-dot-three" />
+            <span className="sc-chakra-dot sc-dot-four" />
+          </div>
+
+          <div className="sc-chakra-orbit sc-chakra-orbit-three">
+            <span className="sc-chakra-dot sc-dot-five" />
+          </div>
+
+          <div className="sc-chakra-ring">
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+
+          <div className="sc-chakra-ring sc-chakra-ring-middle">
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+
+          <div className="sc-chakra-ring sc-chakra-ring-inner">
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+
+          <div className="sc-chakra-core">
+
+            <div className="sc-chakra-core-pulse" />
+
+            <div className="sc-chakra-core-icon">
+
+              <svg
+                viewBox="0 0 100 100"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="38"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  opacity=".28"
+                />
+
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="27"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  opacity=".5"
+                />
+
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="8"
+                  fill="currentColor"
+                />
+
+                <path
+                  d="M50 10V31"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+
+                <path
+                  d="M50 69V90"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+
+                <path
+                  d="M10 50H31"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+
+                <path
+                  d="M69 50H90"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+
+                <path
+                  d="M22 22L37 37"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+
+                <path
+                  d="M63 63L78 78"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+
+                <path
+                  d="M78 22L63 37"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+
+                <path
+                  d="M37 63L22 78"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+
             </div>
+
+            <div className="sc-chakra-core-label">
+              AI MATCH
+            </div>
+
           </div>
 
-          <div className="sc-orbit-chip chip-one">
-            🎓 Education
+          <div className="sc-category-chip sc-chip-education">
+            <span>🎓</span>
+            Education
           </div>
 
-          <div className="sc-orbit-chip chip-two">
-            🌾 Agriculture
+          <div className="sc-category-chip sc-chip-health">
+            <span>🏥</span>
+            Healthcare
           </div>
 
-          <div className="sc-orbit-chip chip-three">
-            💼 Employment
+          <div className="sc-category-chip sc-chip-women">
+            <span>👩</span>
+            Women
           </div>
 
-          <div className="sc-orbit-chip chip-four">
-            🏥 Healthcare
+          <div className="sc-category-chip sc-chip-agriculture">
+            <span>🌾</span>
+            Agriculture
+          </div>
+
+          <div className="sc-category-chip sc-chip-startup">
+            <span>🚀</span>
+            Startup
+          </div>
+
+          <div className="sc-category-chip sc-chip-employment">
+            <span>💼</span>
+            Employment
           </div>
 
         </div>
@@ -425,7 +570,6 @@ const FindSchemes = ({
                 {[
                   "Student scholarships",
                   "Farmer support",
-                  "Women entrepreneurs",
                 ].map((example) => (
                   <button
                     type="button"
@@ -586,6 +730,7 @@ const FindSchemes = ({
 
               <div className="sc-filter-note">
                 <span>✦</span>
+
                 <span>
                   You don't need to fill every field.
                   We'll search with whatever information
@@ -631,6 +776,7 @@ const FindSchemes = ({
           </div>
 
           <div className="sc-loading-copy">
+
             <h3>
               Finding your best matches
             </h3>
@@ -639,6 +785,7 @@ const FindSchemes = ({
               Comparing your profile with thousands
               of government schemes...
             </p>
+
           </div>
 
           <div className="sc-loading-bars">
@@ -769,8 +916,8 @@ const FindSchemes = ({
                   {Math.min(
                     visibleCount,
                     schemes.length
-                  )}{" "}
-                  of {schemes.length}
+                  )}
+                  {" "}of {schemes.length}
                 </small>
 
               </div>
@@ -849,6 +996,7 @@ const FindSchemes = ({
                   background and what you need.
                 </p>
               </div>
+
             </div>
 
             <div className="sc-tip-card">
@@ -864,6 +1012,7 @@ const FindSchemes = ({
                   thousands of government schemes.
                 </p>
               </div>
+
             </div>
 
             <div className="sc-tip-card">
@@ -879,6 +1028,7 @@ const FindSchemes = ({
                   follow the official application link.
                 </p>
               </div>
+
             </div>
 
           </div>
@@ -891,3 +1041,4 @@ const FindSchemes = ({
 };
 
 export default FindSchemes;
+

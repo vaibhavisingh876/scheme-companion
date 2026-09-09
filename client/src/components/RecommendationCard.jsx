@@ -1,3 +1,4 @@
+
 import React from "react";
 
 const CATEGORY_COLORS = {
@@ -37,10 +38,17 @@ const getCategoryStyle = (cat) =>
     text: "var(--saffron-dk)",
   };
 
-const RecommendationCard = ({ scheme, onViewDetails }) => {
-  if (!scheme?.name || !scheme?.description) return null;
+const RecommendationCard = ({
+  scheme,
+  onViewDetails,
+}) => {
+  if (!scheme?.name || !scheme?.description) {
+    return null;
+  }
 
-  const { bg, text } = getCategoryStyle(scheme.category);
+  const { bg, text } = getCategoryStyle(
+    scheme.category
+  );
 
   const applyUrl =
     scheme.applicationLink?.trim().length > 0
@@ -49,31 +57,22 @@ const RecommendationCard = ({ scheme, onViewDetails }) => {
 
   return (
     <div
-      className="sc-recommendation-card rounded-2xl overflow-hidden transition-all duration-200 cursor-pointer"
+      className="premium-card group rounded-3xl overflow-hidden cursor-pointer animate-fade-up"
       style={{
         background: "var(--panel)",
         border: "1px solid var(--border)",
         borderLeft: "3px solid var(--saffron)",
       }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.boxShadow =
-          "0 8px 28px rgba(224,123,57,0.12)";
-        e.currentTarget.style.borderColor = "var(--saffron)";
-        e.currentTarget.style.borderLeftColor = "var(--saffron)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = "none";
-        e.currentTarget.style.borderColor = "var(--border)";
-        e.currentTarget.style.borderLeftColor = "var(--saffron)";
-      }}
-      onClick={() => onViewDetails && onViewDetails(scheme)}
+      onClick={() =>
+        onViewDetails?.(scheme)
+      }
     >
-      {/* Top section */}
-      <div className="px-5 pt-4 pb-3">
+      {/* TOP */}
+      <div className="relative px-5 pt-5 pb-3">
         <div className="flex items-center gap-2 flex-wrap">
           {scheme.category && (
             <span
-              className="text-[10px] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide"
+              className="text-[9px] font-bold px-2.5 py-1.5 rounded-full uppercase tracking-[0.08em]"
               style={{
                 background: bg,
                 color: text,
@@ -85,7 +84,7 @@ const RecommendationCard = ({ scheme, onViewDetails }) => {
 
           {scheme.state && (
             <span
-              className="text-[10px] font-medium px-2.5 py-1 rounded-full"
+              className="text-[9px] font-semibold px-2.5 py-1.5 rounded-full"
               style={{
                 background: "var(--surface)",
                 color: "var(--muted)",
@@ -98,11 +97,14 @@ const RecommendationCard = ({ scheme, onViewDetails }) => {
 
           {scheme.relevanceScore && (
             <span
-              className="text-[10px] font-bold shrink-0 px-2 py-1 rounded-lg ml-auto"
+              className="ml-auto text-[9px] font-bold px-2.5 py-1.5 rounded-lg"
               style={{
-                fontFamily: "'JetBrains Mono', monospace",
-                background: "var(--saffron-lt)",
-                color: "var(--saffron-dk)",
+                fontFamily:
+                  "'JetBrains Mono', monospace",
+                background:
+                  "var(--saffron-lt)",
+                color:
+                  "var(--saffron-dk)",
               }}
             >
               {scheme.relevanceScore}
@@ -111,12 +113,13 @@ const RecommendationCard = ({ scheme, onViewDetails }) => {
         </div>
       </div>
 
-      {/* Main content */}
-      <div className="sc-recommendation-content px-5 pb-4">
+      {/* CONTENT */}
+      <div className="px-5 pb-5">
         <h3
-          className="text-base font-bold leading-snug mb-2"
+          className="text-[17px] font-black leading-snug mb-2.5 tracking-tight"
           style={{
-            fontFamily: "'Plus Jakarta Sans', sans-serif",
+            fontFamily:
+              "'Plus Jakarta Sans', sans-serif",
             color: "var(--ink)",
           }}
         >
@@ -124,9 +127,13 @@ const RecommendationCard = ({ scheme, onViewDetails }) => {
         </h3>
 
         <p
-          className="text-sm leading-relaxed sc-recommendation-description"
+          className="text-sm leading-6"
           style={{
             color: "var(--muted)",
+            display: "-webkit-box",
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
           }}
         >
           {scheme.description}
@@ -134,62 +141,95 @@ const RecommendationCard = ({ scheme, onViewDetails }) => {
 
         {scheme.tags?.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-4">
-            {scheme.tags.slice(0, 5).map((tag, i) => (
-              <span
-                key={i}
-                className="text-[10px] px-2 py-0.5 rounded-md uppercase tracking-wide font-medium"
-                style={{
-                  background: "var(--surface)",
-                  color: "var(--muted)",
-                  border: "1px solid var(--border)",
-                }}
-              >
-                {tag}
-              </span>
-            ))}
+            {scheme.tags
+              .slice(0, 4)
+              .map((tag, i) => (
+                <span
+                  key={i}
+                  className="text-[9px] px-2 py-1 rounded-md uppercase tracking-wide font-semibold"
+                  style={{
+                    background:
+                      "var(--surface)",
+                    color: "var(--muted)",
+                    border:
+                      "1px solid var(--border)",
+                  }}
+                >
+                  {tag}
+                </span>
+              ))}
           </div>
         )}
       </div>
 
-      {/* Footer — always stays at bottom */}
+      {/* FOOTER */}
       <div
-        className="sc-card-footer px-5 py-4 mt-auto flex items-center justify-between gap-3"
+        className="px-5 py-4 flex items-center justify-between gap-3"
         style={{
-          borderTop: "1px solid var(--border)",
+          borderTop:
+            "1px solid var(--border)",
+          background:
+            "color-mix(in srgb, var(--surface) 35%, transparent)",
         }}
       >
-        <span
-          className="text-[11px] truncate"
-          style={{
-            color: "var(--muted)",
-            maxWidth: "55%",
-          }}
-          title={scheme.ministry || "Central Government"}
-        >
-          {scheme.ministry || "Central Government"}
-        </span>
+        <div className="min-w-0">
+          <p
+            className="text-[9px] uppercase tracking-[0.12em] font-bold mb-1"
+            style={{
+              color: "var(--muted)",
+            }}
+          >
+            Ministry
+          </p>
+
+          <span
+            className="block text-[10px] font-semibold truncate"
+            style={{
+              color: "var(--ink)",
+              maxWidth: "180px",
+            }}
+            title={
+              scheme.ministry ||
+              "Central Government"
+            }
+          >
+            {scheme.ministry ||
+              "Central Government"}
+          </span>
+        </div>
 
         <a
           href={applyUrl}
           target="_blank"
           rel="noreferrer"
-          className="sc-apply-button text-xs font-bold px-5 py-2 rounded-lg transition-all shrink-0"
+          className="group/apply shrink-0 inline-flex items-center gap-2 text-xs font-black px-4 py-2.5 rounded-xl text-white transition-all duration-300 hover:-translate-y-0.5"
           style={{
             background: "var(--saffron)",
-            color: "#fff",
-            fontFamily: "'Plus Jakarta Sans', sans-serif",
+            fontFamily:
+              "'Plus Jakarta Sans', sans-serif",
+            boxShadow:
+              "0 7px 20px rgba(224,123,57,0.15)",
           }}
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) =>
+            e.stopPropagation()
+          }
           onMouseEnter={(e) => {
             e.currentTarget.style.background =
               "var(--saffron-dk)";
+            e.currentTarget.style.boxShadow =
+              "0 10px 28px rgba(224,123,57,0.22)";
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background =
               "var(--saffron)";
+            e.currentTarget.style.boxShadow =
+              "0 7px 20px rgba(224,123,57,0.15)";
           }}
         >
-          Apply ↗
+          Apply
+          <span className="transition-transform duration-300 group-hover/apply:translate-x-0.5">
+            ↗
+          </span>
         </a>
       </div>
     </div>
@@ -197,3 +237,4 @@ const RecommendationCard = ({ scheme, onViewDetails }) => {
 };
 
 export default RecommendationCard;
+
