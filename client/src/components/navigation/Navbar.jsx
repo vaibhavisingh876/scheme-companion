@@ -1,10 +1,34 @@
-import React, { useContext, useState } from "react";
-import { AuthContext } from "../../context/AuthContext";
+import React, {
+  useContext,
+  useState,
+} from "react";
+
+import {
+  AuthContext,
+} from "../../context/AuthContext";
+
 import ThemeToggle from "../ThemeToggle";
 
-const Navbar = ({ activeTab, onTabChange }) => {
-  const { user, logout } = useContext(AuthContext);
-  const [mobileOpen, setMobileOpen] = useState(false);
+const Navbar = ({
+  activeTab,
+  onTabChange,
+}) => {
+  const {
+    user,
+    logout,
+  } = useContext(AuthContext);
+
+  const [
+    mobileOpen,
+    setMobileOpen,
+  ] = useState(false);
+
+  const handleNavigation = (
+    tab
+  ) => {
+    onTabChange(tab);
+    setMobileOpen(false);
+  };
 
   const handleAuthAction = () => {
     if (user?.loggedIn) {
@@ -12,196 +36,373 @@ const Navbar = ({ activeTab, onTabChange }) => {
     } else {
       onTabChange("auth");
     }
+
     setMobileOpen(false);
   };
 
   const navItems = [
-    { id: "landing", label: "Home" },
-    { id: "search", label: "Find Schemes" },
-    { id: "saved", label: "Bookmarks" },
+    {
+      id: "landing",
+      label: "Home",
+    },
+    {
+      id: "search",
+      label: "Find Schemes",
+    },
+    {
+      id: "saved",
+      label: "Bookmarks",
+    },
   ];
 
   return (
     <nav
+      className="sticky top-0 z-50 backdrop-blur-xl navbar-glass"
       style={{
-        borderBottom: "1px solid var(--border)",
-        backgroundColor: "var(--nav-bg)",
+        borderBottom:
+          "1px solid var(--border)",
+        background:
+          "var(--nav-bg)",
       }}
-      className="sticky top-0 z-50 backdrop-blur-md"
     >
-      <div className="max-w-7xl mx-auto px-5 sm:px-8 h-14 flex items-center justify-between">
-        {/* Logo */}
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 h-[68px] flex items-center justify-between">
+
+        {/* BRAND */}
+
         <button
-          onClick={() => onTabChange("landing")}
-          className="flex items-center gap-2 shrink-0"
-          style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+          onClick={() =>
+            handleNavigation(
+              "landing"
+            )
+          }
+          className="group flex items-center gap-3"
         >
           <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-black"
-            style={{ background: "var(--saffron)" }}
+            className="relative w-9 h-9 rounded-xl flex items-center justify-center overflow-hidden brand-mark"
+            style={{
+              background:
+                "var(--saffron)",
+            }}
           >
-            SC
-          </div>
-          <span className="text-sm font-black tracking-tight" style={{ color: "var(--ink)" }}>
-            Scheme<span style={{ color: "var(--saffron)" }}>Companion</span>
-          </span>
-        </button>
+            <div className="absolute inset-0 brand-shine" />
 
-        {/* Desktop nav */}
-        <div className="hidden md:flex items-center gap-1">
-          {navItems.map((item) => {
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => onTabChange(item.id)}
-                className="relative px-4 py-1.5 text-xs font-semibold transition-colors"
+            <span
+              className="relative text-white text-[11px] font-black"
+              style={{
+                fontFamily:
+                  "'Plus Jakarta Sans', sans-serif",
+              }}
+            >
+              SC
+            </span>
+          </div>
+
+          <div className="text-left leading-none">
+            <div
+              className="text-[15px] font-black tracking-tight"
+              style={{
+                fontFamily:
+                  "'Plus Jakarta Sans', sans-serif",
+                color:
+                  "var(--ink)",
+              }}
+            >
+              Scheme
+              <span
                 style={{
-                  color: isActive ? "var(--saffron)" : "var(--muted)",
-                  fontFamily: "'Inter', sans-serif",
+                  color:
+                    "var(--saffron)",
                 }}
               >
-                {item.label}
-                {isActive && (
-                  <span
-                    className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full"
-                    style={{ background: "var(--saffron)" }}
-                  />
-                )}
-              </button>
-            );
-          })}
+                Companion
+              </span>
+            </div>
+
+            <div
+              className="text-[8px] uppercase tracking-[0.18em] mt-1"
+              style={{
+                color:
+                  "var(--muted)",
+              }}
+            >
+              AI welfare discovery
+            </div>
+          </div>
+        </button>
+
+        {/* DESKTOP NAV */}
+
+        <div className="hidden md:flex items-center gap-1 p-1 rounded-2xl navbar-nav">
+          {navItems.map(
+            (item) => {
+              const isActive =
+                activeTab ===
+                item.id;
+
+              return (
+                <button
+                  key={item.id}
+                  onClick={() =>
+                    handleNavigation(
+                      item.id
+                    )
+                  }
+                  className="relative px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-300"
+                  style={{
+                    color: isActive
+                      ? "var(--ink)"
+                      : "var(--muted)",
+                    background:
+                      isActive
+                        ? "var(--panel)"
+                        : "transparent",
+                    boxShadow:
+                      isActive
+                        ? "0 3px 12px rgba(0,0,0,0.06)"
+                        : "none",
+                  }}
+                >
+                  {item.label}
+
+                  {isActive && (
+                    <span
+                      className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full"
+                      style={{
+                        background:
+                          "var(--saffron)",
+                      }}
+                    />
+                  )}
+                </button>
+              );
+            }
+          )}
         </div>
 
-        {/* Desktop right actions */}
+        {/* RIGHT */}
+
         <div className="hidden md:flex items-center gap-3">
+
           <ThemeToggle />
+
           {user?.loggedIn ? (
             <>
               <div
                 className="flex items-center gap-2.5 px-3 py-1.5 rounded-full"
-                style={{ border: "1px solid var(--border)", background: "var(--panel)" }}
+                style={{
+                  border:
+                    "1px solid var(--border)",
+                  background:
+                    "var(--panel)",
+                }}
               >
                 <div
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-black"
-                  style={{ background: "var(--saffron)" }}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-black"
+                  style={{
+                    background:
+                      "linear-gradient(135deg,var(--saffron),var(--saffron-dk))",
+                  }}
                 >
-                  {user.name.charAt(0).toUpperCase()}
+                  {user.name
+                    ?.charAt(0)
+                    ?.toUpperCase() ||
+                    "U"}
                 </div>
+
                 <span
-                  className="text-xs font-semibold pr-1"
-                  style={{ color: "var(--ink)", fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                  className="text-xs font-bold"
+                  style={{
+                    color:
+                      "var(--ink)",
+                  }}
                 >
                   {user.name}
                 </span>
               </div>
+
               <button
-                onClick={handleAuthAction}
-                className="text-xs font-semibold transition-colors"
-                style={{ color: "var(--muted)" }}
+                onClick={
+                  handleAuthAction
+                }
+                className="text-xs font-semibold px-2 py-2 transition-colors"
+                style={{
+                  color:
+                    "var(--muted)",
+                }}
               >
                 Sign out
               </button>
             </>
           ) : (
             <button
-              onClick={handleAuthAction}
-              className="text-xs font-bold px-5 py-2 rounded-lg transition-all"
+              onClick={
+                handleAuthAction
+              }
+              className="group relative overflow-hidden text-xs font-black px-5 py-2.5 rounded-xl text-white shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl"
               style={{
-                background: "var(--saffron)",
-                color: "#fff",
-                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                background:
+                  "var(--saffron)",
               }}
             >
-              Sign in
+              <span className="relative z-10">
+                Sign in
+              </span>
+
+              <span className="absolute inset-0 translate-y-full group-hover:translate-y-0 transition-transform duration-300 bg-[var(--saffron-dk)]" />
             </button>
           )}
         </div>
 
-        {/* Mobile hamburger */}
+        {/* MOBILE */}
+
         <button
-          onClick={() => setMobileOpen(!mobileOpen)}
-          className="md:hidden w-8 h-8 flex flex-col items-center justify-center gap-1.5"
+          onClick={() =>
+            setMobileOpen(
+              !mobileOpen
+            )
+          }
+          className="md:hidden w-10 h-10 rounded-xl flex flex-col items-center justify-center gap-1.5"
+          style={{
+            background:
+              "var(--panel)",
+            border:
+              "1px solid var(--border)",
+          }}
           aria-label="Toggle menu"
         >
           <span
-            className="w-5 h-0.5 rounded-full transition-all"
+            className="w-5 h-0.5 rounded-full transition-all duration-300"
             style={{
-              background: "var(--ink)",
-              transform: mobileOpen ? "rotate(45deg) translate(3px,3px)" : "none",
+              background:
+                "var(--ink)",
+              transform:
+                mobileOpen
+                  ? "rotate(45deg) translate(3px,3px)"
+                  : "none",
             }}
           />
+
           <span
-            className="w-5 h-0.5 rounded-full transition-all"
+            className="w-5 h-0.5 rounded-full transition-all duration-300"
             style={{
-              background: "var(--ink)",
-              opacity: mobileOpen ? 0 : 1,
+              background:
+                "var(--ink)",
+              opacity:
+                mobileOpen
+                  ? 0
+                  : 1,
             }}
           />
+
           <span
-            className="w-5 h-0.5 rounded-full transition-all"
+            className="w-5 h-0.5 rounded-full transition-all duration-300"
             style={{
-              background: "var(--ink)",
-              transform: mobileOpen ? "rotate(-45deg) translate(3px,-3px)" : "none",
+              background:
+                "var(--ink)",
+              transform:
+                mobileOpen
+                  ? "rotate(-45deg) translate(3px,-3px)"
+                  : "none",
             }}
           />
         </button>
       </div>
 
-      {/* Mobile menu */}
+      {/* MOBILE MENU */}
+
       {mobileOpen && (
         <div
-          className="md:hidden border-t animate-fade-in"
-          style={{ borderColor: "var(--border)", background: "var(--panel)" }}
+          className="md:hidden animate-slide-down"
+          style={{
+            borderTop:
+              "1px solid var(--border)",
+            background:
+              "var(--panel)",
+          }}
         >
-          <div className="px-5 py-3 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold" style={{ color: "var(--ink)" }}>
-                Theme
-              </span>
-              <ThemeToggle />
-            </div>
+          <div className="px-5 py-5 space-y-2">
 
-            {navItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  onTabChange(item.id);
-                  setMobileOpen(false);
-                }}
-                className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors"
-                style={{
-                  color: activeTab === item.id ? "var(--saffron)" : "var(--ink)",
-                  background: activeTab === item.id ? "var(--saffron-lt)" : "transparent",
-                }}
-              >
-                {item.label}
-              </button>
-            ))}
+            {navItems.map(
+              (item) => {
+                const active =
+                  activeTab ===
+                  item.id;
 
-            <div className="pt-2 border-t mt-2" style={{ borderColor: "var(--border)" }}>
-              {user?.loggedIn ? (
-                <div className="flex items-center justify-between px-4 py-2">
-                  <span className="text-sm font-semibold" style={{ color: "var(--ink)" }}>
-                    {user.name}
-                  </span>
+                return (
                   <button
-                    onClick={handleAuthAction}
-                    className="text-xs font-semibold"
-                    style={{ color: "var(--red)" }}
+                    key={item.id}
+                    onClick={() =>
+                      handleNavigation(
+                        item.id
+                      )
+                    }
+                    className="w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all"
+                    style={{
+                      color: active
+                        ? "var(--saffron)"
+                        : "var(--ink)",
+                      background:
+                        active
+                          ? "var(--saffron-lt)"
+                          : "transparent",
+                    }}
                   >
-                    Sign out
+                    {item.label}
                   </button>
-                </div>
+                );
+              }
+            )}
+
+            <div
+              className="pt-4 mt-3"
+              style={{
+                borderTop:
+                  "1px solid var(--border)",
+              }}
+            >
+              {user?.loggedIn ? (
+                <button
+                  onClick={
+                    handleAuthAction
+                  }
+                  className="w-full py-3 rounded-xl text-sm font-bold"
+                  style={{
+                    background:
+                      "var(--red-lt)",
+                    color:
+                      "var(--red)",
+                  }}
+                >
+                  Sign out
+                </button>
               ) : (
                 <button
-                  onClick={handleAuthAction}
-                  className="w-full text-center py-2.5 rounded-lg text-sm font-bold"
-                  style={{ background: "var(--saffron)", color: "#fff" }}
+                  onClick={
+                    handleAuthAction
+                  }
+                  className="w-full py-3 rounded-xl text-sm font-black text-white"
+                  style={{
+                    background:
+                      "var(--saffron)",
+                  }}
                 >
                   Sign in
                 </button>
               )}
+            </div>
+
+            <div className="flex items-center justify-between px-4 pt-3">
+              <span
+                className="text-xs font-semibold"
+                style={{
+                  color:
+                    "var(--muted)",
+                }}
+              >
+                Appearance
+              </span>
+
+              <ThemeToggle />
             </div>
           </div>
         </div>
