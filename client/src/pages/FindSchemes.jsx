@@ -240,21 +240,16 @@ const FindSchemes = ({
 
         <div className="sc-discovery-copy">
 
-          <div className="sc-eyebrow sc-light-eyebrow">
-            <span className="sc-live-dot" />
-            AI-POWERED BENEFIT DISCOVERY
-          </div>
-
           <h1>
-            Find benefits
+            Describe your situation,
             <br />
-            <span>made for you.</span>
+            <span>we'll do the matching.</span>
           </h1>
 
           <p>
-            Tell us what your life looks like. We'll connect
-            you with government schemes that actually fit
-            your situation.
+            Write a sentence or two about yourself, or fill in
+            what you know using the filters below. Either way
+            works.
           </p>
 
           <div className="sc-hero-trust">
@@ -267,8 +262,8 @@ const FindSchemes = ({
             <div className="sc-trust-divider" />
 
             <div className="sc-trust-item">
-              <strong>AI</strong>
-              <span>matching</span>
+              <strong>2</strong>
+              <span>ways to search</span>
             </div>
 
           </div>
@@ -291,8 +286,8 @@ const FindSchemes = ({
             <span className="sc-mode-icon">✦</span>
 
             <span>
-              <b>AI Assistant</b>
-              <small>Describe your situation</small>
+              <b>Describe it</b>
+              <small>In your own words</small>
             </span>
 
             {searchMode === "ai" && (
@@ -310,8 +305,8 @@ const FindSchemes = ({
             <span className="sc-mode-icon">⌘</span>
 
             <span>
-              <b>Advanced Filters</b>
-              <small>Fine-tune your eligibility</small>
+              <b>Use filters</b>
+              <small>Pick your details</small>
             </span>
 
             {searchMode === "manual" && (
@@ -339,17 +334,14 @@ const FindSchemes = ({
               </div>
 
               <div>
-                <div className="sc-card-kicker">
-                  NATURAL LANGUAGE SEARCH
-                </div>
-
                 <h2>
                   What are you looking for?
                 </h2>
 
                 <p>
-                  Just explain your situation naturally.
-                  Our AI will identify the details that matter.
+                  Mention your age, location, income, or
+                  occupation if you can — the more specific,
+                  the better the matches.
                 </p>
               </div>
 
@@ -374,10 +366,6 @@ const FindSchemes = ({
                 />
 
                 <div className="sc-prompt-footer">
-
-                  <span>
-                    ✦ AI understands natural language
-                  </span>
 
                   <span>
                     {aiMessage.length}/1000
@@ -413,13 +401,9 @@ const FindSchemes = ({
                   loading || !aiMessage.trim()
                 }
               >
-                <span>
-                  {loading
-                    ? "Finding your matches..."
-                    : "Find my matching schemes"}
-                </span>
-
-                <b>→</b>
+                {loading
+                  ? "Finding your matches..."
+                  : "Find my matching schemes"}
               </button>
 
             </form>
@@ -439,10 +423,6 @@ const FindSchemes = ({
               </div>
 
               <div>
-                <div className="sc-card-kicker">
-                  ELIGIBILITY FILTERS
-                </div>
-
                 <h2>
                   Build your profile
                 </h2>
@@ -552,28 +532,19 @@ const FindSchemes = ({
 
               </div>
 
-              <div className="sc-filter-note">
-                <span>✦</span>
-
-                <span>
-                  You don't need to fill every field.
-                  We'll search with whatever information
-                  you provide.
-                </span>
-              </div>
+              <p className="sc-filter-note">
+                You don't need to fill every field — we'll
+                search with whatever you provide.
+              </p>
 
               <button
                 className="sc-primary-btn sc-search-btn"
                 type="submit"
                 disabled={loading}
               >
-                <span>
-                  {loading
-                    ? "Searching..."
-                    : "Search eligible schemes"}
-                </span>
-
-                <b>→</b>
+                {loading
+                  ? "Searching..."
+                  : "Search eligible schemes"}
               </button>
 
             </form>
@@ -593,9 +564,7 @@ const FindSchemes = ({
             <div className="sc-loading-ring ring-a" />
             <div className="sc-loading-ring ring-b" />
 
-            <div className="sc-loading-core">
-              ✦
-            </div>
+            <div className="sc-loading-core" aria-hidden="true" />
 
           </div>
 
@@ -626,10 +595,9 @@ const FindSchemes = ({
       {!loading && hasSearched && profile && (
         <section className="sc-profile-section">
 
-          <div className="sc-section-marker">
-            <span />
-            YOUR PROFILE
-          </div>
+          <h3 className="sc-profile-heading">
+            Your profile
+          </h3>
 
           <ProfileCard profile={profile} />
 
@@ -646,11 +614,6 @@ const FindSchemes = ({
             <div className="sc-results-head">
 
               <div>
-
-                <div className="sc-section-marker">
-                  <span />
-                  MATCH RESULTS
-                </div>
 
                 <h2>
                   Recommended schemes
@@ -732,7 +695,6 @@ const FindSchemes = ({
                   Load{" "}
                   {Math.min(remaining, PAGE_SIZE)}
                   {" "}more
-                  <span>↓</span>
                 </button>
 
                 <small>
@@ -763,10 +725,6 @@ const FindSchemes = ({
               </div>
             </div>
 
-            <div className="sc-section-marker">
-              SEARCH COMPLETE
-            </div>
-
             <h3>
               No matching schemes yet
             </h3>
@@ -785,7 +743,7 @@ const FindSchemes = ({
                 setHasSearched(false);
               }}
             >
-              Try AI search →
+              Try describing it instead
             </button>
 
           </div>
@@ -796,13 +754,8 @@ const FindSchemes = ({
       {!hasSearched && !loading && (
         <section className="sc-discovery-tips">
 
-          <div className="sc-section-marker">
-            <span />
-            START HERE
-          </div>
-
           <h2>
-            One search. Thousands of possibilities.
+            How this works
           </h2>
 
           <div className="sc-tip-grid">
@@ -816,7 +769,7 @@ const FindSchemes = ({
                 </strong>
 
                 <p>
-                  Tell the AI about your goals,
+                  Tell us about your goals,
                   background and what you need.
                 </p>
               </div>
