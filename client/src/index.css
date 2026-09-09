@@ -274,23 +274,7 @@ button {
 }
 
 /* Find schemes page specific */
-@keyframes scChakraRotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-@keyframes scChakraRotateReverse {
-  from { transform: rotate(360deg); }
-  to { transform: rotate(0deg); }
-}
-@keyframes scChakraHaloPulse {
-  0%, 100% { transform: scale(.92); opacity: .55; }
-  50% { transform: scale(1.06); opacity: .9; }
-}
-@keyframes scChakraCorePulse {
-  0% { transform: scale(.7); opacity: .75; }
-  80%, 100% { transform: scale(1.45); opacity: 0; }
-}
-@keyframes scCategoryFloat {
+@keyframes scLogoFloat {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-8px); }
 }
@@ -1169,13 +1153,18 @@ button {
   overflow-x: clip;
 }
 
-/* Discovery hero */
+/* Discovery hero - clean centered */
 .sc-discovery-hero {
   position: relative;
   min-height: 430px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  isolation: isolate;
+  text-align: center;
   margin: -10px -24px 0;
   padding: 70px 70px;
-  overflow: hidden;
   border-radius: 0 0 34px 34px;
   background:
     radial-gradient(circle at 75% 45%, rgba(240,140,74,.20), transparent 34%),
@@ -1203,13 +1192,17 @@ button {
 
 .sc-discovery-copy {
   position: relative;
-  z-index: 5;
-  width: min(590px, 65%);
+  z-index: 2;
+  width: min(760px, calc(100% - 40px));
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   min-width: 0;
 }
 .sc-light-eyebrow { color: #d7c5b5; }
 .sc-discovery-copy h1 {
-  margin: 18px 0;
+  margin: 18px 0 20px;
   font-size: clamp(44px, 5vw, 68px);
   line-height: .98;
   letter-spacing: -.055em;
@@ -1218,8 +1211,8 @@ button {
 }
 .sc-discovery-copy h1 span { color: #f09a59; }
 .sc-discovery-copy > p {
-  max-width: 530px;
-  margin: 0;
+  max-width: 620px;
+  margin: 0 auto;
   color: #b9a99b;
   font-size: 16px;
   line-height: 1.7;
@@ -1228,193 +1221,28 @@ button {
   display: flex;
   align-items: center;
   gap: 22px;
-  margin-top: 34px;
+  margin-top: 30px;
+  justify-content: center;
 }
 .sc-trust-item { display: flex; flex-direction: column; gap: 3px; }
 .sc-trust-item strong { font-family: "JetBrains Mono", monospace; font-size: 18px; color: white; }
 .sc-trust-item span { font-size: 9px; color: #8e7e70; text-transform: uppercase; letter-spacing: .12em; }
 .sc-trust-divider { width: 1px; height: 30px; background: rgba(255,255,255,.13); }
 
-/* New Chakra Visual */
-.sc-chakra-wrap {
-  position: absolute;
-  right: 5px;
-  top: 50%;
-  width: 430px;
-  height: 430px;
-  transform: translateY(-50%);
-  pointer-events: none;
-}
-.sc-chakra-halo {
-  position: absolute;
-  inset: 5%;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    rgba(240, 140, 74, .18),
-    rgba(240, 140, 74, .06) 38%,
-    transparent 70%
-  );
-  filter: blur(18px);
-  animation: scChakraHaloPulse 5s ease-in-out infinite;
-}
-.sc-chakra-halo-two {
-  inset: 20%;
-  background: radial-gradient(
-    circle,
-    rgba(255, 174, 102, .14),
-    transparent 68%
-  );
-  filter: blur(12px);
-  animation-delay: -2s;
-}
-.sc-chakra-orbit {
-  position: absolute;
-  inset: 0;
-  border: 1px solid rgba(255, 255, 255, .10);
-  border-radius: 50%;
-  animation: scChakraRotate 28s linear infinite;
-}
-.sc-chakra-orbit-two {
-  inset: 17%;
-  border-color: rgba(255, 210, 160, .14);
-  animation-duration: 20s;
-  animation-direction: reverse;
-}
-.sc-chakra-orbit-three {
-  inset: 28%;
-  border-color: rgba(255, 150, 67, .18);
-  animation-duration: 14s;
-}
-.sc-chakra-dot {
-  position: absolute;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #ff9a46;
-  box-shadow:
-    0 0 12px rgba(255, 154, 70, .75),
-    0 0 28px rgba(255, 154, 70, .35);
-}
-.sc-dot-one { top: -4px; left: 25%; }
-.sc-dot-two { bottom: 16%; right: -4px; }
-.sc-dot-three { top: 16%; right: -4px; }
-.sc-dot-four { bottom: -4px; left: 35%; }
-.sc-dot-five { top: 25%; left: -4px; }
-.sc-chakra-ring {
-  position: absolute;
-  inset: 0;
-  border: 1px solid rgba(255, 255, 255, .11);
-  border-radius: 50%;
-  animation: scChakraRotate 32s linear infinite;
-}
-.sc-chakra-ring-middle {
-  inset: 12%;
-  border-color: rgba(255, 167, 94, .16);
-  animation-duration: 22s;
-  animation-direction: reverse;
-}
-.sc-chakra-ring-inner {
-  inset: 26%;
-  border-color: rgba(255, 196, 139, .13);
-  animation-duration: 15s;
-}
-.sc-chakra-ring span {
-  position: absolute;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #ff9a46;
-  box-shadow:
-    0 0 14px rgba(255, 154, 70, .7),
-    0 0 25px rgba(255, 154, 70, .25);
-}
-.sc-chakra-ring span:nth-child(1) { top: -4px; left: 50%; }
-.sc-chakra-ring span:nth-child(2) { right: -4px; top: 50%; }
-.sc-chakra-ring span:nth-child(3) { bottom: -4px; left: 50%; }
-.sc-chakra-ring span:nth-child(4) { left: -4px; top: 50%; }
-.sc-chakra-core {
-  position: absolute;
-  inset: 37%;
-  border: 1px solid rgba(255, 178, 104, .32);
-  border-radius: 50%;
-  background:
-    radial-gradient(
-      circle at 50% 45%,
-      rgba(255, 154, 70, .16),
-      rgba(255, 154, 70, .035) 55%,
-      transparent 72%
-    ),
-    rgba(18, 10, 4, .62);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+/* Logo hero */
+.sc-logo-hero {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-direction: column;
-  color: #ff9a46;
-  box-shadow:
-    0 0 35px rgba(240, 140, 74, .14),
-    inset 0 0 30px rgba(240, 140, 74, .05);
 }
-.sc-chakra-core-pulse {
-  position: absolute;
-  inset: 8%;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 154, 70, .25);
-  animation: scChakraCorePulse 3s ease-out infinite;
+.sc-find-logo {
+  width: 245px;
+  height: 245px;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 18px 45px rgba(224, 123, 57, .22));
+  animation: scLogoFloat 4s ease-in-out infinite;
 }
-.sc-chakra-core-icon {
-  position: relative;
-  width: 62%;
-  height: 62%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: scCategoryFloat 4s ease-in-out infinite;
-}
-.sc-chakra-core-icon svg {
-  width: 100%;
-  height: 100%;
-}
-.sc-chakra-core-label {
-  position: absolute;
-  bottom: 13%;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 8px;
-  letter-spacing: .16em;
-  color: rgba(255, 202, 157, .75);
-}
-.sc-category-chip {
-  position: absolute;
-  z-index: 5;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 9px 13px;
-  border: 1px solid rgba(255, 255, 255, .12);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, .055);
-  color: rgba(255, 241, 228, .88);
-  font-family: 'Inter', sans-serif;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: .01em;
-  white-space: nowrap;
-  box-shadow:
-    0 10px 28px rgba(0, 0, 0, .16),
-    inset 0 1px 0 rgba(255, 255, 255, .06);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  animation: scCategoryFloat 4s ease-in-out infinite;
-}
-.sc-category-chip span { font-size: 13px; line-height: 1; }
-.sc-chip-education { top: 5%; left: 8%; animation-delay: -.4s; }
-.sc-chip-health { top: 25%; right: -3%; animation-delay: -1.4s; }
-.sc-chip-women { bottom: 10%; left: 2%; animation-delay: -2.1s; }
-.sc-chip-agriculture { bottom: 0%; right: 15%; animation-delay: -.9s; }
-.sc-chip-startup { top: 47%; left: -9%; animation-delay: -2.8s; }
-.sc-chip-employment { top: 5%; right: 18%; animation-delay: -1.8s; }
 
 /* Search shell */
 .sc-search-shell {
@@ -2076,15 +1904,16 @@ button {
   .hero-title { font-size: clamp(45px, 6vw, 68px); }
   .hero-chakra-wrap { right: -110px; }
   .intro-grid { gap: 55px; }
-  .sc-chakra-wrap { right: -80px; opacity: .72; }
-  .sc-discovery-copy { width: 75%; }
   .sc-results-list { grid-template-columns: 1fr; }
   .sc-filter-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 900px) {
   .sc-discovery-hero { min-height: auto; }
-  .sc-chakra-wrap { transform: translateY(-50%) scale(.82); transform-origin: center; }
+  .sc-find-logo {
+    width: 210px;
+    height: 210px;
+  }
   .sc-results-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
   .sc-results-head { gap: 18px; }
 }
@@ -2135,16 +1964,6 @@ button {
   .sc-discovery-copy { width: 100%; }
   .sc-discovery-copy h1 { font-size: 47px; }
   .sc-discovery-copy > p { font-size: 13px; }
-  .sc-chakra-wrap {
-    width: 330px;
-    height: 330px;
-    right: -80px;
-    bottom: -60px;
-    top: auto;
-    transform: scale(.8);
-    transform-origin: center;
-    opacity: .72;
-  }
   .sc-hero-trust { gap: 14px; }
   .sc-search-shell { margin: -20px 0 0; }
   .sc-mode-switch { grid-template-columns: 1fr; }
@@ -2163,7 +1982,6 @@ button {
   .sc-discovery-copy { width: 100%; max-width: 100%; }
   .sc-discovery-copy h1 { font-size: clamp(2.2rem, 10vw, 3.4rem); line-height: 1.04; }
   .sc-discovery-copy p { width: 100%; max-width: 100%; font-size: 14px; }
-  .sc-chakra-wrap { display: none; }
   .sc-hero-trust { flex-wrap: wrap; gap: 12px; }
   .sc-trust-divider { display: none; }
   .sc-search-shell { width: 100%; max-width: 100%; }
@@ -2188,6 +2006,10 @@ button {
   .sc-result-item > .sc-recommendation-card { width: 100%; min-width: 0; }
   .sc-save-row { justify-content: flex-end; padding-top: 7px; }
   .sc-tip-grid { grid-template-columns: 1fr !important; }
+  .sc-find-logo {
+    width: 175px;
+    height: 175px;
+  }
 }
 
 @media (max-width: 600px) {
@@ -2270,12 +2092,7 @@ button {
   .scroll-line span,
   .steps-line-progress,
   .final-cta-ring,
-  .sc-chakra-orbit,
-  .sc-chakra-ring,
-  .sc-chakra-halo,
-  .sc-chakra-core-pulse,
-  .sc-chakra-core-icon,
-  .sc-category-chip {
+  .sc-find-logo {
     animation: none !important;
   }
   .scroll-reveal {
