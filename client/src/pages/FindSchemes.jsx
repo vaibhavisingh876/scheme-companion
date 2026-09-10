@@ -229,94 +229,121 @@ const FindSchemes = ({
   return (
     <div className="sc-page sc-search-page">
 
-      {/* HERO */}
+      {/* COMPACT HERO */}
 
-      <section className="sc-discovery-hero">
-
+      <section
+        className="sc-discovery-hero"
+        style={{
+          minHeight: "auto",
+          padding: "34px 24px 24px",
+        }}
+      >
         <div className="sc-hero-grid" />
 
         <div className="sc-hero-glow sc-hero-glow-one" />
         <div className="sc-hero-glow sc-hero-glow-two" />
 
-        <div className="sc-discovery-copy">
-
-          <h1>
-            Describe your situation,
+        <div
+          className="sc-discovery-copy"
+          style={{
+            maxWidth: "900px",
+            margin: "0 auto",
+            textAlign: "center",
+          }}
+        >
+          <h1
+            style={{
+              fontSize: "clamp(30px, 4vw, 42px)",
+              lineHeight: 1.12,
+              margin: 0,
+            }}
+          >
+            Find schemes
             <br />
-            <span>we'll do the matching.</span>
+            <span>that fit your needs.</span>
           </h1>
 
-          <p>
-            Write a sentence or two about yourself, or fill in
-            what you know using the filters below. Either way
-            works.
-          </p>
+          {/* SEARCH MODE BUTTONS */}
 
-          <div className="sc-hero-trust">
+          <div
+  className="sc-mode-switch"
+  style={{
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "4px",
+    padding: "4px",
+    margin: "20px auto 0",
+    background: "rgba(255,255,255,0.07)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: "14px",
+    boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
+    backdropFilter: "blur(12px)",
+  }}
+>
+  <button
+    type="button"
+    onClick={() => setSearchMode("ai")}
+    style={{
+      border: "none",
+      borderRadius: "10px",
+      padding: "9px 17px",
+      background:
+        searchMode === "ai"
+          ? "var(--saffron)"
+          : "transparent",
+      color: "#fff",
+      fontSize: "13px",
+      fontWeight: 700,
+      letterSpacing: "0.1px",
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+      boxShadow:
+        searchMode === "ai"
+          ? "0 4px 12px rgba(0,0,0,0.18)"
+          : "none",
+    }}
+  >
+    Describe it
+  </button>
 
-            <div className="sc-trust-item">
-              <strong>4,700+</strong>
-              <span>schemes</span>
-            </div>
-
-            <div className="sc-trust-divider" />
-
-            <div className="sc-trust-item">
-              <strong>2</strong>
-              <span>ways to search</span>
-            </div>
-
-          </div>
-
+  <button
+    type="button"
+    onClick={() => setSearchMode("manual")}
+    style={{
+      border: "none",
+      borderRadius: "10px",
+      padding: "9px 17px",
+      background:
+        searchMode === "manual"
+          ? "var(--saffron)"
+          : "transparent",
+      color: "#fff",
+      fontSize: "13px",
+      fontWeight: 700,
+      letterSpacing: "0.1px",
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+      boxShadow:
+        searchMode === "manual"
+          ? "0 4px 12px rgba(0,0,0,0.18)"
+          : "none",
+    }}
+  >
+    Use filters
+  </button>
+</div>
         </div>
-
       </section>
 
       {/* SEARCH */}
 
-      <div className="sc-search-shell">
-
-        <div className="sc-mode-switch">
-
-          <button
-            type="button"
-            className={searchMode === "ai" ? "active" : ""}
-            onClick={() => setSearchMode("ai")}
-          >
-            <span className="sc-mode-icon">✦</span>
-
-            <span>
-              <b>Describe it</b>
-              <small>In your own words</small>
-            </span>
-
-            {searchMode === "ai" && (
-              <span className="sc-active-check">
-                ✓
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            className={searchMode === "manual" ? "active" : ""}
-            onClick={() => setSearchMode("manual")}
-          >
-            <span className="sc-mode-icon">⌘</span>
-
-            <span>
-              <b>Use filters</b>
-              <small>Pick your details</small>
-            </span>
-
-            {searchMode === "manual" && (
-              <span className="sc-active-check">
-                ✓
-              </span>
-            )}
-          </button>
-
-        </div>
+      <div
+        className="sc-search-shell"
+        style={{
+          marginTop: "-2px",
+          paddingTop: "0",
+        }}
+      >
 
         {/* AI SEARCH */}
 
@@ -326,13 +353,7 @@ const FindSchemes = ({
               focused ? "is-focused" : ""
             }`}
           >
-
             <div className="sc-search-card-top">
-
-              <div className="sc-card-icon sc-ai-icon">
-                ✦
-              </div>
-
               <div>
                 <h2>
                   What are you looking for?
@@ -344,13 +365,10 @@ const FindSchemes = ({
                   the better the matches.
                 </p>
               </div>
-
             </div>
 
             <form onSubmit={handleAISearch}>
-
               <div className="sc-prompt-box">
-
                 <div className="sc-prompt-glow" />
 
                 <textarea
@@ -362,21 +380,17 @@ const FindSchemes = ({
                   onFocus={() => setFocused(true)}
                   onBlur={() => setFocused(false)}
                   placeholder="I'm a 22-year-old engineering student from Delhi, family income around ₹3 lakh, and I'm looking for scholarships..."
-                  rows={5}
+                  rows={4}
                 />
 
                 <div className="sc-prompt-footer">
-
                   <span>
                     {aiMessage.length}/1000
                   </span>
-
                 </div>
-
               </div>
 
               <div className="sc-example-row">
-
                 <span>Try asking:</span>
 
                 {[
@@ -391,7 +405,6 @@ const FindSchemes = ({
                     {example}
                   </button>
                 ))}
-
               </div>
 
               <button
@@ -405,9 +418,7 @@ const FindSchemes = ({
                   ? "Finding your matches..."
                   : "Find my matching schemes"}
               </button>
-
             </form>
-
           </section>
         )}
 
@@ -415,13 +426,7 @@ const FindSchemes = ({
 
         {searchMode === "manual" && (
           <section className="sc-search-card sc-filter-card">
-
             <div className="sc-search-card-top">
-
-              <div className="sc-card-icon sc-filter-icon">
-                ⌘
-              </div>
-
               <div>
                 <h2>
                   Build your profile
@@ -432,13 +437,10 @@ const FindSchemes = ({
                   can stay open.
                 </p>
               </div>
-
             </div>
 
             <form onSubmit={handleManualSearch}>
-
               <div className="sc-filter-grid">
-
                 <FilterSelect
                   label="Gender"
                   value={filters.gender}
@@ -505,13 +507,11 @@ const FindSchemes = ({
                 />
 
                 <div className="sc-filter-field">
-
                   <FieldLabel hint="Optional">
                     Annual income
                   </FieldLabel>
 
                   <div className="sc-income-input">
-
                     <span>₹</span>
 
                     <input
@@ -525,11 +525,8 @@ const FindSchemes = ({
                         )
                       }
                     />
-
                   </div>
-
                 </div>
-
               </div>
 
               <p className="sc-filter-note">
@@ -546,30 +543,26 @@ const FindSchemes = ({
                   ? "Searching..."
                   : "Search eligible schemes"}
               </button>
-
             </form>
-
           </section>
         )}
-
       </div>
 
       {/* LOADING */}
 
       {loading && (
         <div className="sc-loading-panel">
-
           <div className="sc-loading-visual">
-
             <div className="sc-loading-ring ring-a" />
             <div className="sc-loading-ring ring-b" />
 
-            <div className="sc-loading-core" aria-hidden="true" />
-
+            <div
+              className="sc-loading-core"
+              aria-hidden="true"
+            />
           </div>
 
           <div className="sc-loading-copy">
-
             <h3>
               Finding your best matches
             </h3>
@@ -578,7 +571,6 @@ const FindSchemes = ({
               Comparing your profile with thousands
               of government schemes...
             </p>
-
           </div>
 
           <div className="sc-loading-bars">
@@ -586,7 +578,6 @@ const FindSchemes = ({
             <span />
             <span />
           </div>
-
         </div>
       )}
 
@@ -594,13 +585,11 @@ const FindSchemes = ({
 
       {!loading && hasSearched && profile && (
         <section className="sc-profile-section">
-
           <h3 className="sc-profile-heading">
             Your profile
           </h3>
 
           <ProfileCard profile={profile} />
-
         </section>
       )}
 
@@ -610,11 +599,8 @@ const FindSchemes = ({
         hasSearched &&
         schemes.length > 0 && (
           <section className="sc-results-section">
-
             <div className="sc-results-head">
-
               <div>
-
                 <h2>
                   Recommended schemes
                 </h2>
@@ -622,20 +608,16 @@ const FindSchemes = ({
                 <p>
                   Ranked by relevance to your situation.
                 </p>
-
               </div>
 
               <div className="sc-count-pill">
                 <strong>{schemes.length}</strong>
                 <span>matches found</span>
               </div>
-
             </div>
 
             <div className="sc-results-list">
-
               {visibleSchemes.map((scheme, index) => {
-
                 const isSaved = savedIds.includes(
                   scheme.id
                 );
@@ -650,14 +632,12 @@ const FindSchemes = ({
                       }s`,
                     }}
                   >
-
                     <RecommendationCard
                       scheme={scheme}
                       onViewDetails={onViewDetails}
                     />
 
                     <div className="sc-save-row">
-
                       <button
                         type="button"
                         className={`sc-save-float ${
@@ -676,18 +656,14 @@ const FindSchemes = ({
                           ? "✓ Saved"
                           : "＋ Save scheme"}
                       </button>
-
                     </div>
-
                   </div>
                 );
               })}
-
             </div>
 
             {remaining > 0 && (
               <div className="sc-load-more">
-
                 <button
                   type="button"
                   onClick={loadMore}
@@ -705,10 +681,8 @@ const FindSchemes = ({
                   )}
                   {" "}of {schemes.length}
                 </small>
-
               </div>
             )}
-
           </section>
         )}
 
@@ -718,7 +692,6 @@ const FindSchemes = ({
         hasSearched &&
         schemes.length === 0 && (
           <div className="sc-empty-state">
-
             <div className="sc-empty-visual">
               <div className="sc-empty-circle">
                 ?
@@ -745,74 +718,8 @@ const FindSchemes = ({
             >
               Try describing it instead
             </button>
-
           </div>
         )}
-
-      {/* INITIAL STATE */}
-
-      {!hasSearched && !loading && (
-        <section className="sc-discovery-tips">
-
-          <h2>
-            How this works
-          </h2>
-
-          <div className="sc-tip-grid">
-
-            <div className="sc-tip-card">
-              <span>01</span>
-
-              <div>
-                <strong>
-                  Describe your situation
-                </strong>
-
-                <p>
-                  Tell us about your goals,
-                  background and what you need.
-                </p>
-              </div>
-
-            </div>
-
-            <div className="sc-tip-card">
-              <span>02</span>
-
-              <div>
-                <strong>
-                  Get personalized matches
-                </strong>
-
-                <p>
-                  Your profile is matched against
-                  thousands of government schemes.
-                </p>
-              </div>
-
-            </div>
-
-            <div className="sc-tip-card">
-              <span>03</span>
-
-              <div>
-                <strong>
-                  Explore & apply
-                </strong>
-
-                <p>
-                  Open the scheme details and
-                  follow the official application link.
-                </p>
-              </div>
-
-            </div>
-
-          </div>
-
-        </section>
-      )}
-
     </div>
   );
 };

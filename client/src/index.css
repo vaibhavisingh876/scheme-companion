@@ -2115,3 +2115,37 @@ button {
 .sc-search-page button {
   max-width: 100%;
 }
+/* =========================================================
+   LANDING — EQUAL POPULAR SCHEME CARDS
+========================================================= */
+
+.popular-grid {
+  align-items: stretch;
+}
+
+.scheme-card {
+  height: 100%;
+  min-height: 360px;
+  display: flex;
+  flex-direction: column;
+}
+
+.scheme-card-top {
+  min-height: 34px;
+}
+
+.scheme-card h3 {
+  min-height: 52px;
+}
+
+.scheme-card > p {
+  min-height: 84px;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.scheme-card-bottom {
+  margin-top: auto !important;
+}
