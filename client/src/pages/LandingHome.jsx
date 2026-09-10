@@ -14,17 +14,15 @@ const StatPill = ({ value, label }) => (
       {value}
     </p>
 
-```
-<p
-  className="text-[9px] md:text-[10px] uppercase tracking-widest mt-1"
-  style={{
-    color: "rgba(255,255,255,0.42)",
-    fontFamily: "'Inter', sans-serif",
-  }}
->
-  {label}
-</p>
-
+    <p
+      className="text-[9px] md:text-[10px] uppercase tracking-widest mt-1"
+      style={{
+        color: "rgba(255,255,255,0.42)",
+        fontFamily: "'Inter', sans-serif",
+      }}
+    >
+      {label}
+    </p>
 
   </div>
 );
@@ -43,80 +41,78 @@ const SchemeCard = ({ scheme, onViewDetails }) => (
   >
     <div className="scheme-card-glow orange" />
 
-```
-<div
-  className="scheme-card-top"
-  style={{
-    minHeight: "34px",
-  }}
->
-  <span className="scheme-category">
-    {scheme.category || "General"}
-  </span>
-</div>
+    <div
+      className="scheme-card-top"
+      style={{
+        minHeight: "34px",
+      }}
+    >
+      <span className="scheme-category">
+        {scheme.category || "General"}
+      </span>
+    </div>
 
-<h3
-  style={{
-    minHeight: "52px",
-  }}
->
-  {scheme.name}
-</h3>
+    <h3
+      style={{
+        minHeight: "52px",
+      }}
+    >
+      {scheme.name}
+    </h3>
 
-<p
-  style={{
-    minHeight: "84px",
-    display: "-webkit-box",
-    WebkitLineClamp: 4,
-    WebkitBoxOrient: "vertical",
-    overflow: "hidden",
-  }}
->
-  {scheme.description ||
-    "Government benefit scheme. View details to learn more."}
-</p>
+    <p
+      style={{
+        minHeight: "84px",
+        display: "-webkit-box",
+        WebkitLineClamp: 4,
+        WebkitBoxOrient: "vertical",
+        overflow: "hidden",
+      }}
+    >
+      {scheme.description ||
+        "Government benefit scheme. View details to learn more."}
+    </p>
 
-<div
-  className="scheme-card-bottom"
-  style={{
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "12px",
-    marginTop: "auto",
-    paddingTop: "14px",
-    borderTop: "1px solid var(--border)",
-  }}
->
-  <span
-    style={{
-      color: "var(--muted)",
-      fontSize: "10px",
-      fontWeight: 700,
-      minWidth: 0,
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap",
-    }}
-  >
-    {scheme.state || "All India"}
-  </span>
+    <div
+      className="scheme-card-bottom"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "12px",
+        marginTop: "auto",
+        paddingTop: "14px",
+        borderTop: "1px solid var(--border)",
+      }}
+    >
+      <span
+        style={{
+          color: "var(--muted)",
+          fontSize: "10px",
+          fontWeight: 700,
+          minWidth: 0,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {scheme.state || "All India"}
+      </span>
 
-  <a
-    href={
-      scheme.applicationLink ||
-      "https://www.myscheme.gov.in"
-    }
-    target="_blank"
-    rel="noreferrer"
-    className="scheme-explore"
-    onClick={(e) => e.stopPropagation()}
-  >
-    Apply
-    <span>↗</span>
-  </a>
-</div>
-```
+      <a
+        href={
+          scheme.applicationLink ||
+          "https://www.myscheme.gov.in"
+        }
+        target="_blank"
+        rel="noreferrer"
+        className="scheme-explore"
+        onClick={(e) => e.stopPropagation()}
+      >
+        Apply
+        <span>↗</span>
+      </a>
+    </div>
 
   </div>
 );
@@ -150,7 +146,6 @@ useEffect(() => {
 const elements =
 document.querySelectorAll(".scroll-reveal");
 
-```
 if (!elements.length) return;
 
 const observer = new IntersectionObserver(
@@ -172,7 +167,6 @@ elements.forEach((element) =>
 );
 
 return () => observer.disconnect();
-```
 
 }, [popularSchemes]);
 
@@ -190,7 +184,6 @@ behavior: "smooth",
 
 return ( <div className="landing-page">
 
-```
   {/* HERO */}
 
   <section className="hero-section">

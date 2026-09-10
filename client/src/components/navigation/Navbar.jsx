@@ -1,4 +1,3 @@
-
 import React, {
   useContext,
   useState,
@@ -107,16 +106,6 @@ const Navbar = ({
               >
                 Companion
               </span>
-            </div>
-
-            <div
-              className="text-[8px] uppercase tracking-[0.18em] mt-1"
-              style={{
-                color:
-                  "var(--muted)",
-              }}
-            >
-              AI welfare discovery
             </div>
           </div>
         </button>
@@ -403,4 +392,3 @@ const Navbar = ({
 };
 
 export default Navbar;
-

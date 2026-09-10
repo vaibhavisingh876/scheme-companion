@@ -68,7 +68,6 @@ onViewDetails?.(scheme)
 >
 {/* TOP */}
 
-```
   <div className="relative px-5 pt-5 pb-3">
     <div
       className="flex items-center gap-2 flex-wrap"
@@ -253,7 +252,6 @@ onViewDetails?.(scheme)
     </a>
   </div>
 </div>
-
 
 );
 };
