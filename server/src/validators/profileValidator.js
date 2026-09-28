@@ -57,9 +57,10 @@ export const profileSchema = z.object({
     .catch("unknown"),
 
   state: z
-    .string()
-    .transform(sanitizeString)
-    .default("unknown"),
+    .preprocess(
+      (val) => (typeof val === "string" ? val.toLowerCase().trim() || "unknown" : "unknown"),
+      z.string().default("unknown")
+    ),
 
   income: nullableIncome,
 

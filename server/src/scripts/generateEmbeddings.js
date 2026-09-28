@@ -5,7 +5,10 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const prisma = new PrismaClient();
-const BATCH_SIZE = 50;
+
+const INFERENCE_BATCH_SIZE = 32;
+const DB_BATCH_SIZE = 64;
+const EMBEDDING_DIMENSION = 384;
 
 const buildDescriptionText = (scheme) => {
   const parts = [
@@ -27,28 +30,34 @@ const buildDescriptionText = (scheme) => {
 };
 
 const buildEligibilityText = (scheme) => {
-  const parts = [
-    `eligibility: ${scheme.eligibility || ""}`,
-    `occupations: ${(scheme.allowedOccupations || []).join(" ")}`,
-    `categories: ${(scheme.allowedCategories || []).join(" ")}`,
-    `genders: ${(scheme.allowedGenders || []).join(" ")}`,
-    `states: ${(scheme.allowedStates || []).join(" ")}`,
-    `education: ${(scheme.allowedEducationLevels || []).join(" ")}`,
-    `minimum age: ${scheme.minAge ?? ""}`,
-    `maximum age: ${scheme.maxAge ?? ""}`,
-    `minimum income: ${scheme.minIncome ?? ""}`,
-    `maximum income: ${scheme.maxIncome ?? ""}`,
-    `scholarship: ${scheme.isScholarship ? "yes" : "no"}`,
-    `female only: ${scheme.isFemaleOnly ? "yes" : "no"}`,
-  ];
-
-  return parts
-    .filter((part) => part.trim())
-    .join(" | ")
+  return String(scheme.eligibility || "")
     .toLowerCase()
     .replace(/\s+/g, " ")
     .trim();
 };
+
+const getEmbedding = (output, index) => {
+  const start = index * EMBEDDING_DIMENSION;
+  const end = start + EMBEDDING_DIMENSION;
+
+  return Array.from(output.data.slice(start, end));
+};
+
+async function saveUpdates(updates) {
+  if (updates.length === 0) return;
+
+  await prisma.$transaction(
+    updates.map((u) =>
+      prisma.scheme.update({
+        where: { id: u.id },
+        data: {
+          descriptionEmbedding: u.descriptionEmbedding,
+          eligibilityEmbedding: u.eligibilityEmbedding,
+        },
+      })
+    )
+  );
+}
 
 async function generateEmbeddings() {
   try {
@@ -118,101 +127,107 @@ async function generateEmbeddings() {
 
     let success = 0;
     let failed = 0;
+    let skipped = 0;
     let updates = [];
 
-    for (let i = 0; i < schemes.length; i++) {
-      const scheme = schemes[i];
+    for (
+      let i = 0;
+      i < schemes.length;
+      i += INFERENCE_BATCH_SIZE
+    ) {
+      const batch = schemes.slice(
+        i,
+        i + INFERENCE_BATCH_SIZE
+      );
 
-      try {
+      const validSchemes = [];
+      const descriptionTexts = [];
+      const eligibilityTexts = [];
+
+      for (const scheme of batch) {
         const descriptionText = buildDescriptionText(scheme);
         const eligibilityText = buildEligibilityText(scheme);
 
         if (!descriptionText || !eligibilityText) {
+          skipped++;
           console.warn(
             `⚠️ Missing text for ${scheme.id} — skipping`
           );
           continue;
         }
 
+        validSchemes.push(scheme);
+        descriptionTexts.push(descriptionText);
+        eligibilityTexts.push(eligibilityText);
+      }
+
+      if (validSchemes.length === 0) {
+        continue;
+      }
+
+      try {
         const [
           descriptionOutput,
           eligibilityOutput,
         ] = await Promise.all([
-          extractor(descriptionText, {
+          extractor(descriptionTexts, {
             pooling: "mean",
             normalize: true,
           }),
-          extractor(eligibilityText, {
+          extractor(eligibilityTexts, {
             pooling: "mean",
             normalize: true,
           }),
         ]);
 
-        updates.push({
-          id: scheme.id,
-          descriptionEmbedding: Array.from(
-            descriptionOutput.data
-          ),
-          eligibilityEmbedding: Array.from(
-            eligibilityOutput.data
-          ),
-        });
-
-        if (updates.length >= BATCH_SIZE) {
-          await prisma.$transaction(
-            updates.map((u) =>
-              prisma.scheme.update({
-                where: { id: u.id },
-                data: {
-                  descriptionEmbedding: u.descriptionEmbedding,
-                  eligibilityEmbedding: u.eligibilityEmbedding,
-                },
-              })
-            )
-          );
-
-          success += updates.length;
-          updates = [];
-
-          console.log(
-            `✅ ${success} / ${schemes.length} done`
-          );
+        for (let j = 0; j < validSchemes.length; j++) {
+          updates.push({
+            id: validSchemes[j].id,
+            descriptionEmbedding: getEmbedding(
+              descriptionOutput,
+              j
+            ),
+            eligibilityEmbedding: getEmbedding(
+              eligibilityOutput,
+              j
+            ),
+          });
         }
+
+        success += validSchemes.length;
+
+        if (updates.length >= DB_BATCH_SIZE) {
+          await saveUpdates(updates);
+          updates = [];
+        }
+
+        console.log(
+          `✅ ${Math.min(
+            i + batch.length,
+            schemes.length
+          )} / ${schemes.length} processed`
+        );
       } catch (err) {
-        failed++;
+        failed += validSchemes.length;
 
         console.error(
-          `❌ Failed ${scheme.id}: ${err.message}`
+          `❌ Batch failed (${i + 1}-${i + batch.length}): ${err.message}`
         );
       }
     }
 
     if (updates.length > 0) {
-      await prisma.$transaction(
-        updates.map((u) =>
-          prisma.scheme.update({
-            where: { id: u.id },
-            data: {
-              descriptionEmbedding: u.descriptionEmbedding,
-              eligibilityEmbedding: u.eligibilityEmbedding,
-            },
-          })
-        )
-      );
-
-      success += updates.length;
-
-      console.log(
-        `✅ ${success} / ${schemes.length} done`
-      );
+      await saveUpdates(updates);
+      updates = [];
     }
 
     console.log("\n🎉 COMPLETED");
     console.log(`✅ Success : ${success}`);
     console.log(`❌ Failed  : ${failed}`);
+    console.log(`⚠️ Skipped : ${skipped}`);
   } catch (err) {
     console.error("💥 Fatal error:", err);
-    process.exit(1);
+    process.exitCode = 1;
   } finally {
     await prisma.$disconnect();
   }

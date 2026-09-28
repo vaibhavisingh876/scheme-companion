@@ -134,6 +134,8 @@ export const extractUserProfile = async (message) => {
         parsed[field] = parsed[field]
           .toLowerCase()
           .trim();
+      } else {
+        parsed[field] = "unknown";
       }
     }
 

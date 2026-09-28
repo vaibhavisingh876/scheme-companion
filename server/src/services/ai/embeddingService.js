@@ -25,24 +25,7 @@ const buildDescriptionText = (scheme) => {
 };
 
 const buildEligibilityText = (scheme) => {
-  const parts = [
-    `eligibility: ${scheme.eligibility || ""}`,
-    `occupations: ${(scheme.allowedOccupations || []).join(" ")}`,
-    `categories: ${(scheme.allowedCategories || []).join(" ")}`,
-    `genders: ${(scheme.allowedGenders || []).join(" ")}`,
-    `states: ${(scheme.allowedStates || []).join(" ")}`,
-    `education: ${(scheme.allowedEducationLevels || []).join(" ")}`,
-    `minimum age: ${scheme.minAge ?? ""}`,
-    `maximum age: ${scheme.maxAge ?? ""}`,
-    `minimum income: ${scheme.minIncome ?? ""}`,
-    `maximum income: ${scheme.maxIncome ?? ""}`,
-    `scholarship: ${scheme.isScholarship ? "yes" : "no"}`,
-    `female only: ${scheme.isFemaleOnly ? "yes" : "no"}`,
-  ];
-
-  return parts
-    .filter((part) => part.trim())
-    .join(" | ")
+  return String(scheme.eligibility || "")
     .toLowerCase()
     .replace(/\s+/g, " ")
     .trim();

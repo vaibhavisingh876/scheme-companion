@@ -10,7 +10,8 @@ export const scoreScheme = (scheme, profile) => {
   let hardConflicts = 0;
   let ruleScore = 0;
 
-  const semanticSimilarity = scheme._similarity || 0;
+  const semanticSimilarity =
+    scheme._similarity ?? scheme._semanticSimilarity ?? 0;
 
   // ── AGE CHECK ──────────────────────────
   if (profile.age !== null && profile.age !== undefined) {

@@ -138,6 +138,15 @@ const normalizeTags = (tags) => {
 // ---------- Generic text helpers ----------
 const normalizeText = (text = "") =>
   String(text || "")
+    .replace(/&amp;#39;/gi, "'")
+    .replace(/&amp;/gi, "&")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&#39;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\brs\./gi, "rs ")
+    .replace(/\binr\./gi, "inr ")
     .toLowerCase()
     .replace(/\s+/g, " ")
     .trim();
@@ -159,53 +168,27 @@ const hasAnyPattern = (text, patterns = []) =>
   );
 
 // ---------- Income parser ----------
-const parseIncome = (value) => {
-  if (
-    value === null ||
-    value === undefined ||
-    value === ""
-  ) {
-    return null;
-  }
-
-  const original = String(value)
-    .toLowerCase()
-    .trim();
-
-  let str = original
-    .replace(/₹/g, "")
-    .replace(/rs\.?/g, "")
-    .replace(/inr/g, "")
-    .replace(/,/g, "")
-    .replace(/\s+/g, " ");
-
-  const numMatch = str.match(
-    /(\d+(?:\.\d+)?)/
-  );
-
+const parseCurrencyAmount = (rawStr, isMonthly = false) => {
+  if (!rawStr) return null;
+  const str = String(rawStr).toLowerCase().replace(/,/g, "").trim();
+  const numMatch = str.match(/(\d+(?:\.\d+)?)/);
   if (!numMatch) return null;
 
   let num = parseFloat(numMatch[1]);
-
   if (Number.isNaN(num)) return null;
 
-  if (/\bcrore?s?\b/i.test(str)) {
+  if (/\b(?:crores?|cr)\b/i.test(str)) {
     num *= 10000000;
-  } else if (
-    /\b(?:lakh|lac|lacs)\b/i.test(str)
-  ) {
+  } else if (/\b(?:lakhs?|lacs?)\b/i.test(str)) {
     num *= 100000;
-  } else if (/\bthousand\b/i.test(str)) {
+  } else if (/\b(?:thousands?|k)\b/i.test(str)) {
     num *= 1000;
-  } else if (/\bk\b/i.test(str)) {
-    num *= 1000;
+  } else if (num < 1000 && !isMonthly) {
+    // Sanity check: Standalone numbers < 1000 without lakh/crore/thousand are NOT valid annual INR income limits
+    return null;
   }
 
-  if (
-    /\b(?:per month|\/month|monthly)\b/i.test(
-      original
-    )
-  ) {
+  if (isMonthly || /\b(?:per\s+month|\/month|monthly)\b/i.test(str)) {
     num *= 12;
   }
 
@@ -217,18 +200,19 @@ const extractIncomeLimits = (
   eligibility,
   fallbackValue = null
 ) => {
-  const text = normalizeText(eligibility);
-
   let minIncome = null;
   let maxIncome = null;
 
   if (
     fallbackValue !== null &&
-    fallbackValue !== undefined
+    fallbackValue !== undefined &&
+    fallbackValue !== ""
   ) {
-    maxIncome = parseIncome(fallbackValue);
+    const parsed = parseCurrencyAmount(String(fallbackValue));
+    if (parsed !== null) maxIncome = parsed;
   }
 
+  const text = normalizeText(eligibility);
   if (!text) {
     return {
       minIncome,
@@ -236,65 +220,69 @@ const extractIncomeLimits = (
     };
   }
 
-  const incomePattern =
-    "(?:annual|yearly|family|household)?\\s*(?:family\\s+)?income";
+  // Clause splitting by punctuation to keep context bounded, preserving decimals like 3.5
+  const clauses = text
+    .split(/(?<!\d)\.(?!\d)|[;\n|]+/)
+    .map((c) => c.trim())
+    .filter(Boolean);
 
-  const maxRegexes = [
-    new RegExp(
-      `(?:not exceed|does not exceed|should not exceed|less than or equal to|up to|upto|maximum|max(?:imum) of)\\s*(?:rs\\.?\\s*)?(\\d+(?:\\.\\d+)?\\s*(?:lakh|lac|crore|thousand|k)?)`,
-      "i"
-    ),
-    new RegExp(
-      `(?:${incomePattern}).{0,80}?(?:not exceed|does not exceed|should not exceed|less than|below|up to|upto|max(?:imum)?)\\s*(?:rs\\.?\\s*)?(\\d+(?:\\.\\d+)?\\s*(?:lakh|lac|crore|thousand|k)?)`,
-      "i"
-    ),
-    new RegExp(
-      `(?:rs\\.?\\s*)?(\\d+(?:\\.\\d+)?\\s*(?:lakh|lac|crore|thousand|k)?)\\s*(?:per annum|per year|annually)?\\s*(?:or less|or below|or less than|and below)`,
-      "i"
-    ),
+  const incomeKeywords =
+    /\b(?:family\s+income|annual\s+income|household\s+income|parental\s+income|gross\s+income|total\s+income|family's\s+income|personal\s+income|income\s+ceiling|income\s+limit|annual\s+turnover|income)\b/i;
+
+  const maxPatterns = [
+    /(?:family\s+|personal\s+)?income.{0,60}?(?:less\s+than\s+or\s+equal\s+to|less\s+than|should\s+not\s+exceed|does\s+not\s+exceed|not\s+exceed|must\s+not\s+exceed|below|up\s*to|maximum\s+of|maximum|max|under|not\s+more\s+than|within|ceiling\s+of)\s*[:=]?\s*(?:rs|inr|₹)?\s*([\d,]+(?:\.\d+)?\s*(?:lakhs?|lacs?|crores?|thousands?|k)?(?:\s*\/-)?(?:\s*(?:per\s+annum|per\s+year|p\.a\.|annually|per\s+month|monthly))?)/i,
+    /(?:less\s+than\s+or\s+equal\s+to|less\s+than|should\s+not\s+exceed|does\s+not\s+exceed|not\s+exceed|must\s+not\s+exceed|below|up\s*to|maximum\s+of|maximum|under|not\s+more\s+than)\s*(?:of\s+)?(?:family\s+|personal\s+)?income\s*(?:of\s+)?[:=]?\s*(?:rs|inr|₹)?\s*([\d,]+(?:\.\d+)?\s*(?:lakhs?|lacs?|crores?|thousands?|k)?(?:\s*\/-)?)/i,
+    /(?:rs|inr|₹)\s*([\d,]+(?:\.\d+)?\s*(?:lakhs?|lacs?|crores?|thousands?|k)?)\s*(?:per\s+annum|per\s+year|p\.a\.|annually)?\s*(?:or\s+less|or\s+below|or\s+less\s+than|and\s+below)/i,
   ];
 
-  for (const regex of maxRegexes) {
-    const match = text.match(regex);
+  const minPatterns = [
+    /(?:family\s+|personal\s+)?income.{0,60}?(?:minimum\s+of|minimum|min|at\s+least|not\s+less\s+than|must\s+not\s+be\s+less\s+than|more\s+than|above|exceeding|greater\s+than)\s*[:=]?\s*(?:rs|inr|₹)?\s*([\d,]+(?:\.\d+)?\s*(?:lakhs?|lacs?|crores?|thousands?|k)?(?:\s*\/-)?(?:\s*(?:per\s+annum|per\s+year|p\.a\.|annually|per\s+month|monthly))?)/i,
+  ];
 
-    if (match) {
-      const parsed = parseIncome(match[1]);
+  for (const clause of clauses) {
+    if (!incomeKeywords.test(clause) && !/(?:rs|inr|₹)/i.test(clause)) {
+      continue;
+    }
 
-      if (parsed !== null) {
-        maxIncome =
-          maxIncome === null
-            ? parsed
-            : Math.min(maxIncome, parsed);
-
-        break;
+    const rangeMatch = clause.match(
+      /(?:family\s+|personal\s+)?income.{0,40}?(?:between|from)\s*(?:rs|inr|₹)?\s*([\d,]+(?:\.\d+)?\s*(?:lakhs?|lacs?|crores?|thousands?|k)?)\s*(?:and|to|-)\s*(?:rs|inr|₹)?\s*([\d,]+(?:\.\d+)?\s*(?:lakhs?|lacs?|crores?|thousands?|k)?)/i
+    );
+    if (rangeMatch) {
+      const isMonthly = /\b(?:per\s+month|\/month|monthly)\b/i.test(clause);
+      const minVal = parseCurrencyAmount(rangeMatch[1], isMonthly);
+      const maxVal = parseCurrencyAmount(rangeMatch[2], isMonthly);
+      if (minVal !== null && maxVal !== null) {
+        minIncome = minIncome === null ? minVal : Math.max(minIncome, minVal);
+        maxIncome = maxIncome === null ? maxVal : Math.min(maxIncome, maxVal);
+        continue;
       }
     }
-  }
 
-  const minRegexes = [
-    new RegExp(
-      `(?:minimum|at least|not less than|more than|above|exceeding)\\s*(?:rs\\.?\\s*)?(\\d+(?:\\.\\d+)?\\s*(?:lakh|lac|crore|thousand|k)?)`,
-      "i"
-    ),
-    new RegExp(
-      `(?:${incomePattern}).{0,80}?(?:minimum|at least|not less than|more than|above|exceeding)\\s*(?:rs\\.?\\s*)?(\\d+(?:\\.\\d+)?\\s*(?:lakh|lac|crore|thousand|k)?)`,
-      "i"
-    ),
-  ];
+    if (maxIncome === null) {
+      for (const pattern of maxPatterns) {
+        const match = clause.match(pattern);
+        if (match) {
+          const isMonthly = /\b(?:per\s+month|\/month|monthly)\b/i.test(clause);
+          const parsed = parseCurrencyAmount(match[1], isMonthly);
+          if (parsed !== null) {
+            maxIncome = parsed;
+            break;
+          }
+        }
+      }
+    }
 
-  for (const regex of minRegexes) {
-    const match = text.match(regex);
-
-    if (match) {
-      const parsed = parseIncome(match[1]);
-
-      if (parsed !== null) {
-        minIncome =
-          minIncome === null
-            ? parsed
-            : Math.max(minIncome, parsed);
-
-        break;
+    if (minIncome === null) {
+      for (const pattern of minPatterns) {
+        const match = clause.match(pattern);
+        if (match) {
+          const isMonthly = /\b(?:per\s+month|\/month|monthly)\b/i.test(clause);
+          const parsed = parseCurrencyAmount(match[1], isMonthly);
+          if (parsed !== null) {
+            minIncome = parsed;
+            break;
+          }
+        }
       }
     }
   }
@@ -467,58 +455,62 @@ const parseEducationLevels = (
 
 // ---------- Gender ----------
 const parseGender = (
-  labelsArray,
-  eligibilityText
+  labelsArray = [],
+  eligibilityText = "",
+  schemeName = ""
 ) => {
-  const labels = labelsArray.map(normalizeText);
-  const eligibility =
-    normalizeText(eligibilityText);
+  const labels = labelsArray.map((l) => String(l).toLowerCase().trim());
+  const text = normalizeText(`${schemeName} ${eligibilityText}`).toLowerCase();
 
-  const femalePatterns = [
-    "women",
-    "woman",
-    "female",
-    "girl",
-    "girls",
-    "mother",
-    "mothers",
-    "widow",
-    "widows",
-    "housewife",
-    "homemaker",
-    "grihini",
-    "mahila",
-    "ladki",
-    "beti",
-    "kanya",
-    "bahu",
-    "mata",
+  const isExclusivelyFemaleLabel =
+    labels.length > 0 &&
+    labels.every((l) =>
+      [
+        "women",
+        "woman",
+        "female",
+        "girl",
+        "girls",
+        "widow",
+        "widows",
+        "pregnant women",
+        "lactating mothers",
+      ].includes(l)
+    );
+
+  const explicitFemalePatterns = [
+    /\b(?:only\s+(?:for\s+)?(?:women|female|females|girls|widows))\b/i,
+    /\b(?:exclusively\s+(?:for\s+)?(?:women|female|females|girls|widows))\b/i,
+    /\b(?:applicant\s+(?:must|should)\s+be\s+(?:a\s+)?(?:female|woman|girl|widow))\b/i,
+    /\b(?:scheme\s+is\s+(?:only\s+)?for\s+(?:women|female|girls|widows))\b/i,
+    /\b(?:applicable\s+only\s+to\s+(?:women|female|girls))\b/i,
+    /\b(?:restricted\s+to\s+(?:women|female|girls))\b/i,
+    /\b(?:for\s+(?:female|women|girl)\s+candidates\s+only)\b/i,
+    /\b(?:girl\s+students?\s+only)\b/i,
+    /\b(?:female\s+students?\s+only)\b/i,
+    /\b(?:widow\s+pension)\b/i,
+    /\b(?:destitute\s+women\s+pension)\b/i,
+    /\b(?:sukanya\s+samriddhi)\b/i,
+    /\b(?:beti\s+bachao)\b/i,
   ];
 
-  const malePatterns = [
-    "men",
-    "male",
-    "boy",
-    "boys",
+  const explicitMalePatterns = [
+    /\b(?:only\s+(?:for\s+)?(?:men|male|boys))\b/i,
+    /\b(?:applicant\s+(?:must|should)\s+be\s+(?:a\s+)?(?:male|man|boy))\b/i,
+    /\b(?:for\s+(?:male|boy)\s+candidates\s+only)\b/i,
   ];
+
+  // Preference / horizontal reservation guards (e.g. 33% quota for women or preference does not make scheme female-exclusive)
+  const isPreferenceOnly =
+    /\b(?:preference\s+(?:will\s+be\s+)?given\s+to\s+(?:women|female)|33%\s*(?:reservation|quota)?\s*for\s+women)\b/i.test(
+      text
+    );
 
   const isFemale =
-    hasAnyPattern(
-      eligibility,
-      femalePatterns
-    ) ||
-    labels.some((label) =>
-      hasAnyPattern(label, femalePatterns)
-    );
-
-  const isMale =
-    hasAnyPattern(
-      eligibility,
-      malePatterns
-    ) ||
-    labels.some((label) =>
-      hasAnyPattern(label, malePatterns)
-    );
+    !isPreferenceOnly &&
+    (isExclusivelyFemaleLabel ||
+      explicitFemalePatterns.some((p) => p.test(text)));
+  const isMale = explicitMalePatterns.some((p) => p.test(text));
 
   if (isFemale && !isMale) {
     return {
@@ -545,104 +537,43 @@ const parseGender = (
 
 // ---------- Categories ----------
 const parseCategories = (
-  beneficiaryLabels,
-  eligibilityText
+  beneficiaryLabels = [],
+  eligibilityText = "",
+  schemeName = ""
 ) => {
   const allowedCategories = new Set();
+  const text = normalizeText(`${schemeName} ${eligibilityText}`).toLowerCase();
 
-  const labels =
-    beneficiaryLabels.map(normalizeText);
+  const isOpenToAll =
+    /\b(?:all\s+categories|irrespective\s+of\s+caste|general\s+and\s+reserved|open\s+category|all\s+communities|no\s+caste\s+restriction)\b/i.test(
+      text
+    );
 
-  const eligibility =
-    normalizeText(eligibilityText);
+  if (isOpenToAll) {
+    return ["all"];
+  }
 
-  const categoryPatterns = {
-    sc: [
-      "scheduled caste",
-      "scheduled castes",
-      "sc category",
-      "sc candidates",
-      "sc students",
-      "dalit",
-      "chambhar",
-      "charmakar",
-      "dhor",
-      "mochi",
-      "holar",
-      "mahad",
-      "mahar",
-      "mang",
-      "madiga",
-      "adidravida",
-    ],
+  // Remove degree abbreviations before testing to prevent B.Sc / M.Sc false positives for SC
+  const sanitizedText = text.replace(/\b(?:b\.?\s*sc|m\.?\s*sc)\b/gi, "");
 
-    st: [
-      "scheduled tribe",
-      "scheduled tribes",
-      "st category",
-      "st candidates",
-      "st students",
-      "tribal",
-      "tribals",
-      "adivasi",
-      "gond",
-      "santhal",
-      "koya",
-    ],
-
-    obc: [
-      "other backward class",
-      "other backward classes",
-      "obc category",
-      "obc candidates",
-      "obc students",
-      "backward class",
-      "backward classes",
-      "other backward community",
-    ],
-
-    ews: [
-      "economically weaker section",
-      "economically weaker sections",
-      "ews category",
-      "ews candidates",
-      "ews students",
-    ],
-
-    minority: [
-      "minority",
-      "minority community",
-      "minority communities",
-      "religious minority",
-      "muslim",
-      "christian",
-      "sikh",
-      "jain",
-      "buddhist",
-      "parsi",
-    ],
+  const categoryRegexes = {
+    sc: /\b(?:scheduled\s+caste|scheduled\s+castes|sc\s+category|sc\s+candidates?|sc\s+students?|dalit|\bsc\b)\b/i,
+    st: /\b(?:scheduled\s+tribe|scheduled\s+tribes|st\s+category|st\s+candidates?|st\s+students?|adivasi|tribals?|\bst\b)\b/i,
+    obc: /\b(?:other\s+backward\s+class(?:es)?|obc\s+category|obc\s+candidates?|obc\s+students?|backward\s+class(?:es)?|\bobc\b)\b/i,
+    ews: /\b(?:economically\s+weaker\s+section(?:s)?|ews\s+category|ews\s+candidates?|ews\s+students?|\bews\b)\b/i,
+    minority:
+      /\b(?:minority\s+communit(?:y|ies)|religious\s+minority|notified\s+minorities|minority\s+students?|\bminority\b)\b/i,
   };
 
-  for (const [
-    category,
-    patterns,
-  ] of Object.entries(categoryPatterns)) {
-    const found =
-      hasAnyPattern(
-        eligibility,
-        patterns
-      ) ||
-      labels.some((label) =>
-        hasAnyPattern(label, patterns)
-      );
-
-    if (found) {
-      allowedCategories.add(category);
+  for (const [cat, regex] of Object.entries(categoryRegexes)) {
+    if (regex.test(sanitizedText)) {
+      allowedCategories.add(cat);
     }
   }
 
+  // Default to 'all' if no specific category restriction is identified (never assume General-only)
   if (allowedCategories.size === 0) {
-    allowedCategories.add("general");
+    return ["all"];
   }
 
   return Array.from(allowedCategories);
@@ -799,41 +730,26 @@ const extractAgeLimits = (
   let minAge = null;
   let maxAge = null;
 
-  if (
-    fallbackAge &&
-    typeof fallbackAge === "object"
-  ) {
-    for (const key of Object.keys(
-      fallbackAge
-    )) {
+  if (fallbackAge && typeof fallbackAge === "object") {
+    for (const key of Object.keys(fallbackAge)) {
       const range = fallbackAge[key];
-
       if (!range) continue;
-
       if (range.gte != null) {
         minAge =
           minAge === null
             ? Number(range.gte)
-            : Math.max(
-                minAge,
-                Number(range.gte)
-              );
+            : Math.max(minAge, Number(range.gte));
       }
-
       if (range.lte != null) {
         maxAge =
           maxAge === null
             ? Number(range.lte)
-            : Math.min(
-                maxAge,
-                Number(range.lte)
-              );
+            : Math.min(maxAge, Number(range.lte));
       }
     }
   }
 
   const text = normalizeText(eligibility);
-
   if (!text) {
     return {
       minAge,
@@ -841,60 +757,84 @@ const extractAgeLimits = (
     };
   }
 
-  const maxPatterns = [
-    /\b(?:below|under|not exceeding|upto|up to|at most|maximum|max(?:imum)?)\s+(\d+)\s*(?:years?|yrs?)\b/i,
-    /\b(?:age|aged)\s*(?:should be\s*)?(?:less than|below|under|upto|up to)\s*(\d+)\s*(?:years?|yrs?)\b/i,
-    /\b(?:\d+)\s*(?:years?|yrs?)\s*(?:or less|or below)\b/i,
+  const clauses = text
+    .split(/(?<!\d)\.(?!\d)|[;\n|]+/)
+    .map((c) => c.trim())
+    .filter(Boolean);
+
+  const isNonAgeExperienceOrTenure = (clause, matchIndex) => {
+    const surrounding = clause.slice(
+      Math.max(0, matchIndex - 30),
+      matchIndex + 60
+    );
+    return /\b(?:experience|service|residen(?:ce|t)|staying|tenure|imprisonment|sentence|course\s+duration)\b/i.test(
+      surrounding
+    );
+  };
+
+  const rangePatterns = [
+    /(?:applicant|candidate|person)?\s*(?:must\s+be\s+)?(?:between|from)\s+(\d{1,2})\s*(?:years?|yrs?)?\s*(?:and|to|-|–)\s*(\d{1,2})\s*(?:years?|yrs?)(?:\s+of\s+age)?/i,
+    /\bage\s*(?:limit|criteria|group|bracket)?\s*(?:is|should\s+be|between)?\s*[:=]?\s*(\d{1,2})\s*(?:to|-|–)\s*(\d{1,2})\s*(?:years?|yrs?)?/i,
+    /\b(\d{1,2})\s*(?:to|-|–)\s*(\d{1,2})\s*(?:years?|yrs?)\s+of\s+age\b/i,
+    /\bage\s*(?:group\s+of|between)\s*(\d{1,2})\s*(?:to|-|–|and)\s*(\d{1,2})\b/i,
   ];
 
-  for (const regex of maxPatterns) {
-    const match = text.match(regex);
-
-    if (!match) continue;
-
-    const parsedMax = parseInt(
-      match[1],
-      10
-    );
-
-    if (!Number.isNaN(parsedMax)) {
-      maxAge =
-        maxAge === null
-          ? parsedMax
-          : Math.min(
-              maxAge,
-              parsedMax
-            );
-
-      break;
-    }
-  }
+  const maxPatterns = [
+    /\b(?:age|aged).{0,30}?(?:less\s+than|below|under|up\s*to|at\s+most|maximum|not\s+exceeding|not\s+more\s+than)\s*(\d{1,2})\s*(?:years?|yrs?)(?:\s+of\s+age)?\b/i,
+    /\bmaximum\s+age\s*(?:limit|criteria)?\s*(?:is|should\s+be)?\s*[:=]?\s*(\d{1,2})\s*(?:years?|yrs?)?\b/i,
+    /\b(?:below|under|not\s+exceeding|at\s+most)\s+(\d{1,2})\s*(?:years?|yrs?)\s+of\s+age\b/i,
+    /\b(\d{1,2})\s*(?:years?|yrs?)\s*(?:or\s+less|or\s+below)\b/i,
+  ];
 
   const minPatterns = [
-    /\b(?:above|over|at least|minimum|min(?:imum)?)\s+(\d+)\s*(?:years?|yrs?)\b/i,
-    /\b(?:age|aged)\s*(?:should be\s*)?(?:more than|above|over|at least)\s*(\d+)\s*(?:years?|yrs?)\b/i,
+    /\b(?:age|aged).{0,30}?(?:more\s+than|above|over|at\s+least|minimum|not\s+less\s+than)\s*(\d{1,2})\s*(?:years?|yrs?)(?:\s+of\s+age)?\b/i,
+    /\bminimum\s+age\s*(?:limit|criteria)?\s*(?:is|should\s+be)?\s*[:=]?\s*(\d{1,2})\s*(?:years?|yrs?)?\b/i,
+    /\b(?:applicant|candidate).{0,30}?(?:not\s+be\s+less\s+than|at\s+least)\s*(\d{1,2})\s*(?:years?|yrs?)\s+of\s+age\b/i,
+    /\b(?:above|over|at\s+least)\s+(\d{1,2})\s*(?:years?|yrs?)\s+of\s+age\b/i,
   ];
 
-  for (const regex of minPatterns) {
-    const match = text.match(regex);
+  for (const clause of clauses) {
+    if (minAge === null || maxAge === null) {
+      for (const pattern of rangePatterns) {
+        const match = clause.match(pattern);
+        if (match && !isNonAgeExperienceOrTenure(clause, match.index || 0)) {
+          const a1 = parseInt(match[1], 10);
+          const a2 = parseInt(match[2], 10);
+          if (a1 >= 0 && a1 <= 100 && a2 >= 0 && a2 <= 100) {
+            const low = Math.min(a1, a2);
+            const high = Math.max(a1, a2);
+            minAge = minAge === null ? low : Math.max(minAge, low);
+            maxAge = maxAge === null ? high : Math.min(maxAge, high);
+            break;
+          }
+        }
+      }
+    }
 
-    if (!match) continue;
+    if (maxAge === null) {
+      for (const pattern of maxPatterns) {
+        const match = clause.match(pattern);
+        if (match && !isNonAgeExperienceOrTenure(clause, match.index || 0)) {
+          const parsed = parseInt(match[1], 10);
+          if (parsed >= 0 && parsed <= 100) {
+            maxAge = parsed;
+            break;
+          }
+        }
+      }
+    }
 
-    const parsedMin = parseInt(
-      match[1],
-      10
-    );
-
-    if (!Number.isNaN(parsedMin)) {
-      minAge =
-        minAge === null
-          ? parsedMin
-          : Math.max(
-              minAge,
-              parsedMin
-            );
-
-      break;
+    if (minAge === null) {
+      for (const pattern of minPatterns) {
+        const match = clause.match(pattern);
+        if (match && !isNonAgeExperienceOrTenure(clause, match.index || 0)) {
+          const parsed = parseInt(match[1], 10);
+          if (parsed >= 0 && parsed <= 100) {
+            minAge = parsed;
+            break;
+          }
+        }
+      }
     }
   }
 
@@ -1084,7 +1024,8 @@ export const normalizeMyScheme = (
   const finalAllowedCategories =
     parseCategories(
       beneficiaryLabels,
-      eligibility
+      eligibility,
+      name
     );
 
   // ---------- Occupations ----------
@@ -1159,7 +1100,8 @@ export const normalizeMyScheme = (
   const genderInfo =
     parseGender(
       beneficiaryLabels,
-      eligibility
+      eligibility,
+      name
     );
 
 // ---------- Documents ----------
