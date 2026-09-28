@@ -1,5 +1,12 @@
+const cleanText = (value) => {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
 /**
- * Builds the query text for embedding from the user's profile and raw message.
+ * Builds the query text used for the user's semantic embedding.
  */
 export const buildQueryText = (profile, rawMessage = "") => {
   const parts = [];
@@ -12,76 +19,93 @@ export const buildQueryText = (profile, rawMessage = "") => {
     parts.push(`state: ${profile.state}`);
   }
 
-  if (profile.educationLevel && profile.educationLevel !== "unknown") {
-    const label = profile.educationLevel === "higher_education" ? "higher education" : "school level";
-    parts.push(`education: ${label}`);
+  if (
+    profile.educationLevel &&
+    profile.educationLevel !== "unknown"
+  ) {
+    const education =
+      profile.educationLevel === "higher_education"
+        ? "higher education"
+        : "school level";
+
+    parts.push(`education: ${education}`);
   }
 
-  if (profile.primaryIntent && profile.primaryIntent !== "unknown") {
-    parts.push(`intent: ${profile.primaryIntent.replace(/-/g, " ")}`);
+  if (
+    profile.primaryIntent &&
+    profile.primaryIntent !== "unknown"
+  ) {
+    parts.push(
+      `intent: ${profile.primaryIntent.replace(/-/g, " ")}`
+    );
   }
 
   if (profile.gender && profile.gender !== "unknown") {
     parts.push(`gender: ${profile.gender}`);
   }
 
-  if (profile.income !== null && profile.income !== undefined) {
+  if (
+    profile.income !== null &&
+    profile.income !== undefined
+  ) {
     parts.push(`income: ${profile.income}`);
   }
 
-  if (profile.age !== null && profile.age !== undefined) {
+  if (
+    profile.age !== null &&
+    profile.age !== undefined
+  ) {
     parts.push(`age: ${profile.age}`);
   }
 
-  if (profile.casteCategory && profile.casteCategory !== "unknown") {
-    parts.push(`caste: ${profile.casteCategory.toUpperCase()}`);
+  if (
+    profile.casteCategory &&
+    profile.casteCategory !== "unknown"
+  ) {
+    parts.push(
+      `caste: ${profile.casteCategory}`
+    );
   }
 
   if (rawMessage && rawMessage.trim()) {
-    parts.push(`query: ${rawMessage.toLowerCase().trim()}`);
+    parts.push(`query: ${rawMessage}`);
   }
 
-  return parts.join(" | ").toLowerCase().replace(/\s+/g, " ").trim() || "government scheme citizen welfare";
+  return (
+    cleanText(parts.join(" | ")) ||
+    "government scheme citizen welfare"
+  );
 };
 
 /**
- * Builds the search text for a scheme to create its embedding.
- * Uses pre-generated searchText if available (length > 50), otherwise builds from fields.
+ * Builds a combined representation of a scheme.
+ * Used only for the legacy/general embedding.
  */
 export const buildSearchText = (scheme) => {
-  if (scheme.searchText && scheme.searchText.trim().length > 50) {
-    return scheme.searchText.trim();
-  }
-
-  const name = scheme.name || "";
-  const description = scheme.description || "";
-  const benefits = (scheme.benefits || "").substring(0, 300);
-  let eligibility = (scheme.eligibility || "").substring(0, 300);
-
-  const tags = (scheme.tags || []).join(" ");
-  const category = scheme.category || "";
-  const ministry = scheme.ministry || "";
-  const schemeFor = scheme.schemeFor || "";
-
-  const allowedOccupations = (scheme.allowedOccupations || []).join(" ");
-  const allowedStates = (scheme.allowedStates || []).join(" ");
-  const allowedEducation = (scheme.allowedEducationLevels || []).join(" ");
-  const allowedCategories = (scheme.allowedCategories || []).join(" ");
-
   const parts = [
-    `name: ${name}`,
-    `description: ${description}`,
-    `benefits: ${benefits}`,
-    `eligibility: ${eligibility}`,
-    `tags: ${tags}`,
-    `category: ${category}`,
-    `ministry: ${ministry}`,
-    `for: ${schemeFor}`,
-    `occupations: ${allowedOccupations}`,
-    `states: ${allowedStates}`,
-    `education: ${allowedEducation}`,
-    `categories: ${allowedCategories}`,
+    `name: ${scheme.name || ""}`,
+    `description: ${scheme.description || ""}`,
+    `benefits: ${scheme.benefits || ""}`,
+    `eligibility: ${scheme.eligibility || ""}`,
+    `tags: ${(scheme.tags || []).join(" ")}`,
+    `category: ${scheme.category || ""}`,
+    `ministry: ${scheme.ministry || ""}`,
+    `scheme for: ${scheme.schemeFor || ""}`,
+    `occupations: ${(scheme.allowedOccupations || []).join(" ")}`,
+    `states: ${(scheme.allowedStates || []).join(" ")}`,
+    `education: ${(scheme.allowedEducationLevels || []).join(" ")}`,
+    `categories: ${(scheme.allowedCategories || []).join(" ")}`,
+    `genders: ${(scheme.allowedGenders || []).join(" ")}`,
+    `minimum age: ${scheme.minAge ?? ""}`,
+    `maximum age: ${scheme.maxAge ?? ""}`,
+    `minimum income: ${scheme.minIncome ?? ""}`,
+    `maximum income: ${scheme.maxIncome ?? ""}`,
+    `scholarship: ${scheme.isScholarship ? "yes" : "no"}`,
+    `female only: ${scheme.isFemaleOnly ? "yes" : "no"}`,
   ];
 
-  return parts.filter(p => p && p.trim()).join(" | ").toLowerCase().replace(/\s+/g, " ").trim() || "scheme for citizen welfare";
+  return (
+    cleanText(parts.join(" | ")) ||
+    "scheme for citizen welfare"
+  );
 };

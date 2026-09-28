@@ -1,12 +1,47 @@
 import { z } from "zod";
 
 const sanitizeString = (value) =>
-  typeof value === "string" ? value.toLowerCase().trim() || "unknown" : "unknown";
+  typeof value === "string"
+    ? value.toLowerCase().trim() || "unknown"
+    : "unknown";
+
+const nullableNumber = z.preprocess(
+  (value) => {
+    if (value === null || value === undefined || value === "") {
+      return null;
+    }
+
+    const number = Number(value);
+
+    return Number.isFinite(number) ? number : null;
+  },
+  z.number().min(0).max(120).nullable()
+);
+
+const nullableIncome = z.preprocess(
+  (value) => {
+    if (value === null || value === undefined || value === "") {
+      return null;
+    }
+
+    const number = Number(value);
+
+    return Number.isFinite(number) ? number : null;
+  },
+  z.number().nonnegative().nullable()
+);
 
 export const profileSchema = z.object({
-  age: z.coerce.number().min(0).max(120).nullable().optional().default(null),
+  age: nullableNumber,
 
-  gender: z.enum(["male", "female", "other", "unknown"]).catch("unknown"),
+  gender: z
+    .enum([
+      "male",
+      "female",
+      "other",
+      "unknown",
+    ])
+    .catch("unknown"),
 
   occupation: z
     .enum([
@@ -21,17 +56,30 @@ export const profileSchema = z.object({
     ])
     .catch("unknown"),
 
-  state: z.string().transform(sanitizeString).default("unknown"),
+  state: z
+    .string()
+    .transform(sanitizeString)
+    .default("unknown"),
 
-  income: z.coerce.number().nonnegative().nullable().optional().default(null),
+  income: nullableIncome,
 
-  // educationLevel now restricted to specific values
   educationLevel: z
-    .enum(["higher_education", "school", "unknown"])
+    .enum([
+      "higher_education",
+      "school",
+      "unknown",
+    ])
     .catch("unknown"),
 
   casteCategory: z
-    .enum(["general", "sc", "st", "obc", "minority", "unknown"])
+    .enum([
+      "general",
+      "sc",
+      "st",
+      "obc",
+      "minority",
+      "unknown",
+    ])
     .catch("unknown"),
 
   primaryIntent: z
@@ -58,6 +106,4 @@ export const profileSchema = z.object({
     ])
     .catch("unknown")
     .default("unknown"),
-
-  // Removed unused fields: secondaryIntents, emotion, intentConfidence, emotionConfidence
 });

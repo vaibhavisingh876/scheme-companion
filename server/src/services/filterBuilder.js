@@ -1,74 +1,206 @@
-// Inline education mapping
 const getEducationValues = (level) => {
-  if (!level || level === "unknown") return [];
-  const l = level.toLowerCase();
-  if (l === "higher_education") return ["graduate", "post graduate", "phd", "professional", "diploma"];
-  if (l === "school") return ["10th", "12th", "iti", "below 10th"];
-  return [l];
+  if (!level || level === "unknown") {
+    return [];
+  }
+
+  const normalizedLevel = level.toLowerCase().trim();
+
+  if (normalizedLevel === "higher_education") {
+    return [
+      "graduate",
+      "post graduate",
+      "phd",
+      "professional",
+      "diploma",
+    ];
+  }
+
+  if (normalizedLevel === "school") {
+    return [
+      "10th",
+      "12th",
+      "iti",
+      "below 10th",
+    ];
+  }
+
+  return [normalizedLevel];
+};
+
+const normalizeValue = (value) => {
+  return String(value || "")
+    .toLowerCase()
+    .trim();
+};
+
+const normalizeState = (state) => {
+  return normalizeValue(state).replace(/[^a-z0-9]/g, "");
 };
 
 export const buildSchemeFilters = (profile, options = {}) => {
-  const conditions = [];
-  conditions.push({ isActive: true });
+  const conditions = [
+    {
+      isActive: true,
+    },
+  ];
 
   // ── STATE ──────────────────────────────
   if (profile.state && profile.state !== "unknown") {
-    const userState = profile.state.toLowerCase().replace(/[^a-z0-9]/g, "");
-    conditions.push({
-      OR: [
-        { allowedStates: { has: "all" } },
-        { allowedStates: { has: userState } },
-        { allowedStates: { isEmpty: true } },
-      ],
-    });
+    const userState = normalizeState(profile.state);
+
+    if (userState) {
+      conditions.push({
+        OR: [
+          {
+            allowedStates: {
+              has: "all",
+            },
+          },
+          {
+            allowedStates: {
+              has: userState,
+            },
+          },
+          {
+            allowedStates: {
+              isEmpty: true,
+            },
+          },
+        ],
+      });
+    }
   }
 
   // ── GENDER ─────────────────────────────
   if (profile.gender && profile.gender !== "unknown") {
-    conditions.push({
-      OR: [
-        { allowedGenders: { has: "all" } },
-        { allowedGenders: { has: profile.gender.toLowerCase() } },
-        { allowedGenders: { isEmpty: true } },
-      ],
-    });
-  }
+    const userGender = normalizeValue(profile.gender);
 
-  // ── EDUCATION ─────────────────────────
-  if (profile.educationLevel && profile.educationLevel !== "unknown") {
-    const eduValues = getEducationValues(profile.educationLevel);
-    if (eduValues.length > 0) {
+    if (userGender) {
       conditions.push({
         OR: [
-          { allowedEducationLevels: { hasSome: eduValues } },
-          { allowedEducationLevels: { has: "all" } },
-          { allowedEducationLevels: { isEmpty: true } },
+          {
+            allowedGenders: {
+              has: "all",
+            },
+          },
+          {
+            allowedGenders: {
+              has: userGender,
+            },
+          },
+          {
+            allowedGenders: {
+              isEmpty: true,
+            },
+          },
+        ],
+      });
+    }
+  }
+
+  // ── EDUCATION ──────────────────────────
+  if (
+    profile.educationLevel &&
+    profile.educationLevel !== "unknown"
+  ) {
+    const educationValues = getEducationValues(
+      profile.educationLevel
+    );
+
+    if (educationValues.length > 0) {
+      conditions.push({
+        OR: [
+          {
+            allowedEducationLevels: {
+              hasSome: educationValues,
+            },
+          },
+          {
+            allowedEducationLevels: {
+              has: "all",
+            },
+          },
+          {
+            allowedEducationLevels: {
+              isEmpty: true,
+            },
+          },
         ],
       });
     }
   }
 
   // ── CASTE ──────────────────────────────
-  if (profile.casteCategory && profile.casteCategory !== "unknown") {
-    conditions.push({
-      OR: [
-        { allowedCategories: { has: "general" } },
-        { allowedCategories: { has: profile.casteCategory.toLowerCase() } },
-        { allowedCategories: { isEmpty: true } },
-      ],
-    });
+  if (
+    profile.casteCategory &&
+    profile.casteCategory !== "unknown"
+  ) {
+    const userCategory = normalizeValue(
+      profile.casteCategory
+    );
+
+    if (userCategory) {
+      conditions.push({
+        OR: [
+          {
+            allowedCategories: {
+              has: "general",
+            },
+          },
+          {
+            allowedCategories: {
+              has: userCategory,
+            },
+          },
+          {
+            allowedCategories: {
+              has: "all",
+            },
+          },
+          {
+            allowedCategories: {
+              isEmpty: true,
+            },
+          },
+        ],
+      });
+    }
   }
 
-  // ── OCCUPATION (ONLY when explicitly asked) ──
-  if (profile.occupation && profile.occupation !== "unknown" && options.strictOccupation) {
-    conditions.push({
-      OR: [
-        { allowedOccupations: { has: profile.occupation.toLowerCase() } },
-        { allowedOccupations: { has: "all" } },
-        { allowedOccupations: { isEmpty: true } },
-      ],
-    });
+  // ── OCCUPATION ─────────────────────────
+  if (
+    profile.occupation &&
+    profile.occupation !== "unknown" &&
+    options.strictOccupation
+  ) {
+    const userOccupation = normalizeValue(
+      profile.occupation
+    );
+
+    if (userOccupation) {
+      conditions.push({
+        OR: [
+          {
+            allowedOccupations: {
+              has: userOccupation,
+            },
+          },
+          {
+            allowedOccupations: {
+              has: "all",
+            },
+          },
+          {
+            allowedOccupations: {
+              isEmpty: true,
+            },
+          },
+        ],
+      });
+    }
   }
 
-  return { AND: conditions };
+  return {
+    AND: conditions,
+  };
 };

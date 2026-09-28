@@ -1,4 +1,3 @@
-
 const SCORE = {
   OCCUPATION_MATCH: 10,
   OCCUPATION_MISMATCH: -5,
@@ -11,73 +10,110 @@ export const scoreScheme = (scheme, profile) => {
   let hardConflicts = 0;
   let ruleScore = 0;
 
-  const similarity = scheme._similarity || 0;
+  const semanticSimilarity = scheme._similarity || 0;
 
   // ── AGE CHECK ──────────────────────────
   if (profile.age !== null && profile.age !== undefined) {
-    if (scheme.minAge !== null && profile.age < scheme.minAge) {
+    if (
+      scheme.minAge !== null &&
+      scheme.minAge !== undefined &&
+      profile.age < scheme.minAge
+    ) {
       hardConflicts += 1;
     }
 
-    if (scheme.maxAge !== null && profile.age > scheme.maxAge) {
+    if (
+      scheme.maxAge !== null &&
+      scheme.maxAge !== undefined &&
+      profile.age > scheme.maxAge
+    ) {
       hardConflicts += 1;
     }
   }
 
   // ── INCOME CHECK ───────────────────────
   if (profile.income !== null && profile.income !== undefined) {
-    if (scheme.maxIncome !== null && profile.income > scheme.maxIncome) {
+    if (
+      scheme.maxIncome !== null &&
+      scheme.maxIncome !== undefined &&
+      profile.income > scheme.maxIncome
+    ) {
       hardConflicts += 1;
     }
 
-    if (scheme.minIncome !== null && profile.income < scheme.minIncome) {
+    if (
+      scheme.minIncome !== null &&
+      scheme.minIncome !== undefined &&
+      profile.income < scheme.minIncome
+    ) {
       hardConflicts += 1;
     }
   }
 
   // ── RULE-BASED SCORING ─────────────────
   if (hardConflicts === 0) {
-    const schemeText = [
-      String(scheme.name || "").toLowerCase(),
-      String(scheme.description || "").toLowerCase(),
-      String(scheme.eligibility || "").toLowerCase(),
-      ...(scheme.tags || []).map(t => String(t).toLowerCase()),
-    ].join(" ");
+    const userCaste = (profile.casteCategory || "")
+      .toLowerCase()
+      .trim();
 
-    // Reserved-category relevance
-    const userCaste = (profile.casteCategory || "").toLowerCase().trim();
-    const effectiveCaste =
-      userCaste === "unknown" || userCaste === ""
-        ? "general"
-        : userCaste;
+    const schemeCategories = (scheme.allowedCategories || [])
+      .map((category) => String(category).toLowerCase().trim());
 
+    // ── RESERVED CATEGORY RELEVANCE ──────
     if (
-      effectiveCaste === "general" &&
-      /\b(sc|st|obc|minority|scheduled caste|scheduled tribe|dalit|adivasi)\b/i.test(
-        schemeText
+      userCaste === "general" &&
+      schemeCategories.length > 0 &&
+      !schemeCategories.includes("all") &&
+      schemeCategories.some((category) =>
+        ["sc", "st", "obc", "minority"].includes(category)
       )
     ) {
       ruleScore -= SCORE.RESERVED_CASTE_PENALTY;
     }
 
-    // School-level relevance
-    if (
-      profile.educationLevel === "higher_education" &&
-      /\b(school|class|nursery|uniform|textbook|matric)\b/i.test(schemeText)
-    ) {
-      ruleScore -= SCORE.SCHOOL_LEVEL_PENALTY;
+    // ── SCHOOL-LEVEL RELEVANCE ────────────
+    if (profile.educationLevel === "higher_education") {
+      const schemeEducation = (scheme.allowedEducationLevels || [])
+        .map((level) => String(level).toLowerCase().trim());
+
+      const schoolLevels = [
+        "10th",
+        "12th",
+        "iti",
+        "below 10th",
+      ];
+
+      if (
+        schemeEducation.length > 0 &&
+        !schemeEducation.includes("all") &&
+        schemeEducation.some((level) =>
+          schoolLevels.includes(level)
+        )
+      ) {
+        ruleScore -= SCORE.SCHOOL_LEVEL_PENALTY;
+      }
     }
 
     // ── OCCUPATION MATCH ─────────────────
-    if (profile.occupation && profile.occupation !== "unknown") {
-      const userOcc = profile.occupation.toLowerCase().trim();
+    if (
+      profile.occupation &&
+      profile.occupation !== "unknown"
+    ) {
+      const userOccupation = profile.occupation
+        .toLowerCase()
+        .trim();
 
-      const allowedOccs = (scheme.allowedOccupations || []).map(o =>
-        String(o).toLowerCase().trim()
+      const allowedOccupations = (
+        scheme.allowedOccupations || []
+      ).map((occupation) =>
+        String(occupation).toLowerCase().trim()
       );
 
-      if (allowedOccs.length > 0 && !allowedOccs.includes("all")) {
-        if (allowedOccs.includes(userOcc)) {
+      if (
+        allowedOccupations.length > 0 &&
+        !allowedOccupations.includes("all")
+      ) {
+        if (allowedOccupations.includes(userOccupation)) {
           ruleScore += SCORE.OCCUPATION_MATCH;
         } else {
           ruleScore += SCORE.OCCUPATION_MISMATCH;
@@ -90,7 +126,9 @@ export const scoreScheme = (scheme, profile) => {
       profile.educationLevel &&
       profile.educationLevel !== "unknown"
     ) {
-      const level = profile.educationLevel.toLowerCase();
+      const level = profile.educationLevel
+        .toLowerCase()
+        .trim();
 
       let userLevels = [];
 
@@ -113,14 +151,18 @@ export const scoreScheme = (scheme, profile) => {
         userLevels = [level];
       }
 
-      const schemeEdu = (scheme.allowedEducationLevels || []).map(e =>
-        String(e).toLowerCase().trim()
+      const schemeEducation = (
+        scheme.allowedEducationLevels || []
+      ).map((education) =>
+        String(education).toLowerCase().trim()
       );
 
       if (
-        schemeEdu.length > 0 &&
-        !schemeEdu.includes("all") &&
-        userLevels.some(ul => schemeEdu.includes(ul))
+        schemeEducation.length > 0 &&
+        !schemeEducation.includes("all") &&
+        userLevels.some((level) =>
+          schemeEducation.includes(level)
+        )
       ) {
         ruleScore += SCORE.EDUCATION_MATCH;
       }
@@ -134,7 +176,7 @@ export const scoreScheme = (scheme, profile) => {
   const normalizedRuleScore = Math.tanh(ruleScore / 100);
 
   let finalScore =
-    similarity * embeddingWeight +
+    semanticSimilarity * embeddingWeight +
     normalizedRuleScore * ruleWeight;
 
   if (hardConflicts > 0) {
@@ -146,3 +188,4 @@ export const scoreScheme = (scheme, profile) => {
     hardConflicts,
   };
 };
+

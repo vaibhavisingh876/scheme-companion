@@ -37,9 +37,9 @@ model Scheme {
   tags                   String[]
   documentsRequired      String?      @db.Text
 
-  externalId             String       
-  sourceId               String       
-  checksum               String       
+  externalId             String
+  sourceId               String
+  checksum               String
   version                Int          @default(1)
   isActive               Boolean      @default(true)
   lastSyncedAt           DateTime?
@@ -48,8 +48,13 @@ model Scheme {
   schemeFor              String?
 
   source                 SchemeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  embedding              Float[]
+
+  embedding              Float[]      @default([])
+  descriptionEmbedding   Float[]      @default([])
+  eligibilityEmbedding   Float[]      @default([])
+
   searchText             String?      @db.Text
+
   createdAt              DateTime     @default(now())
   updatedAt              DateTime     @updatedAt
 
@@ -70,11 +75,12 @@ model Scheme {
   @@index([allowedEducationLevels])
 
   @@unique([sourceId, externalId])
+
   bookmarks Bookmark[]
 }
 
 model SchemeSource {
-  id          String    @id 
+  id          String    @id
   name        String    @unique
   sourceUrl   String
   lastSyncAt  DateTime?

@@ -11,7 +11,7 @@ const groqClientInstance = new Groq({
 
 const SYSTEM_PROMPT = `You are a profile extraction engine for Indian government scheme recommendations.
 
-Extract structured information from the user message, which may be in English, Hindi, or Hinglish.
+Extract structured information from the user's message, which may be in English, Hindi, or Hinglish.
 
 Return ONLY a valid JSON object with these exact fields:
 
@@ -28,9 +28,20 @@ Return ONLY a valid JSON object with these exact fields:
 
 Rules:
 
-- Extract age only if clearly mentioned.
-- Gender can be inferred from words or pronouns such as "mahila", "aadmi", etc.
-- Extract occupation from the user's self-description.
+- Extract age only when clearly stated.
+- Do not infer age from education, occupation, or scheme context.
+
+- Extract gender only when clearly stated or directly indicated by the user's words or pronouns.
+- Do not infer gender from occupation or intent.
+
+- Extract occupation only from the user's own description.
+- Do not infer occupation from the scheme they are asking about.
+- Examples:
+  "I am a farmer" -> "farmer"
+  "main student hoon" -> "student"
+  "I run a startup" -> "startup"
+  "I am looking for a job" -> "unknown" unless the user explicitly says they are unemployed.
+
 - Return the state as the canonical Indian state or union territory name in lowercase.
 - Normalize common abbreviations and alternate names.
   Examples:
@@ -39,30 +50,47 @@ Rules:
   "Uttar Pradesh" -> "uttar pradesh"
   "Dilli" -> "delhi"
   "Delhi" -> "delhi"
-- Do not convert a city into a state unless the state is clearly implied by the city.
+- Do not convert a city into a state unless the state is clearly implied by the user's statement.
+
 - Income must always be annual and in INR.
-  Example: "3 lakh" -> 300000.
-  Example: "monthly 25000" -> 300000.
+- Convert monthly income to annual income.
+  Examples:
+  "3 lakh" -> 300000
+  "3 lakh per year" -> 300000
+  "monthly 25000" -> 300000
+  "25k per month" -> 300000
+- If income is not clearly stated, return null.
+- Do not estimate income.
+
 - Education:
-  "college", "university", "degree", "B.Tech" -> "higher_education"
-  "school", "10th", "12th" -> "school"
+  "college", "university", "degree", "B.Tech", "B.E.", "M.Tech", "MBA" -> "higher_education"
+  "school", "10th", "12th", "class 10", "class 12" -> "school"
+- If education is unclear, return "unknown".
+
 - Caste:
   "general", "unreserved" -> "general"
-  "SC" -> "sc"
-  "ST" -> "st"
-  "OBC" -> "obc"
-  "minority", "muslim", "sikh" -> "minority"
-  If not mentioned, use "unknown".
-  Never assume "general".
-- primaryIntent should be inferred from the user's main requirement.
-  Examples:
+  "SC", "scheduled caste" -> "sc"
+  "ST", "scheduled tribe" -> "st"
+  "OBC", "other backward class" -> "obc"
+  "minority", "muslim", "sikh", "christian" -> "minority"
+- If caste is not mentioned, return "unknown".
+- Never assume "general".
+
+- primaryIntent should represent the user's main requirement.
+- Infer primaryIntent from the user's actual request, not from unrelated profile information.
+- Examples:
   "scholarship chahiye" -> "scholarship"
   "naukri chahiye" -> "job"
   "kheti ke liye scheme" -> "farmer"
-  If unclear, use "unknown".`;
+  "business ke liye loan chahiye" -> "loan"
+  "ghar banane ke liye scheme" -> "housing"
+- If the intent is unclear, return "unknown".`;
 
 export const extractUserProfile = async (message) => {
-  const cacheKey = String(message).trim().toLowerCase().slice(0, 500);
+  const cacheKey = String(message)
+    .trim()
+    .toLowerCase()
+    .slice(0, 500);
 
   const cached = profileCache.get(cacheKey);
 
@@ -72,21 +100,22 @@ export const extractUserProfile = async (message) => {
   }
 
   try {
-    const response = await groqClientInstance.chat.completions.create({
-      model: "openai/gpt-oss-120b",
-      temperature: 0.1,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content: SYSTEM_PROMPT,
-        },
-        {
-          role: "user",
-          content: message,
-        },
-      ],
-    });
+    const response =
+      await groqClientInstance.chat.completions.create({
+        model: "openai/gpt-oss-120b",
+        temperature: 0.1,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content: SYSTEM_PROMPT,
+          },
+          {
+            role: "user",
+            content: message,
+          },
+        ],
+      });
 
     const rawContent =
       response?.choices?.[0]?.message?.content || "{}";
@@ -99,27 +128,38 @@ export const extractUserProfile = async (message) => {
       "casteCategory",
       "educationLevel",
       "primaryIntent",
+      "state",
     ]) {
       if (typeof parsed[field] === "string") {
-        parsed[field] = parsed[field].toLowerCase().trim();
+        parsed[field] = parsed[field]
+          .toLowerCase()
+          .trim();
       }
     }
 
-    parsed.age = parsed.age != null ? Number(parsed.age) : null;
+    parsed.age =
+      parsed.age != null
+        ? Number(parsed.age)
+        : null;
 
     if (
       parsed.age !== null &&
-      (isNaN(parsed.age) || parsed.age < 0 || parsed.age > 120)
+      (Number.isNaN(parsed.age) ||
+        parsed.age < 0 ||
+        parsed.age > 120)
     ) {
       parsed.age = null;
     }
 
     parsed.income =
-      parsed.income != null ? Number(parsed.income) : null;
+      parsed.income != null
+        ? Number(parsed.income)
+        : null;
 
     if (
       parsed.income !== null &&
-      (isNaN(parsed.income) || parsed.income < 0)
+      (Number.isNaN(parsed.income) ||
+        parsed.income < 0)
     ) {
       parsed.income = null;
     }
@@ -141,4 +181,3 @@ export const extractUserProfile = async (message) => {
     throw err;
   }
 };
-
