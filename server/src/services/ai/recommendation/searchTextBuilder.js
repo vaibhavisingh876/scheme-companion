@@ -11,11 +11,17 @@ const cleanText = (value) => {
 export const buildQueryText = (profile, rawMessage = "") => {
   const parts = [];
 
-  if (profile.occupation && profile.occupation !== "unknown") {
+  if (
+    profile.occupation &&
+    profile.occupation !== "unknown"
+  ) {
     parts.push(`occupation: ${profile.occupation}`);
   }
 
-  if (profile.state && profile.state !== "unknown") {
+  if (
+    profile.state &&
+    profile.state !== "unknown"
+  ) {
     parts.push(`state: ${profile.state}`);
   }
 
@@ -40,7 +46,10 @@ export const buildQueryText = (profile, rawMessage = "") => {
     );
   }
 
-  if (profile.gender && profile.gender !== "unknown") {
+  if (
+    profile.gender &&
+    profile.gender !== "unknown"
+  ) {
     parts.push(`gender: ${profile.gender}`);
   }
 
@@ -74,38 +83,5 @@ export const buildQueryText = (profile, rawMessage = "") => {
   return (
     cleanText(parts.join(" | ")) ||
     "government scheme citizen welfare"
-  );
-};
-
-/**
- * Builds a combined representation of a scheme.
- * Used only for the legacy/general embedding.
- */
-export const buildSearchText = (scheme) => {
-  const parts = [
-    `name: ${scheme.name || ""}`,
-    `description: ${scheme.description || ""}`,
-    `benefits: ${scheme.benefits || ""}`,
-    `eligibility: ${scheme.eligibility || ""}`,
-    `tags: ${(scheme.tags || []).join(" ")}`,
-    `category: ${scheme.category || ""}`,
-    `ministry: ${scheme.ministry || ""}`,
-    `scheme for: ${scheme.schemeFor || ""}`,
-    `occupations: ${(scheme.allowedOccupations || []).join(" ")}`,
-    `states: ${(scheme.allowedStates || []).join(" ")}`,
-    `education: ${(scheme.allowedEducationLevels || []).join(" ")}`,
-    `categories: ${(scheme.allowedCategories || []).join(" ")}`,
-    `genders: ${(scheme.allowedGenders || []).join(" ")}`,
-    `minimum age: ${scheme.minAge ?? ""}`,
-    `maximum age: ${scheme.maxAge ?? ""}`,
-    `minimum income: ${scheme.minIncome ?? ""}`,
-    `maximum income: ${scheme.maxIncome ?? ""}`,
-    `scholarship: ${scheme.isScholarship ? "yes" : "no"}`,
-    `female only: ${scheme.isFemaleOnly ? "yes" : "no"}`,
-  ];
-
-  return (
-    cleanText(parts.join(" | ")) ||
-    "scheme for citizen welfare"
   );
 };

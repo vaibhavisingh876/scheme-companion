@@ -50,13 +50,6 @@ const buildEligibilityText = (scheme) => {
     .trim();
 };
 
-const buildCombinedText = (descriptionText, eligibilityText) => {
-  return `${descriptionText} | ${eligibilityText}`
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
-};
-
 async function generateEmbeddings() {
   try {
     console.log("⏳ Loading embedding model...");
@@ -79,9 +72,6 @@ async function generateEmbeddings() {
           OR "eligibilityEmbedding" IS NULL
           OR array_length("eligibilityEmbedding", 1) IS NULL
           OR array_length("eligibilityEmbedding", 1) = 0
-          OR "embedding" IS NULL
-          OR array_length("embedding", 1) IS NULL
-          OR array_length("embedding", 1) = 0
         )
     `;
 
@@ -144,15 +134,9 @@ async function generateEmbeddings() {
           continue;
         }
 
-        const combinedText = buildCombinedText(
-          descriptionText,
-          eligibilityText
-        );
-
         const [
           descriptionOutput,
           eligibilityOutput,
-          combinedOutput,
         ] = await Promise.all([
           extractor(descriptionText, {
             pooling: "mean",
@@ -162,17 +146,16 @@ async function generateEmbeddings() {
             pooling: "mean",
             normalize: true,
           }),
-          extractor(combinedText, {
-            pooling: "mean",
-            normalize: true,
-          }),
         ]);
 
         updates.push({
           id: scheme.id,
-          descriptionEmbedding: Array.from(descriptionOutput.data),
-          eligibilityEmbedding: Array.from(eligibilityOutput.data),
-          embedding: Array.from(combinedOutput.data),
+          descriptionEmbedding: Array.from(
+            descriptionOutput.data
+          ),
+          eligibilityEmbedding: Array.from(
+            eligibilityOutput.data
+          ),
         });
 
         if (updates.length >= BATCH_SIZE) {
@@ -183,7 +166,6 @@ async function generateEmbeddings() {
                 data: {
                   descriptionEmbedding: u.descriptionEmbedding,
                   eligibilityEmbedding: u.eligibilityEmbedding,
-                  embedding: u.embedding,
                 },
               })
             )
@@ -213,7 +195,6 @@ async function generateEmbeddings() {
             data: {
               descriptionEmbedding: u.descriptionEmbedding,
               eligibilityEmbedding: u.eligibilityEmbedding,
-              embedding: u.embedding,
             },
           })
         )
@@ -238,4 +219,3 @@ async function generateEmbeddings() {
 }
 
 generateEmbeddings();
-

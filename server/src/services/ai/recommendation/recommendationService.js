@@ -1,227 +1,205 @@
-import { extractUserProfile } from "../../ai/groqService.js";
-import { getExtractor } from "../../embeddingModel.js";
-import prisma from "../../../config/prisma.js";
-import { scoreScheme } from "../../ai/scoringEngine.js";
-import { embeddingCache } from "../../../utils/cache.js";
-import { buildQueryText } from "./searchTextBuilder.js";
-import { buildSchemeFilters } from "../../filterBuilder.js";
-
-const MAX_RESULTS = 20;
-
-const DESCRIPTION_WEIGHT = 0.65;
-const ELIGIBILITY_WEIGHT = 0.35;
-
-const getQueryEmbedding = async (queryText) => {
-  const cacheKey = queryText.toLowerCase().trim();
-  const cached = embeddingCache.get(cacheKey);
-
-  if (cached) return cached;
-
-  const extractor = await getExtractor();
-
-  const output = await extractor(queryText, {
-    pooling: "mean",
-    normalize: true,
-  });
-
-  const embedding = Array.from(output.data);
-
-  embeddingCache.set(cacheKey, embedding);
-
-  return embedding;
+const SCORE = {
+  OCCUPATION_MATCH: 10,
+  OCCUPATION_MISMATCH: -5,
+  EDUCATION_MATCH: 8,
+  RESERVED_CASTE_PENALTY: 15,
+  SCHOOL_LEVEL_PENALTY: 10,
 };
 
-const cosineSimilarity = (a, b) => {
+export const scoreScheme = (scheme, profile) => {
+  let hardConflicts = 0;
+  let ruleScore = 0;
+
+  const semanticSimilarity =
+    scheme._semanticSimilarity || 0;
+
+  // ── AGE CHECK ──────────────────────────
+  if (profile.age !== null && profile.age !== undefined) {
+    if (
+      scheme.minAge !== null &&
+      scheme.minAge !== undefined &&
+      profile.age < scheme.minAge
+    ) {
+      hardConflicts += 1;
+    }
+
+    if (
+      scheme.maxAge !== null &&
+      scheme.maxAge !== undefined &&
+      profile.age > scheme.maxAge
+    ) {
+      hardConflicts += 1;
+    }
+  }
+
+  // ── INCOME CHECK ───────────────────────
   if (
-    !Array.isArray(a) ||
-    !Array.isArray(b) ||
-    a.length !== b.length ||
-    a.length === 0
+    profile.income !== null &&
+    profile.income !== undefined
   ) {
-    return 0;
+    if (
+      scheme.maxIncome !== null &&
+      scheme.maxIncome !== undefined &&
+      profile.income > scheme.maxIncome
+    ) {
+      hardConflicts += 1;
+    }
+
+    if (
+      scheme.minIncome !== null &&
+      scheme.minIncome !== undefined &&
+      profile.income < scheme.minIncome
+    ) {
+      hardConflicts += 1;
+    }
   }
 
-  let dot = 0;
-  let normA = 0;
-  let normB = 0;
+  // ── RULE-BASED SCORING ─────────────────
+  if (hardConflicts === 0) {
+    const userCaste = (profile.casteCategory || "")
+      .toLowerCase()
+      .trim();
 
-  for (let i = 0; i < a.length; i++) {
-    const valueA = Number(a[i]) || 0;
-    const valueB = Number(b[i]) || 0;
-
-    dot += valueA * valueB;
-    normA += valueA ** 2;
-    normB += valueB ** 2;
-  }
-
-  const denominator = Math.sqrt(normA) * Math.sqrt(normB);
-
-  return denominator === 0 ? 0 : dot / denominator;
-};
-
-const deduplicateSchemes = (schemes) => {
-  const seen = new Set();
-
-  return schemes.filter((scheme) => {
-    const key =
-      scheme.externalId?.trim() ||
-      scheme.name?.toLowerCase().replace(/\s+/g, " ").trim();
-
-    if (seen.has(key)) return false;
-
-    seen.add(key);
-    return true;
-  });
-};
-
-const getSchemeCandidates = async (where) => {
-  return prisma.scheme.findMany({
-    where,
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      benefits: true,
-      eligibility: true,
-      category: true,
-      ministry: true,
-      state: true,
-
-      allowedCategories: true,
-      allowedStates: true,
-      allowedGenders: true,
-      allowedOccupations: true,
-      allowedEducationLevels: true,
-
-      minIncome: true,
-      maxIncome: true,
-      minAge: true,
-      maxAge: true,
-
-      isFemaleOnly: true,
-      applicationLink: true,
-      sourceUrl: true,
-      tags: true,
-      externalId: true,
-
-      embedding: true,
-      descriptionEmbedding: true,
-      eligibilityEmbedding: true,
-    },
-  });
-};
-
-export const recommendSchemes = async (message) => {
-  const trimmed = (message || "").trim();
-
-  if (!trimmed) {
-    return { error: "message is required" };
-  }
-
-  const profile = await extractUserProfile(trimmed);
-
-  const queryText = buildQueryText(profile, trimmed);
-  const queryEmbedding = await getQueryEmbedding(queryText);
-
-  const filterWhere = buildSchemeFilters(profile, {
-    strictOccupation: true,
-  });
-
-  let schemesToScore = await getSchemeCandidates(filterWhere);
-
-  if (schemesToScore.length === 0) {
-    schemesToScore = await getSchemeCandidates({
-      isActive: true,
-    });
-  }
-
-  const withSimilarity = schemesToScore.map((scheme) => {
-    const descriptionSimilarity = cosineSimilarity(
-      queryEmbedding,
-      scheme.descriptionEmbedding
+    const schemeCategories = (
+      scheme.allowedCategories || []
+    ).map((category) =>
+      String(category).toLowerCase().trim()
     );
 
-    const eligibilitySimilarity = cosineSimilarity(
-      queryEmbedding,
-      scheme.eligibilityEmbedding
-    );
+    // ── RESERVED CATEGORY RELEVANCE ──────
+    if (
+      userCaste === "general" &&
+      schemeCategories.length > 0 &&
+      !schemeCategories.includes("all") &&
+      schemeCategories.some((category) =>
+        ["sc", "st", "obc", "minority"].includes(category)
+      )
+    ) {
+      ruleScore -= SCORE.RESERVED_CASTE_PENALTY;
+    }
 
-    const semanticSimilarity =
-      descriptionSimilarity * DESCRIPTION_WEIGHT +
-      eligibilitySimilarity * ELIGIBILITY_WEIGHT;
+    // ── SCHOOL-LEVEL RELEVANCE ────────────
+    if (
+      profile.educationLevel === "higher_education"
+    ) {
+      const schemeEducation = (
+        scheme.allowedEducationLevels || []
+      ).map((level) =>
+        String(level).toLowerCase().trim()
+      );
 
-    return {
-      ...scheme,
-      _descriptionSimilarity: descriptionSimilarity,
-      _eligibilitySimilarity: eligibilitySimilarity,
-      _similarity: semanticSimilarity,
-    };
-  });
+      const schoolLevels = [
+        "10th",
+        "12th",
+        "iti",
+        "below 10th",
+      ];
 
-  withSimilarity.sort((a, b) => b._similarity - a._similarity);
+      if (
+        schemeEducation.length > 0 &&
+        !schemeEducation.includes("all") &&
+        schemeEducation.some((level) =>
+          schoolLevels.includes(level)
+        )
+      ) {
+        ruleScore -= SCORE.SCHOOL_LEVEL_PENALTY;
+      }
+    }
 
-  const scored = withSimilarity.map((scheme) => {
-    const { score, hardConflicts } = scoreScheme(
-      scheme,
-      profile
-    );
+    // ── OCCUPATION MATCH ─────────────────
+    if (
+      profile.occupation &&
+      profile.occupation !== "unknown"
+    ) {
+      const userOccupation = profile.occupation
+        .toLowerCase()
+        .trim();
 
-    return {
-      ...scheme,
-      _score: score,
-      _hardConflicts: hardConflicts,
-    };
-  });
+      const allowedOccupations = (
+        scheme.allowedOccupations || []
+      ).map((occupation) =>
+        String(occupation).toLowerCase().trim()
+      );
 
-  const eligible = scored.filter(
-    (scheme) => scheme._hardConflicts === 0
-  );
+      if (
+        allowedOccupations.length > 0 &&
+        !allowedOccupations.includes("all")
+      ) {
+        if (
+          allowedOccupations.includes(userOccupation)
+        ) {
+          ruleScore += SCORE.OCCUPATION_MATCH;
+        } else {
+          ruleScore += SCORE.OCCUPATION_MISMATCH;
+        }
+      }
+    }
 
-  const valid = eligible.filter(
-    (scheme) => scheme._score >= 0.35
-  );
+    // ── EDUCATION MATCH ──────────────────
+    if (
+      profile.educationLevel &&
+      profile.educationLevel !== "unknown"
+    ) {
+      const level = profile.educationLevel
+        .toLowerCase()
+        .trim();
 
-  if (!valid.length) {
-    return {
-      profile: { ...profile },
-      schemes: [],
-      meta: {
-        total: 0,
-        candidatesEvaluated: schemesToScore.length,
-      },
-    };
+      let userLevels = [];
+
+      if (level === "higher_education") {
+        userLevels = [
+          "graduate",
+          "post graduate",
+          "phd",
+          "professional",
+          "diploma",
+        ];
+      } else if (level === "school") {
+        userLevels = [
+          "10th",
+          "12th",
+          "iti",
+          "below 10th",
+        ];
+      } else {
+        userLevels = [level];
+      }
+
+      const schemeEducation = (
+        scheme.allowedEducationLevels || []
+      ).map((education) =>
+        String(education).toLowerCase().trim()
+      );
+
+      if (
+        schemeEducation.length > 0 &&
+        !schemeEducation.includes("all") &&
+        userLevels.some((level) =>
+          schemeEducation.includes(level)
+        )
+      ) {
+        ruleScore += SCORE.EDUCATION_MATCH;
+      }
+    }
   }
 
-  valid.sort((a, b) => b._score - a._score);
+  // ── FINAL SCORE ────────────────────────
+  const embeddingWeight = 0.8;
+  const ruleWeight = 0.2;
 
-  const deduped = deduplicateSchemes(valid);
+  const normalizedRuleScore =
+    Math.tanh(ruleScore / 100);
 
-  const topResults = deduped.slice(0, MAX_RESULTS);
+  let finalScore =
+    semanticSimilarity * embeddingWeight +
+    normalizedRuleScore * ruleWeight;
 
-  const results = topResults.map(
-    ({
-      embedding,
-      descriptionEmbedding,
-      eligibilityEmbedding,
-      _descriptionSimilarity,
-      _eligibilitySimilarity,
-      _similarity,
-      _score,
-      _hardConflicts,
-      ...rest
-    }) => ({
-      ...rest,
-      relevanceScore: Math.round(_score * 100),
-    })
-  );
+  if (hardConflicts > 0) {
+    finalScore = 0;
+  }
 
   return {
-    profile: { ...profile },
-    schemes: results,
-    meta: {
-      total: results.length,
-      candidatesEvaluated: schemesToScore.length,
-    },
+    score: Math.max(0, Math.min(1, finalScore)),
+    hardConflicts,
   };
 };
-

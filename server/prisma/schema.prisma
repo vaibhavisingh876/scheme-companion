@@ -49,11 +49,8 @@ model Scheme {
 
   source                 SchemeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
 
-  embedding              Float[]      @default([])
   descriptionEmbedding   Float[]      @default([])
   eligibilityEmbedding   Float[]      @default([])
-
-  searchText             String?      @db.Text
 
   createdAt              DateTime     @default(now())
   updatedAt              DateTime     @updatedAt
@@ -93,7 +90,7 @@ model RawScheme {
   id          String   @id @default(cuid())
   source      String
   externalId  String?
-  payload     Json
+  payload      Json
   fetchedAt   DateTime @default(now())
 }
 

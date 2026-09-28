@@ -1,8 +1,8 @@
 import prisma from "../../config/prisma.js";
 import { getExtractor } from "./embeddingModel.js";
-import { buildSearchText } from "../ai/recommendation/searchTextBuilder.js";
 
 const BATCH_SIZE = 5;
+
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const buildDescriptionText = (scheme) => {
@@ -51,32 +51,25 @@ const buildEligibilityText = (scheme) => {
 const generateEmbeddings = async (scheme, extractor) => {
   const descriptionText = buildDescriptionText(scheme);
   const eligibilityText = buildEligibilityText(scheme);
-  const searchText = buildSearchText(scheme);
 
   if (!descriptionText || !eligibilityText) {
     throw new Error("Missing description or eligibility text");
   }
 
-  const [descriptionOutput, eligibilityOutput, combinedOutput] =
-    await Promise.all([
-      extractor(descriptionText, {
-        pooling: "mean",
-        normalize: true,
-      }),
-      extractor(eligibilityText, {
-        pooling: "mean",
-        normalize: true,
-      }),
-      extractor(searchText, {
-        pooling: "mean",
-        normalize: true,
-      }),
-    ]);
+  const [descriptionOutput, eligibilityOutput] = await Promise.all([
+    extractor(descriptionText, {
+      pooling: "mean",
+      normalize: true,
+    }),
+    extractor(eligibilityText, {
+      pooling: "mean",
+      normalize: true,
+    }),
+  ]);
 
   return {
     descriptionEmbedding: Array.from(descriptionOutput.data),
     eligibilityEmbedding: Array.from(eligibilityOutput.data),
-    embedding: Array.from(combinedOutput.data),
   };
 };
 
@@ -90,7 +83,10 @@ const processSchemes = async (schemes, extractor) => {
     await Promise.all(
       batch.map(async (scheme) => {
         try {
-          const embeddings = await generateEmbeddings(scheme, extractor);
+          const embeddings = await generateEmbeddings(
+            scheme,
+            extractor
+          );
 
           await prisma.scheme.update({
             where: { id: scheme.id },
@@ -100,6 +96,7 @@ const processSchemes = async (schemes, extractor) => {
           successCount++;
         } catch (err) {
           failCount++;
+
           console.error(
             `❌ Embedding failed for scheme ${scheme.id}:`,
             err.message
@@ -115,7 +112,10 @@ const processSchemes = async (schemes, extractor) => {
     await delay(500);
   }
 
-  return { successCount, failCount };
+  return {
+    successCount,
+    failCount,
+  };
 };
 
 const schemeSelect = {
@@ -140,7 +140,6 @@ const schemeSelect = {
   isScholarship: true,
   isFemaleOnly: true,
   schemeFor: true,
-  searchText: true,
 };
 
 /**
@@ -149,7 +148,9 @@ const schemeSelect = {
 export const regenerateAllEmbeddings = async () => {
   try {
     const schemes = await prisma.scheme.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+      },
       select: schemeSelect,
     });
 
@@ -231,4 +232,3 @@ export const updateMissingEmbeddings = async () => {
     );
   }
 };
-

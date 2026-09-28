@@ -93,7 +93,9 @@ const normalizeState = (state = "") => {
 
 // ---------- Stable stringify ----------
 const sortObject = (obj) => {
-  if (Array.isArray(obj)) return obj.map(sortObject);
+  if (Array.isArray(obj)) {
+    return obj.map(sortObject);
+  }
 
   if (obj && typeof obj === "object" && obj !== null) {
     const sorted = {};
@@ -108,7 +110,8 @@ const sortObject = (obj) => {
   return obj;
 };
 
-const stableStringify = (obj) => JSON.stringify(sortObject(obj));
+const stableStringify = (obj) =>
+  JSON.stringify(sortObject(obj));
 
 // ---------- Tags ----------
 const normalizeTags = (tags) => {
@@ -127,7 +130,9 @@ const normalizeTags = (tags) => {
       .filter(Boolean);
   }
 
-  return [...new Set(raw.map((t) => t.toLowerCase()))];
+  return [
+    ...new Set(raw.map((t) => t.toLowerCase())),
+  ];
 };
 
 // ---------- Generic text helpers ----------
@@ -149,15 +154,23 @@ const hasPattern = (text, pattern) => {
 };
 
 const hasAnyPattern = (text, patterns = []) =>
-  patterns.some((pattern) => hasPattern(text, pattern));
+  patterns.some((pattern) =>
+    hasPattern(text, pattern)
+  );
 
 // ---------- Income parser ----------
 const parseIncome = (value) => {
-  if (value === null || value === undefined || value === "") {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
     return null;
   }
 
-  const original = String(value).toLowerCase().trim();
+  const original = String(value)
+    .toLowerCase()
+    .trim();
 
   let str = original
     .replace(/₹/g, "")
@@ -166,7 +179,9 @@ const parseIncome = (value) => {
     .replace(/,/g, "")
     .replace(/\s+/g, " ");
 
-  const numMatch = str.match(/(\d+(?:\.\d+)?)/);
+  const numMatch = str.match(
+    /(\d+(?:\.\d+)?)/
+  );
 
   if (!numMatch) return null;
 
@@ -176,7 +191,9 @@ const parseIncome = (value) => {
 
   if (/\bcrore?s?\b/i.test(str)) {
     num *= 10000000;
-  } else if (/\b(?:lakh|lac|lacs)\b/i.test(str)) {
+  } else if (
+    /\b(?:lakh|lac|lacs)\b/i.test(str)
+  ) {
     num *= 100000;
   } else if (/\bthousand\b/i.test(str)) {
     num *= 1000;
@@ -185,7 +202,9 @@ const parseIncome = (value) => {
   }
 
   if (
-    /\b(?:per month|\/month|monthly|per month)\b/i.test(original)
+    /\b(?:per month|\/month|monthly)\b/i.test(
+      original
+    )
   ) {
     num *= 12;
   }
@@ -194,18 +213,27 @@ const parseIncome = (value) => {
 };
 
 // ---------- Extract income from eligibility ----------
-const extractIncomeLimits = (eligibility, fallbackValue = null) => {
+const extractIncomeLimits = (
+  eligibility,
+  fallbackValue = null
+) => {
   const text = normalizeText(eligibility);
 
   let minIncome = null;
   let maxIncome = null;
 
-  if (fallbackValue !== null && fallbackValue !== undefined) {
+  if (
+    fallbackValue !== null &&
+    fallbackValue !== undefined
+  ) {
     maxIncome = parseIncome(fallbackValue);
   }
 
   if (!text) {
-    return { minIncome, maxIncome };
+    return {
+      minIncome,
+      maxIncome,
+    };
   }
 
   const incomePattern =
@@ -213,7 +241,7 @@ const extractIncomeLimits = (eligibility, fallbackValue = null) => {
 
   const maxRegexes = [
     new RegExp(
-      `(?:not exceed|does not exceed|should not exceed|less than or equal to|up to|upto|maximum|max(?:imum)? of)\\s*(?:rs\\.?\\s*)?(\\d+(?:\\.\\d+)?\\s*(?:lakh|lac|crore|thousand|k)?)`,
+      `(?:not exceed|does not exceed|should not exceed|less than or equal to|up to|upto|maximum|max(?:imum) of)\\s*(?:rs\\.?\\s*)?(\\d+(?:\\.\\d+)?\\s*(?:lakh|lac|crore|thousand|k)?)`,
       "i"
     ),
     new RegExp(
@@ -271,7 +299,10 @@ const extractIncomeLimits = (eligibility, fallbackValue = null) => {
     }
   }
 
-  return { minIncome, maxIncome };
+  return {
+    minIncome,
+    maxIncome,
+  };
 };
 
 // ---------- Benefits ----------
@@ -291,10 +322,15 @@ const extractBenefitsText = (content) => {
     for (const item of content.benefits) {
       if (typeof item === "string") {
         parts.push(item);
-      } else if (item && typeof item === "object") {
+      } else if (
+        item &&
+        typeof item === "object"
+      ) {
         if (Array.isArray(item.children)) {
           const childText = item.children
-            .map((c) => (c && c.text ? c.text : ""))
+            .map((c) =>
+              c && c.text ? c.text : ""
+            )
             .join(" ");
 
           if (childText.trim()) {
@@ -304,7 +340,9 @@ const extractBenefitsText = (content) => {
 
         if (item.label || item.value) {
           parts.push(
-            `${item.label || ""} ${item.value || ""}`.trim()
+            `${item.label || ""} ${
+              item.value || ""
+            }`.trim()
           );
         }
 
@@ -317,21 +355,31 @@ const extractBenefitsText = (content) => {
     return parts.join(" | ").trim();
   }
 
-  return (content.detailedDescription_md || "").trim();
+  return (
+    content.detailedDescription_md || ""
+  ).trim();
 };
 
 // ---------- Eligibility text ----------
-const extractEligibility = (eligibilityObj, basic) => {
+const extractEligibility = (
+  eligibilityObj,
+  basic
+) => {
   if (!eligibilityObj && !basic) return "";
 
   if (
     eligibilityObj?.eligibilityDescription_md &&
-    typeof eligibilityObj.eligibilityDescription_md === "string"
+    typeof eligibilityObj.eligibilityDescription_md ===
+      "string"
   ) {
-    return eligibilityObj.eligibilityDescription_md.trim();
+    return eligibilityObj
+      .eligibilityDescription_md
+      .trim();
   }
 
-  if (Array.isArray(eligibilityObj?.criteria)) {
+  if (
+    Array.isArray(eligibilityObj?.criteria)
+  ) {
     return eligibilityObj.criteria
       .map((c) => {
         if (typeof c === "string") return c;
@@ -350,11 +398,16 @@ const extractEligibility = (eligibilityObj, basic) => {
       .join(" | ");
   }
 
-  return (basic?.eligibilityNote || "").trim();
+  return (
+    basic?.eligibilityNote || ""
+  ).trim();
 };
 
 // ---------- Education ----------
-const parseEducationLevels = (labelsArray, text) => {
+const parseEducationLevels = (
+  labelsArray,
+  text
+) => {
   const levels = new Set();
 
   const lowerText = normalizeText(text);
@@ -396,7 +449,9 @@ const parseEducationLevels = (labelsArray, text) => {
   };
 
   for (const entry of candidates) {
-    for (const [pattern, level] of Object.entries(eduMap)) {
+    for (const [pattern, level] of Object.entries(
+      eduMap
+    )) {
       if (hasPattern(entry, pattern)) {
         levels.add(level);
       }
@@ -411,9 +466,13 @@ const parseEducationLevels = (labelsArray, text) => {
 };
 
 // ---------- Gender ----------
-const parseGender = (labelsArray, eligibilityText) => {
+const parseGender = (
+  labelsArray,
+  eligibilityText
+) => {
   const labels = labelsArray.map(normalizeText);
-  const eligibility = normalizeText(eligibilityText);
+  const eligibility =
+    normalizeText(eligibilityText);
 
   const femalePatterns = [
     "women",
@@ -443,11 +502,23 @@ const parseGender = (labelsArray, eligibilityText) => {
     "boys",
   ];
 
-  const isFemale = hasAnyPattern(eligibility, femalePatterns) ||
-    labels.some((label) => hasAnyPattern(label, femalePatterns));
+  const isFemale =
+    hasAnyPattern(
+      eligibility,
+      femalePatterns
+    ) ||
+    labels.some((label) =>
+      hasAnyPattern(label, femalePatterns)
+    );
 
-  const isMale = hasAnyPattern(eligibility, malePatterns) ||
-    labels.some((label) => hasAnyPattern(label, malePatterns));
+  const isMale =
+    hasAnyPattern(
+      eligibility,
+      malePatterns
+    ) ||
+    labels.some((label) =>
+      hasAnyPattern(label, malePatterns)
+    );
 
   if (isFemale && !isMale) {
     return {
@@ -473,11 +544,17 @@ const parseGender = (labelsArray, eligibilityText) => {
 };
 
 // ---------- Categories ----------
-const parseCategories = (beneficiaryLabels, eligibilityText) => {
+const parseCategories = (
+  beneficiaryLabels,
+  eligibilityText
+) => {
   const allowedCategories = new Set();
 
-  const labels = beneficiaryLabels.map(normalizeText);
-  const eligibility = normalizeText(eligibilityText);
+  const labels =
+    beneficiaryLabels.map(normalizeText);
+
+  const eligibility =
+    normalizeText(eligibilityText);
 
   const categoryPatterns = {
     sc: [
@@ -546,10 +623,18 @@ const parseCategories = (beneficiaryLabels, eligibilityText) => {
     ],
   };
 
-  for (const [category, patterns] of Object.entries(categoryPatterns)) {
+  for (const [
+    category,
+    patterns,
+  ] of Object.entries(categoryPatterns)) {
     const found =
-      hasAnyPattern(eligibility, patterns) ||
-      labels.some((label) => hasAnyPattern(label, patterns));
+      hasAnyPattern(
+        eligibility,
+        patterns
+      ) ||
+      labels.some((label) =>
+        hasAnyPattern(label, patterns)
+      );
 
     if (found) {
       allowedCategories.add(category);
@@ -564,11 +649,17 @@ const parseCategories = (beneficiaryLabels, eligibilityText) => {
 };
 
 // ---------- Occupations ----------
-const parseOccupations = (beneficiaryLabels, eligibilityText) => {
+const parseOccupations = (
+  beneficiaryLabels,
+  eligibilityText
+) => {
   const occSet = new Set();
 
-  const labels = beneficiaryLabels.map(normalizeText);
-  const eligibility = normalizeText(eligibilityText);
+  const labels =
+    beneficiaryLabels.map(normalizeText);
+
+  const eligibility =
+    normalizeText(eligibilityText);
 
   const occMap = {
     farmer: [
@@ -649,10 +740,18 @@ const parseOccupations = (beneficiaryLabels, eligibilityText) => {
     ],
   };
 
-  for (const [occupation, patterns] of Object.entries(occMap)) {
+  for (const [
+    occupation,
+    patterns,
+  ] of Object.entries(occMap)) {
     const found =
-      hasAnyPattern(eligibility, patterns) ||
-      labels.some((label) => hasAnyPattern(label, patterns));
+      hasAnyPattern(
+        eligibility,
+        patterns
+      ) ||
+      labels.some((label) =>
+        hasAnyPattern(label, patterns)
+      );
 
     if (found) {
       occSet.add(occupation);
@@ -693,12 +792,20 @@ const SCHOLARSHIP_PATTERNS = [
 ];
 
 // ---------- Age extraction ----------
-const extractAgeLimits = (eligibility, fallbackAge = null) => {
+const extractAgeLimits = (
+  eligibility,
+  fallbackAge = null
+) => {
   let minAge = null;
   let maxAge = null;
 
-  if (fallbackAge && typeof fallbackAge === "object") {
-    for (const key of Object.keys(fallbackAge)) {
+  if (
+    fallbackAge &&
+    typeof fallbackAge === "object"
+  ) {
+    for (const key of Object.keys(
+      fallbackAge
+    )) {
       const range = fallbackAge[key];
 
       if (!range) continue;
@@ -707,14 +814,20 @@ const extractAgeLimits = (eligibility, fallbackAge = null) => {
         minAge =
           minAge === null
             ? Number(range.gte)
-            : Math.max(minAge, Number(range.gte));
+            : Math.max(
+                minAge,
+                Number(range.gte)
+              );
       }
 
       if (range.lte != null) {
         maxAge =
           maxAge === null
             ? Number(range.lte)
-            : Math.min(maxAge, Number(range.lte));
+            : Math.min(
+                maxAge,
+                Number(range.lte)
+              );
       }
     }
   }
@@ -722,7 +835,10 @@ const extractAgeLimits = (eligibility, fallbackAge = null) => {
   const text = normalizeText(eligibility);
 
   if (!text) {
-    return { minAge, maxAge };
+    return {
+      minAge,
+      maxAge,
+    };
   }
 
   const maxPatterns = [
@@ -736,13 +852,19 @@ const extractAgeLimits = (eligibility, fallbackAge = null) => {
 
     if (!match) continue;
 
-    const parsedMax = parseInt(match[1], 10);
+    const parsedMax = parseInt(
+      match[1],
+      10
+    );
 
     if (!Number.isNaN(parsedMax)) {
       maxAge =
         maxAge === null
           ? parsedMax
-          : Math.min(maxAge, parsedMax);
+          : Math.min(
+              maxAge,
+              parsedMax
+            );
 
       break;
     }
@@ -758,28 +880,45 @@ const extractAgeLimits = (eligibility, fallbackAge = null) => {
 
     if (!match) continue;
 
-    const parsedMin = parseInt(match[1], 10);
+    const parsedMin = parseInt(
+      match[1],
+      10
+    );
 
     if (!Number.isNaN(parsedMin)) {
       minAge =
         minAge === null
           ? parsedMin
-          : Math.max(minAge, parsedMin);
+          : Math.max(
+              minAge,
+              parsedMin
+            );
 
       break;
     }
   }
 
-  return { minAge, maxAge };
+  return {
+    minAge,
+    maxAge,
+  };
 };
 
 // ---------- Main normalizer ----------
-export const normalizeMyScheme = (detailData, searchFields = {}) => {
+export const normalizeMyScheme = (
+  detailData,
+  searchFields = {}
+) => {
   if (!detailData) return null;
 
-  const basic = detailData.basicDetails || {};
-  const content = detailData.schemeContent || {};
-  const eligibilityObj = detailData.eligibilityCriteria || {};
+  const basic =
+    detailData.basicDetails || {};
+
+  const content =
+    detailData.schemeContent || {};
+
+  const eligibilityObj =
+    detailData.eligibilityCriteria || {};
 
   const externalId =
     searchFields.slug ||
@@ -788,59 +927,85 @@ export const normalizeMyScheme = (detailData, searchFields = {}) => {
 
   if (!externalId) return null;
 
-  const name = (basic.schemeName || "Untitled Scheme").trim();
+  const name = (
+    basic.schemeName ||
+    "Untitled Scheme"
+  ).trim();
 
   const description =
-    (content.briefDescription || "").trim();
+    (
+      content.briefDescription ||
+      ""
+    ).trim();
 
-  const benefits = extractBenefitsText(content);
+  const benefits =
+    extractBenefitsText(content);
 
   const eligibility =
-    extractEligibility(eligibilityObj, basic);
+    extractEligibility(
+      eligibilityObj,
+      basic
+    );
 
-  const tags = normalizeTags(basic.tags);
+  const tags =
+    normalizeTags(basic.tags);
 
-  const eligibilityText = normalizeText(eligibility);
-
-  const category = basic.schemeCategory?.length
-    ? basic.schemeCategory
-        .map((c) => (c.label || c))
-        .join(", ")
-    : "General";
+  const category =
+    basic.schemeCategory?.length
+      ? basic.schemeCategory
+          .map((c) => c.label || c)
+          .join(", ")
+      : "General";
 
   const ministry =
-    (typeof basic.nodalMinistryName === "string"
-      ? basic.nodalMinistryName
-      : basic.nodalMinistryName?.label) ||
-    (typeof basic.nodalDepartmentName === "string"
-      ? basic.nodalDepartmentName
-      : basic.nodalDepartmentName?.label) ||
+    (
+      typeof basic.nodalMinistryName ===
+      "string"
+        ? basic.nodalMinistryName
+        : basic.nodalMinistryName?.label
+    ) ||
+    (
+      typeof basic.nodalDepartmentName ===
+      "string"
+        ? basic.nodalDepartmentName
+        : basic.nodalDepartmentName?.label
+    ) ||
     "Central Government";
 
   // ---------- State extraction ----------
   let rawState = "All India";
   const allowedStates = [];
 
-  const extractStateList = (source) => {
+  const extractStateList = (
+    source
+  ) => {
     if (!source) return [];
 
     if (Array.isArray(source)) {
       return source
         .filter(Boolean)
-        .map((s) => String(s).trim())
+        .map((s) =>
+          String(s).trim()
+        )
         .filter(
           (s) =>
             s &&
-            s.toLowerCase() !== "all india" &&
+            s.toLowerCase() !==
+              "all india" &&
             s.toLowerCase() !== "all"
         );
     }
 
-    if (typeof source === "string" && source.trim()) {
-      const trimmed = source.trim();
+    if (
+      typeof source === "string" &&
+      source.trim()
+    ) {
+      const trimmed =
+        source.trim();
 
       if (
-        trimmed.toLowerCase() !== "all india" &&
+        trimmed.toLowerCase() !==
+          "all india" &&
         trimmed.toLowerCase() !== "all"
       ) {
         return [trimmed];
@@ -851,178 +1016,201 @@ export const normalizeMyScheme = (detailData, searchFields = {}) => {
   };
 
   const stateCandidates = [
-    ...extractStateList(basic.allowedStates),
-    ...extractStateList(searchFields.beneficiaryState),
-    ...extractStateList(basic.state),
+    ...extractStateList(
+      basic.allowedStates
+    ),
+    ...extractStateList(
+      searchFields.beneficiaryState
+    ),
+    ...extractStateList(
+      basic.state
+    ),
   ];
 
-  const uniqueStates = [...new Set(stateCandidates)];
+  const uniqueStates = [
+    ...new Set(stateCandidates),
+  ];
 
   if (uniqueStates.length > 0) {
-    const normalizedStates = uniqueStates
-      .map((state) => normalizeState(state))
-      .filter(Boolean);
+    const normalizedStates =
+      uniqueStates
+        .map((state) =>
+          normalizeState(state)
+        )
+        .filter(Boolean);
 
-    rawState = normalizedStates.join(", ");
+    rawState =
+      normalizedStates.join(", ");
 
     for (const state of normalizedStates) {
-      if (!allowedStates.includes(state)) {
+      if (
+        !allowedStates.includes(state)
+      ) {
         allowedStates.push(state);
       }
     }
   }
 
-  if (allowedStates.length === 0) {
+  if (
+    allowedStates.length === 0
+  ) {
     allowedStates.push("all");
   }
 
   // ---------- Beneficiaries ----------
   const targetBeneficiaries =
-    Array.isArray(basic.targetBeneficiaries)
+    Array.isArray(
+      basic.targetBeneficiaries
+    )
       ? basic.targetBeneficiaries
       : [];
 
-  const beneficiaryLabels = targetBeneficiaries
-    .map((b) => (b?.label || b || "").toString().toLowerCase().trim())
-    .filter(Boolean);
+  const beneficiaryLabels =
+    targetBeneficiaries
+      .map(
+        (b) =>
+          (
+            b?.label ||
+            b ||
+            ""
+          )
+            .toString()
+            .toLowerCase()
+            .trim()
+      )
+      .filter(Boolean);
 
   // ---------- Categories ----------
-  const finalAllowedCategories = parseCategories(
-    beneficiaryLabels,
-    eligibility
-  );
+  const finalAllowedCategories =
+    parseCategories(
+      beneficiaryLabels,
+      eligibility
+    );
 
   // ---------- Occupations ----------
-  const allowedOccupations = parseOccupations(
-    beneficiaryLabels,
-    eligibility
-  );
+  const allowedOccupations =
+    parseOccupations(
+      beneficiaryLabels,
+      eligibility
+    );
 
   // ---------- Scholarship ----------
-  const combinedScholarshipText = normalizeText(
-    `${name} ${description} ${eligibility} ${tags.join(" ")}`
-  );
+  const combinedScholarshipText =
+    normalizeText(
+      `${name} ${description} ${eligibility} ${tags.join(
+        " "
+      )}`
+    );
 
-  const isScholarship = SCHOLARSHIP_PATTERNS.some((pattern) =>
-    hasPattern(combinedScholarshipText, pattern)
-  );
+  const isScholarship =
+    SCHOLARSHIP_PATTERNS.some(
+      (pattern) =>
+        hasPattern(
+          combinedScholarshipText,
+          pattern
+        )
+    );
 
   // ---------- Scheme metadata ----------
   const schemeFor =
-    basic.schemeFor || "Individual";
-
-  const schemeType =
-    basic.type || "General";
+    basic.schemeFor ||
+    "Individual";
 
   // ---------- Age ----------
-  const { minAge, maxAge } = extractAgeLimits(
+  const {
+    minAge,
+    maxAge,
+  } = extractAgeLimits(
     eligibility,
-    searchFields.age || basic.age
+    searchFields.age ||
+      basic.age
   );
 
   // ---------- Income ----------
-  const { minIncome, maxIncome } =
-    extractIncomeLimits(
-      eligibility,
-      searchFields.familyIncomeLimit ||
-        basic.familyIncomeLimit
-    );
+  const {
+    minIncome,
+    maxIncome,
+  } = extractIncomeLimits(
+    eligibility,
+    searchFields.familyIncomeLimit ||
+      basic.familyIncomeLimit
+  );
 
   // ---------- Education ----------
-  const educationLabels = Array.isArray(basic.educationLevel)
-    ? basic.educationLevel.map((e) => e?.label || e)
-    : [];
+  const educationLabels =
+    Array.isArray(
+      basic.educationLevel
+    )
+      ? basic.educationLevel.map(
+          (e) => e?.label || e
+        )
+      : [];
 
-  const educationLevels = parseEducationLevels(
-    educationLabels,
-    `${eligibility} ${description}`
-  );
+  const educationLevels =
+    parseEducationLevels(
+      educationLabels,
+      `${eligibility} ${description}`
+    );
 
-  const primaryEducation = educationLevels[0];
+  const primaryEducation =
+    educationLevels[0];
 
   // ---------- Gender ----------
-  const genderInfo = parseGender(
-    beneficiaryLabels,
-    eligibility
-  );
+  const genderInfo =
+    parseGender(
+      beneficiaryLabels,
+      eligibility
+    );
 
   // ---------- Documents ----------
   let documentsRequired = null;
 
-  if (Array.isArray(eligibilityObj.documentsRequired)) {
-    documentsRequired = eligibilityObj.documentsRequired
-      .map((d) => d?.label || d)
-      .filter(Boolean);
-  } else if (
-    typeof eligibilityObj.documentsRequired === "string"
+  if (
+    Array.isArray(
+      eligibilityObj.documentsRequired
+    )
   ) {
-    documentsRequired = eligibilityObj.documentsRequired
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-  } else if (Array.isArray(content.documentsRequired)) {
-    documentsRequired = content.documentsRequired
-      .map((d) => d?.label || d)
-      .filter(Boolean);
+    documentsRequired =
+      eligibilityObj.documentsRequired
+        .map(
+          (d) => d?.label || d
+        )
+        .filter(Boolean);
   } else if (
-    typeof content.documentsRequired === "string"
+    typeof eligibilityObj.documentsRequired ===
+    "string"
   ) {
-    documentsRequired = content.documentsRequired
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
+    documentsRequired =
+      eligibilityObj.documentsRequired
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+  } else if (
+    Array.isArray(
+      content.documentsRequired
+    )
+  ) {
+    documentsRequired =
+      content.documentsRequired
+        .map(
+          (d) => d?.label || d
+        )
+        .filter(Boolean);
+  } else if (
+    typeof content.documentsRequired ===
+    "string"
+  ) {
+    documentsRequired =
+      content.documentsRequired
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
   }
-
-  // ---------- Search text ----------
-  const searchText = [
-    name,
-    description,
-    content.detailedDescription_md || "",
-    benefits,
-    eligibility,
-    tags.join(" "),
-    beneficiaryLabels.join(" "),
-
-    `category: ${category}`,
-    `ministry: ${ministry}`,
-    `state: ${rawState}`,
-    `states: ${allowedStates.join(" ")}`,
-    `type: ${schemeType}`,
-    `for: ${schemeFor}`,
-
-    `eligible occupations: ${allowedOccupations.join(" ")}`,
-    `eligible categories: ${finalAllowedCategories.join(" ")}`,
-    `education: ${educationLevels.join(" ")}`,
-    `gender: ${genderInfo.gender}`,
-
-    minIncome !== null
-      ? `minimum income: ${minIncome}`
-      : "",
-
-    maxIncome !== null
-      ? `maximum income: ${maxIncome}`
-      : "",
-
-    minAge !== null
-      ? `minimum age: ${minAge}`
-      : "",
-
-    maxAge !== null
-      ? `maximum age: ${maxAge}`
-      : "",
-
-    isScholarship
-      ? "scholarship education financial assistance"
-      : "",
-  ]
-    .join(" ")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
 
   // ---------- Final normalized object ----------
   const normalized = {
-    externalId: String(externalId).trim(),
+    externalId:
+      String(externalId).trim(),
 
     name,
     description,
@@ -1034,15 +1222,27 @@ export const normalizeMyScheme = (detailData, searchFields = {}) => {
 
     state: rawState,
 
-    occupation: allowedOccupations[0],
-    educationLevel: primaryEducation,
-    gender: genderInfo.gender,
+    occupation:
+      allowedOccupations[0],
 
-    allowedCategories: finalAllowedCategories,
+    educationLevel:
+      primaryEducation,
+
+    gender:
+      genderInfo.gender,
+
+    allowedCategories:
+      finalAllowedCategories,
+
     allowedStates,
-    allowedGenders: genderInfo.allowedGenders,
+
+    allowedGenders:
+      genderInfo.allowedGenders,
+
     allowedOccupations,
-    allowedEducationLevels: educationLevels,
+
+    allowedEducationLevels:
+      educationLevels,
 
     minIncome,
     maxIncome,
@@ -1051,7 +1251,9 @@ export const normalizeMyScheme = (detailData, searchFields = {}) => {
     maxAge,
 
     isScholarship,
-    isFemaleOnly: genderInfo.isFemaleOnly,
+
+    isFemaleOnly:
+      genderInfo.isFemaleOnly,
 
     schemeFor,
 
@@ -1067,14 +1269,14 @@ export const normalizeMyScheme = (detailData, searchFields = {}) => {
 
     documentsRequired,
 
-    searchText,
-
     tags,
   };
 
   const checksum = crypto
     .createHash("md5")
-    .update(stableStringify(normalized))
+    .update(
+      stableStringify(normalized)
+    )
     .digest("hex");
 
   return {
