@@ -1162,50 +1162,32 @@ export const normalizeMyScheme = (
       eligibility
     );
 
-  // ---------- Documents ----------
-  let documentsRequired = null;
+// ---------- Documents ----------
+let documentsRequired = null;
 
-  if (
-    Array.isArray(
-      eligibilityObj.documentsRequired
-    )
-  ) {
-    documentsRequired =
-      eligibilityObj.documentsRequired
-        .map(
-          (d) => d?.label || d
-        )
-        .filter(Boolean);
-  } else if (
-    typeof eligibilityObj.documentsRequired ===
-    "string"
-  ) {
-    documentsRequired =
-      eligibilityObj.documentsRequired
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-  } else if (
-    Array.isArray(
-      content.documentsRequired
-    )
-  ) {
-    documentsRequired =
-      content.documentsRequired
-        .map(
-          (d) => d?.label || d
-        )
-        .filter(Boolean);
-  } else if (
-    typeof content.documentsRequired ===
-    "string"
-  ) {
-    documentsRequired =
-      content.documentsRequired
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-  }
+if (Array.isArray(eligibilityObj.documentsRequired)) {
+  documentsRequired = eligibilityObj.documentsRequired
+    .map((d) => d?.label || d)
+    .filter(Boolean)
+    .join(", ");
+} else if (typeof eligibilityObj.documentsRequired === "string") {
+  documentsRequired = eligibilityObj.documentsRequired
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join(", ");
+} else if (Array.isArray(content.documentsRequired)) {
+  documentsRequired = content.documentsRequired
+    .map((d) => d?.label || d)
+    .filter(Boolean)
+    .join(", ");
+} else if (typeof content.documentsRequired === "string") {
+  documentsRequired = content.documentsRequired
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join(", ");
+}
 
   // ---------- Final normalized object ----------
   const normalized = {
