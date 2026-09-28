@@ -80,6 +80,7 @@ function App() {
       "popstate",
       syncRoute
     );
+    
 
     return () => {
       window.removeEventListener(
@@ -285,6 +286,7 @@ function App() {
 
     try {
       await addBookmark(
+        
         scheme.id
       );
 

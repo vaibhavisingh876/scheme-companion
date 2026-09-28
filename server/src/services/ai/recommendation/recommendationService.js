@@ -3,8 +3,7 @@ import { getExtractor } from "../../embeddingModel.js";           // ✅ 2 level
 import prisma from "../../../config/prisma.js";                    // ✅ 3 levels up
 import { scoreScheme } from "../../ai/scoringEngine.js";              // ✅ 2 levels up
 import { embeddingCache } from "../../../utils/cache.js";          // ✅ 3 levels up
-import { buildQueryText } from "./searchTextBuilder.js";           // ✅ same folder
-import { normalizeCategory } from "./utils.js";                    // ✅ same folder
+import { buildQueryText } from "./searchTextBuilder.js";           // ✅ same folder                    // ✅ same folder
 import { buildSchemeFilters } from "../../filterBuilder.js";       // ✅ 2 levels up
 
 const MAX_RESULTS = 20;
@@ -43,35 +42,6 @@ const deduplicateSchemes = (schemes) => {
   });
 };
 
-const applyDiversity = (sorted, maxResults, primaryIntent) => {
-  if (!sorted.length) return [];
-  
-  const intentCat = primaryIntent && primaryIntent !== "unknown"
-    ? normalizeCategory(primaryIntent.replace(/-/g, " "))
-    : null;
-  
-  const result = [], counts = {};
-  for (const s of sorted) {
-    const cat = normalizeCategory(s.category);
-    const cap = cat === intentCat ? 10 : 5;
-    if ((counts[cat] || 0) < cap) {
-      result.push(s);
-      counts[cat] = (counts[cat] || 0) + 1;
-      if (result.length >= maxResults) break;
-    }
-  }
-  
-  if (result.length < maxResults) {
-    for (const s of sorted) {
-      if (!result.includes(s)) {
-        result.push(s);
-        if (result.length >= maxResults) break;
-      }
-    }
-  }
-  
-  return result;
-};
 
 export const recommendSchemes = async (message) => {
   const trimmed = (message || "").trim();
@@ -81,7 +51,7 @@ export const recommendSchemes = async (message) => {
   const queryText = buildQueryText(profile, trimmed);
   const queryEmbedding = await getQueryEmbedding(queryText);
 
-  const filterWhere = buildSchemeFilters(profile, { strictOccupation: false });
+  const filterWhere = buildSchemeFilters(profile, { strictOccupation: true });
   
   const allSchemes = await prisma.scheme.findMany({
     where: filterWhere,
@@ -136,9 +106,9 @@ export const recommendSchemes = async (message) => {
 
   valid.sort((a, b) => b._score - a._score);
   const deduped = deduplicateSchemes(valid);
-  const diverse = applyDiversity(deduped, MAX_RESULTS, profile.primaryIntent);
+  const topResults = deduped.slice(0, MAX_RESULTS);
 
-  const results = diverse.map(({ embedding, _similarity, _score, _hardConflicts, ...rest }) => ({
+  const results = topResults.map(({ embedding, _similarity, _score, _hardConflicts, ...rest }) => ({
     ...rest,
     relevanceScore: Math.round(_score * 100),
   }));

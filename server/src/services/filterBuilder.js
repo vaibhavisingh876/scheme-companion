@@ -52,7 +52,7 @@ export const buildSchemeFilters = (profile, options = {}) => {
   if (profile.casteCategory && profile.casteCategory !== "unknown") {
     conditions.push({
       OR: [
-        { allowedCategories: { has: "all" } },
+        { allowedCategories: { has: "general" } },
         { allowedCategories: { has: profile.casteCategory.toLowerCase() } },
         { allowedCategories: { isEmpty: true } },
       ],
