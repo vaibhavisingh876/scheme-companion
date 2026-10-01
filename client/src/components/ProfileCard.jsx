@@ -1,82 +1,99 @@
-import React from "react";
+const CATEGORY_LABELS = {
+  sc: "SC",
+  st: "ST",
+  obc: "OBC",
+  general: "General",
+  minority: "Minority",
+};
+
+const EDUCATION_LABELS = {
+  higher_education: "Higher education",
+  school: "School",
+};
+
+const INTENT_LABELS = {
+  student: "Student support",
+  business: "Business",
+  job: "Employment",
+  medical: "Medical",
+  treatment: "Treatment",
+  loan: "Loan",
+  scholarship: "Scholarship",
+  marriage: "Marriage",
+  death: "Death benefit",
+  disability: "Disability",
+  maternity: "Maternity",
+  farmer: "Farming",
+  unemployed: "Unemployment",
+  "startup-funding": "Startup funding",
+  "widow-support": "Widow support",
+  housing: "Housing",
+  sanitation: "Sanitation",
+  pension: "Pension",
+};
+
+const humanize = (value) =>
+  String(value)
+    .replace(/_/g, " ")
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 
 const ProfileCard = ({ profile }) => {
   if (!profile) return null;
 
-  const cap = (str) => {
-    if (!str || str === "unknown") return null;
-    return String(str).charAt(0).toUpperCase() + String(str).slice(1);
-  };
+  const known = (v) => v !== null && v !== undefined && v !== "" && v !== "unknown";
 
   const fields = [
-    { label: "Age",        value: profile.age ?? null,         icon: "👤" },
-    { label: "Gender",     value: cap(profile.gender),          icon: "⚧"  },
-    { label: "Occupation", value: cap(profile.occupation),      icon: "💼" },
-    { label: "State",      value: cap(profile.state),           icon: "📍" },
+    { label: "Age", value: known(profile.age) ? `${profile.age} years` : null, icon: "◷" },
+    { label: "Gender", value: known(profile.gender) ? humanize(profile.gender) : null, icon: "⚤" },
+    { label: "Occupation", value: known(profile.occupation) ? humanize(profile.occupation) : null, icon: "⚒" },
+    { label: "State", value: known(profile.state) ? humanize(profile.state) : null, icon: "⊕" },
     {
-      label: "Income",
-      value: profile.income
+      label: "Annual income",
+      value: known(profile.income)
         ? `₹${Number(profile.income).toLocaleString("en-IN")}`
         : null,
       icon: "₹",
     },
-    { label: "Education",  value: cap(profile.educationLevel),  icon: "🎓" },
-    { label: "Category",   value: cap(profile.casteCategory),   icon: "🏷"  },
-  ].filter((f) => f.value && f.value !== "Unknown");
+    {
+      label: "Education",
+      value: known(profile.educationLevel)
+        ? EDUCATION_LABELS[profile.educationLevel] || humanize(profile.educationLevel)
+        : null,
+      icon: "◎",
+    },
+    {
+      label: "Category",
+      value: known(profile.casteCategory)
+        ? CATEGORY_LABELS[profile.casteCategory] || humanize(profile.casteCategory)
+        : null,
+      icon: "⬡",
+    },
+    {
+      label: "Looking for",
+      value: known(profile.primaryIntent)
+        ? INTENT_LABELS[profile.primaryIntent] || humanize(profile.primaryIntent)
+        : null,
+      icon: "→",
+    },
+  ].filter((f) => f.value);
 
   if (fields.length === 0) return null;
 
   return (
-    <div
-      className="rounded-2xl p-5 mb-2 animate-fade-up"
-      style={{
-        background: "var(--panel)",
-        border: "1px solid var(--border)",
-        borderLeft: "3px solid var(--saffron)",
-      }}
-    >
-      <div className="flex items-center gap-2 mb-3">
-        <span
-          className="w-2 h-2 rounded-full"
-          style={{ background: "var(--saffron)", boxShadow: "0 0 6px var(--saffron)" }}
-        />
-        <p
-          className="text-[10px] font-semibold uppercase tracking-widest"
-          style={{ color: "var(--muted)", fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-        >
-          Profile detected
-        </p>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {fields.map(({ label, value, icon }) => (
-          <div
-            key={label}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
-            style={{
-              background: "var(--saffron-lt)",
-              border: "1px solid #F5D4B8",
-              color: "var(--saffron-dk)",
-              fontFamily: "'Inter', sans-serif",
-            }}
-          >
-            <span className="text-[11px]">{icon}</span>
-            <span
-              className="font-semibold"
-              style={{
-                color: "var(--muted)",
-                fontSize: "10px",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              }}
-            >
-              {label}
-            </span>
-            {/* FIX: was hardcoded #1A0F00 (near-black) — invisible in dark mode */}
-            <span style={{ color: "var(--ink)" }}>{value}</span>
+    <div className="readout">
+      <p className="readout__title">What we understood from your description</p>
+      <dl className="readout__grid">
+        {fields.map((f) => (
+          <div className="readout__item" key={f.label}>
+            <dt>
+              <i aria-hidden="true">{f.icon}</i>
+              {f.label}
+            </dt>
+            <dd>{f.value}</dd>
           </div>
         ))}
-      </div>
+      </dl>
     </div>
   );
 };

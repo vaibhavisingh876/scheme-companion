@@ -455,6 +455,9 @@ function App() {
             onViewDetails={
               handleViewDetailsTrigger
             }
+            onTabChange={
+              handleTabChange
+            }
           />
         );
 
@@ -491,14 +494,6 @@ function App() {
   return (
     <div
       className="min-h-screen flex flex-col app-shell"
-      style={{
-        background:
-          "var(--surface)",
-        color:
-          "var(--ink)",
-        fontFamily:
-          "'Inter', sans-serif",
-      }}
     >
 
       {!isAuthPage && (
@@ -522,66 +517,29 @@ function App() {
         {renderViewport()}
 
         {!isAuthPage && (
-          <footer
-            className="max-w-7xl mx-auto px-5 sm:px-8 py-10 mt-12"
-          >
-            <div
-              className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3"
-              style={{
-                borderTop:
-                  "1px solid var(--border)",
-              }}
-            >
+          <footer className="foot">
+            <div className="container container--wide foot__inner">
               <div>
-                <p
-                  className="text-sm font-black"
-                  style={{
-                    fontFamily:
-                      "'Plus Jakarta Sans', sans-serif",
-                    color:
-                      "var(--ink)",
-                  }}
-                >
-                  Scheme
-                  <span
-                    style={{
-                      color:
-                        "var(--saffron)",
-                    }}
-                  >
-                    Companion
+                <div className="foot__brand">
+                  <span className="brand__mark">
+                    <img src="/logo.png" alt="" />
                   </span>
-                </p>
+                  <span className="brand__word">
+                    Scheme<b>Companion</b>
+                  </span>
+                </div>
 
-                <p
-                  className="text-[11px] mt-1"
-                  style={{
-                    color:
-                      "var(--muted)",
-                  }}
-                >
-                  Discover government benefits
-                  that are meant for you.
+                <p className="foot__tag">
+                  Discover government benefits that are meant for you.
                 </p>
               </div>
 
-              <p
-                className="text-[11px]"
-                style={{
-                  color:
-                    "var(--muted)",
-                }}
-              >
+              <p className="foot__src">
                 Data sourced from{" "}
                 <a
                   href="https://www.myscheme.gov.in"
                   target="_blank"
                   rel="noreferrer"
-                  className="underline underline-offset-2"
-                  style={{
-                    color:
-                      "var(--saffron)",
-                  }}
                 >
                   MyScheme.gov.in
                 </a>

@@ -1,259 +1,123 @@
-import React from "react";
+const applyUrlFor = (scheme) =>
+  scheme.applicationLink?.trim()
+    ? scheme.applicationLink
+    : "https://www.myscheme.gov.in";
 
-const CATEGORY_COLORS = {
-"Education & Learning": {
-bg: "#EBF5EE",
-text: "#2E7D52",
-},
-"Health & Wellness": {
-bg: "#FEF3F2",
-text: "#B42318",
-},
-"Agriculture, Rural & Environment": {
-bg: "#F0FDF4",
-text: "#166534",
-},
-"Banking,Financial Services and Insurance": {
-bg: "#EFF6FF",
-text: "#1D4ED8",
-},
-"Skills & Employment": {
-bg: "#F5F3FF",
-text: "#6D28D9",
-},
-"Social welfare & Empowerment": {
-bg: "#FFF7ED",
-text: "#C2410C",
-},
-"Business & Entrepreneurship": {
-bg: "#ECFDF5",
-text: "#065F46",
-},
+const formatIncome = (value) => {
+  if (!value) return null;
+  if (value >= 10000000) return `₹${(value / 10000000).toFixed(1)}Cr`;
+  if (value >= 100000) return `₹${(value / 100000).toFixed(1)}L`;
+  if (value >= 1000) return `₹${(value / 1000).toFixed(0)}K`;
+  return `₹${value.toLocaleString("en-IN")}`;
 };
 
-const getCategoryStyle = (cat) =>
-CATEGORY_COLORS[cat] || {
-bg: "var(--saffron-lt)",
-text: "var(--saffron-dk)",
-};
-
-const RecommendationCard = ({
-scheme,
-onViewDetails,
-}) => {
-if (!scheme?.name || !scheme?.description) {
-return null;
-}
-
-const { bg, text } = getCategoryStyle(
-scheme.category
+const EligibilityPill = ({ icon, label }) => (
+  <span className="epill">
+    <i aria-hidden="true">{icon}</i>
+    {label}
+  </span>
 );
 
-const applyUrl =
-scheme.applicationLink?.trim().length > 0
-? scheme.applicationLink
-: "https://www.myscheme.gov.in";
+const RecommendationCard = ({ scheme, onViewDetails, action }) => {
+  if (!scheme?.name) return null;
 
-return (
-<div
-className="premium-card group rounded-3xl overflow-hidden cursor-pointer animate-fade-up h-full flex flex-col"
-style={{
-background: "var(--panel)",
-border: "1px solid var(--border)",
-borderLeft: "3px solid var(--saffron)",
-}}
-onClick={() =>
-onViewDetails?.(scheme)
-}
->
-{/* TOP */}
+  const applyUrl = applyUrlFor(scheme);
 
-  <div className="relative px-5 pt-5 pb-3">
-    <div
-      className="flex items-center gap-2 flex-wrap"
-      style={{
-        minHeight: "34px",
+  const ageLabel =
+    scheme.minAge != null && scheme.maxAge != null
+      ? `${scheme.minAge}–${scheme.maxAge} yrs`
+      : scheme.minAge != null
+      ? `${scheme.minAge}+ yrs`
+      : scheme.maxAge != null
+      ? `≤${scheme.maxAge} yrs`
+      : null;
+
+  const incomeLabel = scheme.maxIncome
+    ? `Income ≤ ${formatIncome(scheme.maxIncome)}`
+    : null;
+
+  return (
+    <article
+      className="rcard"
+      onClick={() => onViewDetails?.(scheme)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onViewDetails?.(scheme);
+        }
       }}
     >
-      {scheme.category && (
-        <span
-          className="text-[9px] font-bold px-2.5 py-1.5 rounded-full uppercase tracking-[0.08em]"
-          style={{
-            background: bg,
-            color: text,
-          }}
-        >
-          {scheme.category}
-        </span>
+      <div className="rcard__top">
+        <div className="rcard__badges">
+          {scheme.category && <span className="tag-cat">{scheme.category}</span>}
+          {scheme.isFemaleOnly && <span className="tag-female">Women only</span>}
+          {scheme.isScholarship && <span className="tag-scholar">Scholarship</span>}
+        </div>
+
+        <div className="rcard__meta-right">
+          {typeof scheme.relevanceScore === "number" && scheme.relevanceScore > 0 && (
+            <span className="rcard__score" title="Relevance score">
+              {scheme.relevanceScore}%
+            </span>
+          )}
+          <span className="rcard__state">
+            {scheme.state && scheme.state !== "all"
+              ? scheme.state.replace(/^./, (c) => c.toUpperCase())
+              : "All India"}
+          </span>
+        </div>
+      </div>
+
+      <h3 className="rcard__name">{scheme.name}</h3>
+      {scheme.description && (
+        <p className="rcard__desc">{scheme.description}</p>
       )}
 
-      {scheme.state && (
-        <span
-          className="text-[9px] font-semibold px-2.5 py-1.5 rounded-full"
-          style={{
-            background: "var(--surface)",
-            color: "var(--muted)",
-            border: "1px solid var(--border)",
-          }}
-        >
-          {scheme.state}
-        </span>
-      )}
-
-      {scheme.relevanceScore && (
-        <span
-          className="ml-auto text-[9px] font-bold px-2.5 py-1.5 rounded-lg"
-          style={{
-            fontFamily:
-              "'JetBrains Mono', monospace",
-            background:
-              "var(--saffron-lt)",
-            color:
-              "var(--saffron-dk)",
-          }}
-        >
-          {scheme.relevanceScore}
-        </span>
-      )}
-    </div>
-  </div>
-
-  {/* CONTENT */}
-
-  <div
-    className="px-5 pb-5 flex-1 flex flex-col"
-  >
-    <h3
-      className="text-[17px] font-black leading-snug mb-2.5 tracking-tight"
-      style={{
-        fontFamily:
-          "'Plus Jakarta Sans', sans-serif",
-        color: "var(--ink)",
-        minHeight: "42px",
-      }}
-    >
-      {scheme.name}
-    </h3>
-
-    <p
-      className="text-sm leading-6"
-      style={{
-        color: "var(--muted)",
-        display: "-webkit-box",
-        WebkitLineClamp: 3,
-        WebkitBoxOrient: "vertical",
-        overflow: "hidden",
-        minHeight: "72px",
-      }}
-    >
-      {scheme.description}
-    </p>
-
-    <div
-      style={{
-        minHeight: "34px",
-        marginTop: "16px",
-      }}
-    >
-      {scheme.tags?.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {scheme.tags
-            .slice(0, 4)
-            .map((tag, i) => (
-              <span
-                key={i}
-                className="text-[9px] px-2 py-1 rounded-md uppercase tracking-wide font-semibold"
-                style={{
-                  background:
-                    "var(--surface)",
-                  color: "var(--muted)",
-                  border:
-                    "1px solid var(--border)",
-                }}
-              >
-                {tag}
-              </span>
-            ))}
+      {(ageLabel || incomeLabel || scheme.allowedGenders?.length > 0) && (
+        <div className="rcard__elig">
+          {ageLabel && <EligibilityPill icon="◷" label={ageLabel} />}
+          {incomeLabel && <EligibilityPill icon="₹" label={incomeLabel} />}
+          {scheme.gender && scheme.gender !== "all" && (
+            <EligibilityPill icon="⚤" label={scheme.gender} />
+          )}
         </div>
       )}
-    </div>
-  </div>
 
-  {/* FOOTER */}
+      {scheme.tags?.length > 0 && (
+        <div className="rcard__tags">
+          {scheme.tags.slice(0, 3).map((tag, i) => (
+            <span key={`${tag}-${i}`} className="rcard__tag">
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
 
-  <div
-    className="px-5 py-4 flex items-center justify-between gap-3 mt-auto"
-    style={{
-      borderTop:
-        "1px solid var(--border)",
-      background:
-        "color-mix(in srgb, var(--surface) 35%, transparent)",
-      minHeight: "76px",
-    }}
-  >
-    <div className="min-w-0">
-      <p
-        className="text-[9px] uppercase tracking-[0.12em] font-bold mb-1"
-        style={{
-          color: "var(--muted)",
-        }}
-      >
-        Ministry
-      </p>
+      <div className="rcard__foot">
+        <div className="rcard__ministry">
+          <span className="lbl">Ministry</span>
+          <span className="val" title={scheme.ministry || "Central Government"}>
+            {scheme.ministry || "Central Government"}
+          </span>
+        </div>
 
-      <span
-        className="block text-[10px] font-semibold truncate"
-        style={{
-          color: "var(--ink)",
-          maxWidth: "180px",
-        }}
-        title={
-          scheme.ministry ||
-          "Central Government"
-        }
-      >
-        {scheme.ministry ||
-          "Central Government"}
-      </span>
-    </div>
-
-    <a
-      href={applyUrl}
-      target="_blank"
-      rel="noreferrer"
-      className="group/apply shrink-0 inline-flex items-center gap-2 text-xs font-black px-4 py-2.5 rounded-xl text-white transition-all duration-300 hover:-translate-y-0.5"
-      style={{
-        background: "var(--saffron)",
-        fontFamily:
-          "'Plus Jakarta Sans', sans-serif",
-        boxShadow:
-          "0 7px 20px rgba(224,123,57,0.15)",
-      }}
-      onClick={(e) =>
-        e.stopPropagation()
-      }
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background =
-          "var(--saffron-dk)";
-        e.currentTarget.style.boxShadow =
-          "0 10px 28px rgba(224,123,57,0.22)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background =
-          "var(--saffron)";
-        e.currentTarget.style.boxShadow =
-          "0 7px 20px rgba(224,123,57,0.15)";
-      }}
-    >
-      Apply
-      <span className="transition-transform duration-300 group-hover/apply:translate-x-0.5">
-        ↗
-      </span>
-    </a>
-  </div>
-</div>
-
-);
+        <div className="rcard__side">
+          <a
+            href={applyUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="rcard__apply"
+            onClick={(e) => e.stopPropagation()}
+          >
+            Apply <span className="arw">↗</span>
+          </a>
+          {action}
+        </div>
+      </div>
+    </article>
+  );
 };
 
 export default RecommendationCard;

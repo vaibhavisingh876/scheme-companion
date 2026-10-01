@@ -1,9 +1,24 @@
 import prisma from "../../config/prisma.js";
 import { fetchAllMySchemes } from "../connectors/mySchemeBulkfetcher.js";
 import { normalizeMyScheme } from "../normalizers/mySchemeNormalizer.js";
-import { fetchSchemeDetail } from "../connectors/mySchemeDetailFetcher.js";
+import { fetchSchemeDetail, fetchSchemeDocuments } from "../connectors/mySchemeDetailFetcher.js";
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// schemeCategory entries arrive as { label, value } objects; the DB column is String.
+const toLabel = (v) => (v && typeof v === "object" ? v.label || v.name || "" : v);
+
+// Mirrors test.js: search fields are derived from the detail payload itself.
+const buildSearchFields = (detail, slug) => ({
+  schemeName: detail?.basicDetails?.schemeName || "",
+  slug: detail?.slug || slug,
+  briefDescription: detail?.basicDetails?.briefDescription || "",
+  tags: detail?.tags || [],
+  beneficiaryState: detail?.basicDetails?.state?.label ? [detail.basicDetails.state.label] : [],
+  schemeCategory: detail?.basicDetails?.schemeCategory || [],
+  nodalMinistryName: detail?.basicDetails?.nodalMinistryName || "",
+  schemeFor: detail?.basicDetails?.schemeFor || "",
+});
 
 const connectWithRetry = async (retries = 5, delayMs = 2000) => {
   for (let i = 0; i < retries; i++) {
@@ -57,11 +72,10 @@ export const syncMyScheme = async () => {
   }
 
   const slugMap = new Map();
-  for (const hit of searchHits) {
-    const fields = hit.fields || hit;
-    const slug = fields.slug || fields.schemeSlug;
+  for (const item of searchHits) {
+    const slug = item?.slug;
     if (!slug || slugMap.has(slug)) continue;
-    slugMap.set(slug, fields);
+    slugMap.set(slug, item);
   }
 
   const slugs = Array.from(slugMap.keys());
@@ -82,7 +96,16 @@ export const syncMyScheme = async () => {
       batch.map(async (slug) => {
         const detail = await fetchSchemeDetail(slug);
         if (!detail) return null;
-        return normalizeMyScheme(detail, slugMap.get(slug));
+
+        const documents = await fetchSchemeDocuments(slugMap.get(slug)?._id);
+        if (documents?.length) {
+          detail.schemeContent = {
+            ...(detail.schemeContent || {}),
+            documentsRequired: documents,
+          };
+        }
+
+        return normalizeMyScheme(detail, buildSearchFields(detail, slug));
       })
     );
 
@@ -108,7 +131,7 @@ export const syncMyScheme = async () => {
 
   const existingSchemes = await prisma.scheme.findMany({
     where: { sourceId: "myscheme" },
-    select: { id: true, externalId: true, checksum: true, isActive: true },
+    select: { id: true, externalId: true, checksum: true, version: true, isActive: true },
   });
 
   const existingMap = new Map(existingSchemes.map(s => [s.externalId, s]));
@@ -117,13 +140,15 @@ export const syncMyScheme = async () => {
   const updateBatch = [];
 
   for (const scheme of enrichedSchemes) {
-    const existing = existingMap.get(scheme.externalId);
+    const { _semanticDebug, ...dbScheme } = scheme;
+    dbScheme.category = toLabel(dbScheme.category);
+    const existing = existingMap.get(dbScheme.externalId);
     if (!existing) {
-      createBatch.push({ ...scheme, version: 1, lastSyncedAt: new Date(), isActive: true });
-    } else if (existing.checksum !== scheme.checksum || !existing.isActive) {
+      createBatch.push({ ...dbScheme, version: 1, lastSyncedAt: new Date(), isActive: true });
+    } else if (existing.checksum !== dbScheme.checksum || !existing.isActive) {
       updateBatch.push({
         id: existing.id,
-        data: { ...scheme, version: existing.version + 1, lastSyncedAt: new Date(), isActive: true },
+        data: { ...dbScheme, version: existing.version + 1, lastSyncedAt: new Date(), isActive: true },
       });
     }
   }

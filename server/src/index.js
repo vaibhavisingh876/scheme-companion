@@ -6,6 +6,7 @@ import express from "express";
 import cors from "cors";
 
 import { startMySchemeCron } from "./ingestion/jobs/myschemeCron.js";
+import { warmCandidateCache } from "./services/ai/recommendation/recommendationService.js";
 
 import schemeRoutes from "./routes/schemeRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
@@ -135,4 +136,5 @@ const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
+  warmCandidateCache();
 });

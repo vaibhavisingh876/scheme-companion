@@ -29,12 +29,13 @@ The application supports both English and Hinglish queries.
 * Eligibility-based filtering
 * State, gender, education, income and caste filtering
 * Occupation-aware recommendations
+* Intent- and purpose-aware filtering for targeted requests
 * Relevance thresholding
 * Duplicate removal
-* Category diversification
 * Scheme bookmarking for authenticated users
 * PostgreSQL database with Prisma ORM
-* Automatic scheme data synchronization
+* MyScheme data ingestion and synchronization
+* Automatic generation of missing scheme embeddings after synchronization
 * Responsive React frontend
 
 ## How It Works
@@ -63,13 +64,13 @@ Candidate Schemes from PostgreSQL
 Cosine Similarity
     |
     v
-Eligibility Filtering
+Intent and Eligibility Filtering
     |
     v
-Hybrid Scoring
+Hybrid Relevance Scoring
     |
     v
-Deduplication and Diversification
+Deduplication and Ranking
     |
     v
 Ranked Recommendations
@@ -128,7 +129,7 @@ The system therefore applies eligibility rules based on available scheme informa
 * Caste category
 * State
 
-These checks help remove schemes that clearly do not satisfy important eligibility requirements.
+These checks remove schemes that clearly conflict with the profile or with explicit request constraints, including targeted use cases such as overseas study, startup funding, and loan purpose.
 
 ### 5. Hybrid Scoring
 
@@ -141,7 +142,7 @@ Final Score =
     20% Rule-Based Relevance
 ```
 
-This balances the user's intent with structured eligibility information.
+The 20% component reflects rule-based relevance adjustments; eligibility conflicts are handled separately as a hard filter.
 
 ### 6. Result Quality Controls
 
@@ -149,7 +150,6 @@ Before returning recommendations, the system also performs:
 
 * Relevance thresholding
 * Duplicate removal
-* Category diversification
 * Result ranking
 
 The system returns up to 20 recommendations.
@@ -160,13 +160,13 @@ Scheme data is collected from the MyScheme data source.
 
 The backend contains an ingestion pipeline that:
 
-1. Fetches scheme data
+1. Fetches scheme listings and detailed records
 2. Retrieves detailed scheme information
 3. Normalizes the data
 4. Stores schemes in PostgreSQL
-5. Generates searchable text
-6. Maintains source and synchronization information
-7. Updates existing schemes when their source data changes
+5. Tracks source metadata and synchronization state
+6. Updates existing schemes when their source data changes
+7. Generates embeddings for schemes that are missing them
 
 A scheduled synchronization job runs periodically to keep the database updated.
 
@@ -193,8 +193,8 @@ A scheduled synchronization job runs periodically to keep the database updated.
 * Groq API
 * `openai/gpt-oss-120b`
 * `Xenova/all-MiniLM-L6-v2`
-* Transformers.js
-* Cosine similarity
+* Transformers.js and 384-dimensional embeddings
+* Cosine similarity with an 80:20 semantic-to-rule-based relevance score
 
 ### Authentication
 

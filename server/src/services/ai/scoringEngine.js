@@ -78,10 +78,11 @@ export const scoreScheme = (scheme, profile) => {
         .map((level) => String(level).toLowerCase().trim());
 
       const schoolLevels = [
-        "10th",
-        "12th",
-        "iti",
         "below 10th",
+        "9th",
+        "10th",
+        "11th",
+        "12th",
       ];
 
       if (
@@ -135,18 +136,19 @@ export const scoreScheme = (scheme, profile) => {
 
       if (level === "higher_education") {
         userLevels = [
-          "graduate",
-          "post graduate",
+          "undergraduate",
+          "postgraduate",
           "phd",
           "professional",
           "diploma",
         ];
       } else if (level === "school") {
         userLevels = [
-          "10th",
-          "12th",
-          "iti",
           "below 10th",
+          "9th",
+          "10th",
+          "11th",
+          "12th",
         ];
       } else {
         userLevels = [level];

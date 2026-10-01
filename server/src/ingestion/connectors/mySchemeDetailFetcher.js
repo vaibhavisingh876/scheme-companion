@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BASE_URL = "https://api.myscheme.gov.in/schemes/v6/public/schemes";
+const BASE_URL = "https://www.myscheme.gov.in/api/apisetu/schemes";
 const API_KEY = process.env.MYSCHEME_API_KEY;
 const MAX_RETRIES = 5;
 const INITIAL_DELAY = 2000;
@@ -38,7 +38,7 @@ export const fetchSchemeDetail = async (slug) => {
         return response.data.data.en;
       }
 
-      if (response.status === 403 || response.status === 404) {
+      if (response.status === 403 || response.status === 404 || response.status === 412) {
         console.warn(`⚠️ ${response.status} for ${slug} – skipping`);
         return null;
       }
@@ -66,5 +66,46 @@ export const fetchSchemeDetail = async (slug) => {
     }
   }
   console.error(`❌ Failed to fetch ${slug} after ${MAX_RETRIES} retries.`);
+  return null;
+};
+
+// Documents live on a separate endpoint keyed by the Mongo _id (slug returns 412).
+// Returns the Slate-style documents_required tree, or null when unavailable.
+export const fetchSchemeDocuments = async (schemeId) => {
+  if (!API_KEY || !schemeId) return null;
+
+  let retries = 0;
+  while (retries <= 2) {
+    try {
+      const response = await axios.get(`${BASE_URL}/${encodeURIComponent(schemeId)}/documents`, {
+        headers: getHeaders(),
+        params: { lang: "en" },
+        timeout: 30000,
+        validateStatus: () => true,
+      });
+
+      if (response.status === 200) {
+        return response.data?.data?.en?.documents_required || null;
+      }
+
+      if (response.status === 404 || response.status === 412) {
+        return null;
+      }
+
+      if (response.status === 429) {
+        const waitTime = INITIAL_DELAY * Math.pow(2, retries);
+        await sleep(waitTime);
+        retries++;
+        continue;
+      }
+
+      retries++;
+      await sleep(INITIAL_DELAY);
+    } catch (err) {
+      retries++;
+      if (retries > 2) return null;
+      await sleep(INITIAL_DELAY);
+    }
+  }
   return null;
 };

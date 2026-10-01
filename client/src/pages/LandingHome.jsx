@@ -1,831 +1,253 @@
 import { useEffect, useState } from "react";
 import { getPaginatedSchemes } from "../services/api";
+import Chakra from "../components/Chakra";
 
-const StatPill = ({ value, label }) => (
-
-  <div className="text-center">
-    <p
-      className="text-2xl md:text-3xl font-black"
-      style={{
-        fontFamily: "'JetBrains Mono', monospace",
-        color: "var(--saffron)",
-      }}
-    >
-      {value}
-    </p>
-
-    <p
-      className="text-[9px] md:text-[10px] uppercase tracking-widest mt-1"
-      style={{
-        color: "rgba(255,255,255,0.42)",
-        fontFamily: "'Inter', sans-serif",
-      }}
-    >
-      {label}
-    </p>
-
-  </div>
-);
-
-const SchemeCard = ({ scheme, onViewDetails }) => (
-
-  <div
-    className="scheme-card group"
-    onClick={() => onViewDetails?.(scheme)}
-    style={{
-      height: "100%",
-      minHeight: "360px",
-      display: "flex",
-      flexDirection: "column",
+const SchemeTile = ({ scheme, onViewDetails, duplicate = false }) => (
+  <article
+    className="scheme"
+    onClick={() => !duplicate && onViewDetails?.(scheme)}
+    role="button"
+    tabIndex={duplicate ? -1 : 0}
+    aria-hidden={duplicate || undefined}
+    onKeyDown={(e) => {
+      if (!duplicate && e.key === "Enter") onViewDetails?.(scheme);
     }}
   >
-    <div className="scheme-card-glow orange" />
-
-    <div
-      className="scheme-card-top"
-      style={{
-        minHeight: "34px",
-      }}
-    >
-      <span className="scheme-category">
-        {scheme.category || "General"}
-      </span>
+    <div className="scheme__top">
+      {scheme.category && <span className="tag-cat">{scheme.category}</span>}
+      <span className="scheme__state">{scheme.state || "All India"}</span>
     </div>
-
-    <h3
-      style={{
-        minHeight: "52px",
-      }}
-    >
-      {scheme.name}
-    </h3>
-
-    <p
-      style={{
-        minHeight: "84px",
-        display: "-webkit-box",
-        WebkitLineClamp: 4,
-        WebkitBoxOrient: "vertical",
-        overflow: "hidden",
-      }}
-    >
-      {scheme.description ||
-        "Government benefit scheme. View details to learn more."}
+    <h3 className="scheme__name">{scheme.name}</h3>
+    <p className="scheme__desc">
+      {scheme.description || "Government benefit scheme. View details to learn more."}
     </p>
-
-    <div
-      className="scheme-card-bottom"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: "12px",
-        marginTop: "auto",
-        paddingTop: "14px",
-        borderTop: "1px solid var(--border)",
-      }}
-    >
-      <span
-        style={{
-          color: "var(--muted)",
-          fontSize: "10px",
-          fontWeight: 700,
-          minWidth: 0,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {scheme.state || "All India"}
+    <div className="scheme__foot">
+      <span className="scheme__ministry">
+        {scheme.ministry || "Central Government"}
       </span>
-
-      <a
-        href={
-          scheme.applicationLink ||
-          "https://www.myscheme.gov.in"
-        }
-        target="_blank"
-        rel="noreferrer"
-        className="scheme-explore"
-        onClick={(e) => e.stopPropagation()}
-      >
-        Apply
-        <span>↗</span>
-      </a>
+      <span className="scheme__cta">
+        Explore <span className="arw">↗</span>
+      </span>
     </div>
-
-  </div>
+  </article>
 );
 
-const LandingHome = ({
-onViewDetails,
-onTabChange,
-}) => {
-const [popularSchemes, setPopularSchemes] = useState([]);
-const [loading, setLoading] = useState(true);
-
-useEffect(() => {
-getPaginatedSchemes(1, 6)
-.then((data) => {
-if (data?.schemes) {
-setPopularSchemes(data.schemes);
-}
-})
-.catch((err) => {
-console.error(
-"Backend connection failure:",
-err
-);
-})
-.finally(() => {
-setLoading(false);
-});
-}, []);
-
-useEffect(() => {
-const elements =
-document.querySelectorAll(".scroll-reveal");
-
-if (!elements.length) return;
-
-const observer = new IntersectionObserver(
-  (entries) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add("is-visible");
-        observer.unobserve(entry.target);
-      }
-    });
-  },
-  {
-    threshold: 0.12,
-  }
-);
-
-elements.forEach((element) =>
-  observer.observe(element)
-);
-
-return () => observer.disconnect();
-
-}, [popularSchemes]);
-
-const goToSearch = () => {
-onTabChange?.("search");
-};
-
-const scrollToHowItWorks = () => {
-document
-.getElementById("how-it-works")
-?.scrollIntoView({
-behavior: "smooth",
-});
-};
-
-return ( <div className="landing-page">
-
-  {/* HERO */}
-
-  <section className="hero-section">
-    <div className="hero-grid" />
-    <div className="hero-noise" />
-
-    <div className="hero-glow hero-glow-left" />
-    <div className="hero-glow hero-glow-right" />
-
-    <div className="hero-container">
-
-      <div className="hero-copy">
-
-        <h1 className="hero-title animate-fade-up stagger-1">
-          Most people qualify for
-          <br />
-
-          <span>
-            a scheme they've never heard of.
-          </span>
-        </h1>
-
-        <p className="hero-description animate-fade-up stagger-2">
-          Central and state governments run thousands
-          of programs — scholarships, pensions,
-          subsidies, insurance — and most of them go
-          unclaimed simply because nobody knew to look.
-          Tell us about your situation and we'll show
-          you what applies.
-        </p>
-
-        <div className="hero-actions animate-fade-up stagger-3">
-
-          <button
-            type="button"
-            className="hero-primary-button"
-            onClick={goToSearch}
-          >
-            <span>Find my schemes</span>
-
-            <span className="button-arrow">
-              →
-            </span>
-          </button>
-
-          <button
-            type="button"
-            className="hero-secondary-button"
-            onClick={scrollToHowItWorks}
-          >
-            <span>↓</span>
-            See how it works
-          </button>
-
-        </div>
-
-      </div>
-
-      {/* CHAKRA / SCHEME CATEGORIES */}
-
-      <div
-        className="hero-visual animate-fade-in"
-        aria-hidden="true"
-      >
-        <div className="hero-chakra-wrap">
-
-          <div className="chakra-halo" />
-          <div className="chakra-halo halo-two" />
-
-          <div className="chakra-orbit">
-            <span className="orbit-dot dot-one" />
-            <span className="orbit-dot dot-two" />
-          </div>
-
-          <div className="chakra-orbit orbit-two">
-            <span className="orbit-dot dot-three" />
-            <span className="orbit-dot dot-four" />
-          </div>
-
-          <div className="chakra-orbit orbit-three">
-            <span className="orbit-dot dot-five" />
-            <span className="orbit-dot dot-six" />
-          </div>
-
-          <div className="chakra-ring">
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
-
-          <div className="chakra-ring ring-middle">
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
-
-          <div className="chakra-ring ring-inner">
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
-
-          <div className="chakra-core">
-
-            <div className="core-pulse" />
-
-            <div className="core-icon">
-              <svg
-                viewBox="0 0 100 100"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="38"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  opacity=".28"
-                />
-
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="27"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  opacity=".5"
-                />
-
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="8"
-                  fill="currentColor"
-                />
-
-                <path
-                  d="M50 10V31"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-
-                <path
-                  d="M50 69V90"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-
-                <path
-                  d="M10 50H31"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-
-                <path
-                  d="M69 50H90"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-
-                <path
-                  d="M22 22L37 37"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-
-                <path
-                  d="M63 63L78 78"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-
-                <path
-                  d="M78 22L63 37"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-
-                <path
-                  d="M37 63L22 78"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </div>
-
-            <div className="core-label">
-              MATCH
-            </div>
-
-          </div>
-
-          {/* CATEGORY LABELS */}
-
-          <div className="floating-chip chip-education">
-            <span>🎓</span>
-            Education
-          </div>
-
-          <div className="floating-chip chip-health">
-            <span>🏥</span>
-            Healthcare
-          </div>
-
-          <div className="floating-chip chip-women">
-            <span>👩</span>
-            Women & Child
-          </div>
-
-          <div className="floating-chip chip-farm">
-            <span>🌾</span>
-            Agriculture
-          </div>
-
-          <div className="floating-chip chip-pension">
-            <span>👵</span>
-            Pension
-          </div>
-
-          <div className="floating-chip chip-housing">
-            <span>🏠</span>
-            Housing
-          </div>
-
-          <div className="floating-chip chip-employment">
-            <span>💼</span>
-            Employment
-          </div>
-
-        </div>
-      </div>
-    </div>
-
-    {/* SIMPLE STATS */}
-
-    <div className="hero-bottom">
-
-      <div className="hero-stats">
-
-        <StatPill
-          value="4,700+"
-          label="Government schemes"
-        />
-
-        <div className="stat-divider" />
-
-        <StatPill
-          value="AI"
-          label="Scheme matching"
-        />
-
-      </div>
-
-      <div className="scroll-indicator">
-        <span>Scroll to explore</span>
-
-        <div className="scroll-line">
-          <span />
-        </div>
-      </div>
-
-    </div>
-  </section>
-
-  {/* INTRO */}
-
-  <section className="intro-section">
-
-    <div className="section-container">
-
-      <div className="intro-grid">
-
-        <div className="scroll-reveal">
-
-          <h2 className="intro-heading">
-            There's a scheme for almost
-            <br />
-            everything. Finding it
-            <br />
-
-            <span>is the hard part.</span>
-          </h2>
-
-        </div>
-
-        <div className="intro-copy scroll-reveal">
-
-          <p>
-            Housing, education, farming, healthcare,
-            pensions — programs exist for most of it,
-            spread across central and state departments,
-            each with its own paperwork and cut-off
-            dates.
-          </p>
-
-          <p>
-            Scheme Companion asks a few questions about
-            who you are and where you live, then narrows
-            thousands of listings down to the ones that
-            actually apply to you.
-          </p>
-
-        </div>
-
-      </div>
-    </div>
-  </section>
-
-  {/* HOW IT WORKS */}
-
-  <section
-    className="how-section"
-    id="how-it-works"
-  >
-
-    <div className="section-container">
-
-      <div className="section-heading scroll-reveal">
-
-        <h2>
-          Three steps,
-          <br />
-
-          <span>start to finish.</span>
-        </h2>
-
-        <p>
-          Tell us what matters about you and we'll
-          narrow the list to schemes worth checking.
-        </p>
-
-      </div>
-
-      <div className="steps-wrapper">
-
-        <div className="steps-line">
-          <div className="steps-line-progress" />
-        </div>
-
-        <div className="steps-grid">
-
-          <article className="step-card scroll-reveal">
-
-            <span className="step-number">
-              01
-            </span>
-
-            <div className="step-icon">
-
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <circle
-                  cx="12"
-                  cy="7"
-                  r="4"
-                />
-
-                <path
-                  d="M4 21a8 8 0 0 1 16 0"
-                />
-              </svg>
-
-            </div>
-
-            <h3>
-              Tell us about yourself
-            </h3>
-
-            <p>
-              Age, occupation, state, income bracket —
-              the details that actually decide what
-              you're eligible for.
+const LandingHome = ({ onViewDetails, onTabChange }) => {
+  const [schemes, setSchemes] = useState([]);
+  const [total, setTotal] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getPaginatedSchemes(1, 6)
+      .then((data) => {
+        if (data?.schemes) setSchemes(data.schemes);
+        if (typeof data?.meta?.total === "number") setTotal(data.meta.total);
+      })
+      .catch((err) => console.error("Backend connection failure:", err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    const els = document.querySelectorAll(".reveal:not(.is-in)");
+    if (!els.length) return;
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-in");
+            io.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -40px 0px" }
+    );
+
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, [schemes, loading]);
+
+  const goToSearch = () => onTabChange?.("search");
+  const scrollToHow = () =>
+    document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" });
+
+  return (
+    <div className="view">
+      {/* HERO */}
+      <section className="hero">
+        <div className="container container--wide hero__inner">
+          <div className="hero__copy">
+            <h1 className="display hero__title">
+              <span className="line"><span>Most people qualify</span></span>
+              <span className="line"><span>for a scheme they've</span></span>
+              <span className="line"><span><em>never heard of.</em></span></span>
+            </h1>
+
+            <p className="hero__lede">
+              Scholarships, pensions, subsidies, insurance — thousands of central and
+              state programs go unclaimed every year simply because nobody knew to look.
+              Describe your situation and we'll narrow it down to what actually applies.
             </p>
 
-          </article>
-
-          <article className="step-card scroll-reveal">
-
-            <span className="step-number">
-              02
-            </span>
-
-            <div className="step-icon">
-
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <circle
-                  cx="11"
-                  cy="11"
-                  r="7"
-                />
-
-                <path d="m20 20-4-4" />
-
-                <path d="M8.5 11h5M11 8.5v5" />
-              </svg>
-
+            <div className="hero__actions">
+              <button type="button" className="btn btn--night btn--lg" onClick={goToSearch}>
+                Find my schemes <span className="arw">→</span>
+              </button>
+              <button type="button" className="tlink" onClick={scrollToHow}>
+                How it works <span className="arw">↓</span>
+              </button>
             </div>
 
-            <h3>
-              See what you match
-            </h3>
-
-            <p>
-              We check your details against scheme
-              eligibility rules and rank what's actually
-              worth reading.
-            </p>
-
-          </article>
-
-          <article className="step-card scroll-reveal">
-
-            <span className="step-number">
-              03
-            </span>
-
-            <div className="step-icon">
-
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <rect
-                  x="3"
-                  y="3"
-                  width="18"
-                  height="18"
-                  rx="4"
-                />
-
-                <path d="m7 12 3 3 7-7" />
-              </svg>
-
-            </div>
-
-            <h3>
-              Apply on the official site
-            </h3>
-
-            <p>
-              We link straight to the government
-              page for each scheme — we don't process
-              applications ourselves.
-            </p>
-
-          </article>
-
-        </div>
-      </div>
-    </div>
-  </section>
-
-  {/* POPULAR SCHEMES */}
-
-  <section className="popular-section">
-
-    <div className="section-container">
-
-      <div className="popular-heading scroll-reveal">
-
-        <div>
-
-          <h2>
-            A few schemes people
-            <br />
-
-            <span>
-              are checking out right now.
-            </span>
-          </h2>
-
-        </div>
-
-        <button
-          type="button"
-          className="view-all-button"
-          onClick={goToSearch}
-        >
-          See the full list
-        </button>
-
-      </div>
-
-      {loading ? (
-
-        <div className="scheme-grid">
-
-          {[1, 2, 3, 4, 5, 6].map(
-            (item) => (
-              <div
-                key={item}
-                className="h-[290px] rounded-[20px] skeleton"
-              />
-            )
-          )}
-
-        </div>
-
-      ) : popularSchemes.length === 0 ? (
-
-        <div
-          className="text-center py-16 rounded-2xl scroll-reveal is-visible"
-          style={{
-            border:
-              "1px dashed var(--border)",
-            background: "var(--surface)",
-          }}
-        >
-
-          <div
-            style={{
-              fontSize: "30px",
-              marginBottom: "12px",
-            }}
-          >
-            ◌
-          </div>
-
-          <p
-            className="text-sm font-semibold"
-            style={{
-              color: "var(--ink)",
-            }}
-          >
-            Schemes couldn't be loaded
-          </p>
-
-          <p
-            className="text-xs mt-1"
-            style={{
-              color: "var(--muted)",
-            }}
-          >
-            Please check your connection and try again.
-          </p>
-
-        </div>
-
-      ) : (
-
-        <div
-          className="scheme-grid"
-          style={{
-            alignItems: "stretch",
-          }}
-        >
-
-          {popularSchemes.map(
-            (scheme, index) => (
-
-              <div
-                key={
-                  scheme.id ||
-                  `${scheme.name}-${index}`
-                }
-                className="scroll-reveal"
-                style={{
-                  transitionDelay:
-                    `${index * 50}ms`,
-                  height: "100%",
-                }}
-              >
-
-                <SchemeCard
-                  scheme={scheme}
-                  onViewDetails={
-                    onViewDetails
-                  }
-                />
-
+            {total !== null && (
+              <div className="hero__fact">
+                <span className="num">{total.toLocaleString("en-IN")}</span>
+                <span>+ schemes</span>
               </div>
+            )}
+          </div>
 
-            )
-          )}
-
+          <div className="hero__orrery">
+            <Chakra />
+          </div>
         </div>
 
-      )}
+        <div className="hero__showcase container container--wide">
+          <div className="hero__showcase-head">
+            <div>
+              <h2>Schemes people are <em>checking right now.</em></h2>
+            </div>
+            <button type="button" className="tlink" onClick={goToSearch}>
+              See the full list <span className="arw">→</span>
+            </button>
+          </div>
 
+          <div className="hero__scheme-rail" aria-label="Featured schemes">
+            <div className="hero__scheme-track">
+              {[false, true].map((duplicate) => (
+                <div
+                  className="hero__scheme-group"
+                  key={duplicate ? "reel-copy" : "reel-main"}
+                  aria-hidden={duplicate || undefined}
+                  inert={duplicate}
+                >
+                  {loading
+                    ? [0, 1, 2, 3, 4, 5].map((n) => (
+                        <div className="scheme hero__scheme-skeleton" key={`${duplicate}-${n}`} aria-hidden="true">
+                          <div className="index-skeleton" style={{ padding: 0, border: 0, flex: 1 }}>
+                            <div style={{ width: "42%", height: 20 }} />
+                            <div style={{ width: "70%", height: 12 }} />
+                          </div>
+                        </div>
+                      ))
+                    : schemes.map((scheme, i) => (
+                        <SchemeTile
+                          key={`${duplicate ? "copy-" : ""}${scheme.id || `${scheme.name}-${i}`}`}
+                          scheme={scheme}
+                          onViewDetails={onViewDetails}
+                          duplicate={duplicate}
+                        />
+                      ))}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {!loading && schemes.length === 0 && (
+            <p className="hero__scheme-empty">
+              Schemes couldn't be loaded right now. Please check your connection and try again.
+            </p>
+          )}
+        </div>
+      </section>
+
+      {/* INTRO */}
+      <section className="section">
+        <div className="container split">
+          <h2 className="split__aside reveal">
+            There's a scheme for almost everything.
+            <br />
+            <em>Finding it is the hard part.</em>
+          </h2>
+
+          <div className="prose reveal">
+            <p>
+              Housing, education, farming, healthcare, pensions — programs exist for most
+              of it, scattered across central and state departments, each with its own
+              paperwork, thresholds and cut-off dates.
+            </p>
+            <p>
+              <strong>Scheme Companion asks a few questions</strong> about who you are and
+              where you live, then narrows thousands of listings down to the ones that
+              genuinely apply to you — ranked by how closely they match, never by
+              guesswork.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* HOW IT WORKS */}
+      <section className="band-night section" id="how-it-works">
+        <div className="container">
+          <div className="sec-head reveal">
+            <span className="kicker">The process</span>
+            <h2>Three steps, <em>start to finish.</em></h2>
+            <p className="lede">
+              No forms to file here — we point you to the official page for each scheme.
+            </p>
+          </div>
+
+          <div className="steps">
+            {[
+              {
+                n: "01",
+                t: "Tell us about yourself",
+                d: "Age, occupation, state, income — the details that actually decide what you're eligible for.",
+              },
+              {
+                n: "02",
+                t: "See what you match",
+                d: "We check your details against each scheme's eligibility rules and rank what's worth reading.",
+              },
+              {
+                n: "03",
+                t: "Apply on the official site",
+                d: "Every result links straight to the government page. We don't process applications ourselves.",
+              },
+            ].map((s) => (
+              <article className="step reveal" key={s.n}>
+                <span className="step__bar" />
+                <span className="step__n">{s.n}</span>
+                <h3>{s.t}</h3>
+                <p>{s.d}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CLOSING CTA */}
+      <section className="band-night section closing-cta">
+        <div className="container" style={{ position: "relative", zIndex: 1, textAlign: "center" }}>
+          <div className="reveal" style={{ maxWidth: 680, margin: "0 auto" }}>
+            <h2 className="display" style={{ fontSize: "clamp(30px,4.4vw,52px)", color: "var(--night-ink)" }}>
+              Chances are, one of these<br /><em style={{ color: "var(--night-ink)", fontStyle: "italic" }}>schemes is meant for you.</em>
+            </h2>
+            <p className="lede" style={{ margin: "22px auto 0", maxWidth: 480, color: "var(--night-muted)" }}>
+              It takes about two minutes to find out what fits.
+            </p>
+            <button
+              type="button"
+              className="btn btn--night btn--lg"
+              style={{ marginTop: 32 }}
+              onClick={goToSearch}
+            >
+              Check what I qualify for <span className="arw">→</span>
+            </button>
+          </div>
+        </div>
+      </section>
     </div>
-  </section>
-
-  {/* FINAL CTA */}
-
-  <section className="final-cta-section">
-
-    <div className="final-cta-glow" />
-
-    <div className="final-cta-ring ring-a" />
-    <div className="final-cta-ring ring-b" />
-
-    <div className="section-container">
-
-      <div className="final-cta scroll-reveal">
-
-        <h2>
-          Chances are, one of these
-          <br />
-
-          <span>
-            4,700 schemes is for you.
-          </span>
-        </h2>
-
-        <p>
-          Takes about two minutes to find out what fits you.
-        </p>
-
-        <button
-          type="button"
-          className="final-cta-button"
-          onClick={goToSearch}
-        >
-          Check what I qualify for
-        </button>
-
-      </div>
-
-    </div>
-  </section>
-
-</div>
-
-
-);
+  );
 };
 
 export default LandingHome;

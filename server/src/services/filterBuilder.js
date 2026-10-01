@@ -7,8 +7,8 @@ const getEducationValues = (level) => {
 
   if (normalizedLevel === "higher_education") {
     return [
-      "graduate",
-      "post graduate",
+      "undergraduate",
+      "postgraduate",
       "phd",
       "professional",
       "diploma",
@@ -17,10 +17,11 @@ const getEducationValues = (level) => {
 
   if (normalizedLevel === "school") {
     return [
-      "10th",
-      "12th",
-      "iti",
       "below 10th",
+      "9th",
+      "10th",
+      "11th",
+      "12th",
     ];
   }
 

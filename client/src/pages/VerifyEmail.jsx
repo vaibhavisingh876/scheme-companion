@@ -47,28 +47,29 @@ const VerifyEmail = () => {
     <div
       className="min-h-screen flex items-center justify-center px-5 py-10"
       style={{
-        background: "var(--surface)",
+        background: "var(--bg)",
         fontFamily: "'Inter', sans-serif",
       }}
     >
       <div
         className="w-full max-w-md rounded-3xl p-7 sm:p-9 text-center animate-fade-up"
         style={{
-          background: "var(--panel)",
+          background: "var(--surface)",
           border:
             "1px solid var(--border)",
           boxShadow:
-            "0 16px 45px var(--shadow)",
+            "var(--shadow-lg)",
         }}
       >
         {/* BRAND */}
 
         <div className="flex items-center justify-center gap-2 mb-10">
           <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-[10px] font-black"
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-[10px] font-black"
             style={{
               background:
-                "var(--saffron)",
+                "var(--accent)",
+              color: "var(--bg-deep)",
             }}
           >
             SC
@@ -86,7 +87,7 @@ const VerifyEmail = () => {
             <span
               style={{
                 color:
-                  "var(--saffron)",
+                  "var(--accent)",
               }}
             >
               Companion
@@ -102,7 +103,7 @@ const VerifyEmail = () => {
               className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5"
               style={{
                 background:
-                  "var(--saffron-lt)",
+                  "var(--amber-soft)",
                 border:
                   "1px solid var(--border)",
               }}
@@ -113,7 +114,7 @@ const VerifyEmail = () => {
                   border:
                     "2.5px solid var(--border)",
                   borderTopColor:
-                    "var(--saffron)",
+                    "var(--accent)",
                 }}
               />
             </div>
@@ -122,7 +123,7 @@ const VerifyEmail = () => {
               className="text-[10px] font-bold uppercase tracking-[0.18em] mb-2"
               style={{
                 color:
-                  "var(--saffron)",
+                  "var(--accent)",
               }}
             >
               Please wait
@@ -160,9 +161,9 @@ const VerifyEmail = () => {
               className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5 text-xl"
               style={{
                 background:
-                  "var(--green-lt)",
+                  "var(--green-soft)",
                 border:
-                  "1px solid #C3E6D0",
+                  "1px solid var(--border-strong)",
               }}
             >
               ✓
@@ -201,14 +202,15 @@ const VerifyEmail = () => {
 
             <a
               href="/?page=auth"
-              className="inline-flex items-center justify-center mt-7 px-6 py-3 rounded-xl text-xs font-bold text-white transition-all hover:-translate-y-0.5"
+              className="inline-flex items-center justify-center mt-7 px-6 py-3 rounded-xl text-xs font-bold transition-all hover:-translate-y-0.5"
               style={{
                 background:
-                  "var(--saffron)",
+                  "var(--accent)",
+                color: "var(--bg-deep)",
                 fontFamily:
                   "'Plus Jakarta Sans', sans-serif",
                 boxShadow:
-                  "0 7px 20px rgba(224,123,57,0.18)",
+                  "var(--shadow-sm)",
               }}
             >
               Go to Login →
@@ -224,9 +226,9 @@ const VerifyEmail = () => {
               className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5 text-xl"
               style={{
                 background:
-                  "var(--red-lt)",
+                  "var(--red-soft)",
                 border:
-                  "1px solid #F5C6C2",
+                  "1px solid var(--border-strong)",
               }}
             >
               !
@@ -268,7 +270,7 @@ const VerifyEmail = () => {
               className="inline-flex items-center justify-center mt-7 px-6 py-3 rounded-xl text-xs font-bold text-white transition-all hover:-translate-y-0.5"
               style={{
                 background:
-                  "var(--saffron)",
+                  "var(--accent)",
                 fontFamily:
                   "'Plus Jakarta Sans', sans-serif",
               }}

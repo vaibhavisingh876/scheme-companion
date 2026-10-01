@@ -1,289 +1,309 @@
 import crypto from "crypto";
+import { pipeline } from "@xenova/transformers";
 
-// ---------- State normalization ----------
+const SEMANTIC_MODEL = "Xenova/all-MiniLM-L6-v2";
+const SEMANTIC_THRESHOLD = 0.55;
+const SEMANTIC_MARGIN = 0.08;
+
+let embeddingPipeline = null;
+
+const canonicalEmbeddingCache = new Map();
+
 const stateMap = {
-  up: "uttarpradesh",
-  uttarpradesh: "uttarpradesh",
-  mp: "madhyapradesh",
-  madhyapradesh: "madhyapradesh",
-  dl: "delhi",
-  delhi: "delhi",
-  nctdelhi: "delhi",
-  dilli: "delhi",
-  mh: "maharashtra",
-  maharashtra: "maharashtra",
-  gujarat: "gujarat",
-  gujrat: "gujarat",
-  gj: "gujarat",
-  pb: "punjab",
-  punjab: "punjab",
-  hr: "haryana",
-  haryana: "haryana",
-  kar: "karnataka",
-  karnataka: "karnataka",
-  tn: "tamilnadu",
-  tamilnadu: "tamilnadu",
-  tg: "telangana",
-  telangana: "telangana",
-  ap: "andhrapradesh",
-  andhrapradesh: "andhrapradesh",
-  rj: "rajasthan",
-  rajasthan: "rajasthan",
-  br: "bihar",
+  "andhra pradesh": "andhrapradesh",
+  "arunachal pradesh": "arunachalpradesh",
+  assam: "assam",
   bihar: "bihar",
-  wb: "westbengal",
-  westbengal: "westbengal",
-  jk: "jammukashmir",
-  jammukashmir: "jammukashmir",
-  uk: "uttarakhand",
-  uttarakhand: "uttarakhand",
-  cg: "chhattisgarh",
   chhattisgarh: "chhattisgarh",
+  goa: "goa",
+  gujarat: "gujarat",
+  haryana: "haryana",
+  "himachal pradesh": "himachalpradesh",
+  jharkhand: "jharkhand",
+  karnataka: "karnataka",
+  kerala: "kerala",
+  "madhya pradesh": "madhyapradesh",
+  maharashtra: "maharashtra",
+  manipur: "manipur",
+  meghalaya: "meghalaya",
+  mizoram: "mizoram",
+  nagaland: "nagaland",
   odisha: "odisha",
   orissa: "odisha",
-  assam: "assam",
-  as: "assam",
-  hp: "himachalpradesh",
-  himachalpradesh: "himachalpradesh",
-  goa: "goa",
-  mn: "manipur",
-  manipur: "manipur",
-  mg: "meghalaya",
-  meghalaya: "meghalaya",
-  tr: "tripura",
-  tripura: "tripura",
-  sk: "sikkim",
+  punjab: "punjab",
+  rajasthan: "rajasthan",
   sikkim: "sikkim",
-  ar: "arunachalpradesh",
-  arunachalpradesh: "arunachalpradesh",
-  naga: "nagaland",
-  nagaland: "nagaland",
-  mz: "mizoram",
-  mizoram: "mizoram",
-  jh: "jharkhand",
-  jharkhand: "jharkhand",
-  ch: "chandigarh",
-  chandigarh: "chandigarh",
-  puducherry: "puducherry",
-  pondicherry: "puducherry",
-  py: "puducherry",
-  andamannicobar: "andamannicobar",
+  "tamil nadu": "tamilnadu",
+  telangana: "telangana",
+  tripura: "tripura",
+  "uttar pradesh": "uttarpradesh",
+  uttarakhand: "uttarakhand",
+  "west bengal": "westbengal",
+  delhi: "delhi",
+  "jammu and kashmir": "jammuandkashmir",
   ladakh: "ladakh",
+  puducherry: "puducherry",
+  chandigarh: "chandigarh",
+  "dadra and nagar haveli and daman and diu":
+    "dadranagarhavelianddamananddiu",
+  "dadra & nagar haveli and daman & diu":
+    "dadranagarhavelianddamananddiu",
   lakshadweep: "lakshadweep",
-  kerala: "kerala",
-  daman: "damandiu",
-  diu: "damandiu",
-  dadra: "dadranagarhaveli",
-  nagarhaveli: "dadranagarhaveli",
-  dnh: "dadranagarhaveli",
-  dd: "damandiu",
-  dadraandnagarhavelianddamananddiu:
-    "dadraandnagarhavelianddamananddiu",
-  andamanandnicobarislands: "andamannicobar",
+  "andaman and nicobar islands":
+    "andamanandnicobarislands",
 };
 
-const normalizeState = (state = "") => {
-  const cleaned = String(state || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "")
-    .trim();
+const SEMANTIC_CONCEPTS = {
+  occupation: {
+    farmer: [
+      "farmer",
+      "cultivator",
+      "person engaged in farming",
+      "person cultivating agricultural land",
+      "agricultural worker",
+    ],
+    fisherman: [
+      "fisherman",
+      "fishermen",
+      "fisher",
+      "person engaged in fishing",
+      "person whose occupation is fishing",
+    ],
+    weaver: [
+      "weaver",
+      "handloom weaver",
+      "person engaged in weaving",
+      "handloom worker",
+    ],
+    student: [
+      "student",
+      "school student",
+      "college student",
+      "person studying",
+      "person pursuing studies",
+    ],
+    artisan: [
+      "artisan",
+      "craftsperson",
+      "craft worker",
+      "traditional artisan",
+    ],
+    entrepreneur: [
+      "entrepreneur",
+      "business owner",
+      "businessperson",
+      "enterprise owner",
+    ],
+    worker: [
+      "worker",
+      "labourer",
+      "laborer",
+      "wage worker",
+      "daily wage worker",
+    ],
+    unemployed: [
+      "unemployed person",
+      "unemployed youth",
+      "person without employment",
+    ],
+  },
 
-  return stateMap[cleaned] || cleaned;
+  education: {
+    "below 10th": [
+      "below class 10",
+      "below 10th standard",
+    ],
+    "10th": [
+      "class 10",
+      "10th class",
+      "10th standard",
+      "matriculation",
+      "secondary school",
+    ],
+    "11th": [
+      "class 11",
+      "11th class",
+      "11th standard",
+      "higher secondary first year",
+    ],
+    "12th": [
+      "class 12",
+      "12th class",
+      "12th standard",
+      "senior secondary",
+      "intermediate",
+      "plus two",
+    ],
+    diploma: [
+      "diploma",
+      "polytechnic diploma",
+    ],
+    undergraduate: [
+      "undergraduate",
+      "bachelor degree",
+      "bachelor's degree",
+      "graduate degree",
+    ],
+    postgraduate: [
+      "postgraduate",
+      "post graduation",
+      "master degree",
+      "master's degree",
+    ],
+    professional: [
+      "professional course",
+      "professional degree",
+      "professional qualification",
+    ],
+    phd: [
+      "PhD",
+      "doctoral degree",
+      "doctorate",
+      "post doctoral degree",
+      "postdoctoral degree",
+    ],
+  },
 };
 
-// ---------- Stable stringify ----------
-const sortObject = (obj) => {
-  if (Array.isArray(obj)) {
-    return obj.map(sortObject);
-  }
+const normalizeText = (value) => {
+  if (!value) return "";
 
-  if (obj && typeof obj === "object" && obj !== null) {
-    const sorted = {};
-
-    for (const key of Object.keys(obj).sort()) {
-      sorted[key] = sortObject(obj[key]);
-    }
-
-    return sorted;
-  }
-
-  return obj;
-};
-
-const stableStringify = (obj) =>
-  JSON.stringify(sortObject(obj));
-
-// ---------- Tags ----------
-const normalizeTags = (tags) => {
-  if (!tags) return [];
-
-  let raw = [];
-
-  if (Array.isArray(tags)) {
-    raw = tags
-      .filter(Boolean)
-      .map((t) => String(t).trim());
-  } else if (typeof tags === "string") {
-    raw = tags
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
-  }
-
-  return [
-    ...new Set(raw.map((t) => t.toLowerCase())),
-  ];
-};
-
-// ---------- Generic text helpers ----------
-const normalizeText = (text = "") =>
-  String(text || "")
-    .replace(/&amp;#39;/gi, "'")
+  return String(value)
     .replace(/&amp;/gi, "&")
     .replace(/&nbsp;/gi, " ")
+    .replace(/&gt;/gi, ">")
+    .replace(/&lt;/gi, "<")
     .replace(/&#39;/gi, "'")
     .replace(/&quot;/gi, '"')
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/\brs\./gi, "rs ")
-    .replace(/\binr\./gi, "inr ")
-    .toLowerCase()
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/^\s*>\s?/gm, "")
+    .replace(/\*{1,3}/g, "")
+    .replace(/^\s*[-•]\s+/gm, "")
     .replace(/\s+/g, " ")
     .trim();
-
-const hasPattern = (text, pattern) => {
-  if (!text) return false;
-
-  const regex = new RegExp(
-    `\\b${pattern.replace(/\s+/g, "\\s+")}\\b`,
-    "i"
-  );
-
-  return regex.test(text);
 };
 
-const hasAnyPattern = (text, patterns = []) =>
-  patterns.some((pattern) =>
-    hasPattern(text, pattern)
-  );
+const hasAnyPattern = (text, patterns) =>
+  patterns.some((pattern) => pattern.test(text));
 
-// ---------- Income parser ----------
-const parseCurrencyAmount = (rawStr, isMonthly = false) => {
-  if (!rawStr) return null;
-  const str = String(rawStr).toLowerCase().replace(/,/g, "").trim();
-  const numMatch = str.match(/(\d+(?:\.\d+)?)/);
-  if (!numMatch) return null;
+const extractRichText = (node) => {
+  if (!node) return "";
 
-  let num = parseFloat(numMatch[1]);
-  if (Number.isNaN(num)) return null;
+  if (typeof node === "string") {
+    return normalizeText(node);
+  }
 
-  if (/\b(?:crores?|cr)\b/i.test(str)) {
-    num *= 10000000;
-  } else if (/\b(?:lakhs?|lacs?)\b/i.test(str)) {
-    num *= 100000;
-  } else if (/\b(?:thousands?|k)\b/i.test(str)) {
-    num *= 1000;
-  } else if (num < 1000 && !isMonthly) {
-    // Sanity check: Standalone numbers < 1000 without lakh/crore/thousand are NOT valid annual INR income limits
+  if (Array.isArray(node)) {
+    return node
+      .map(extractRichText)
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  if (typeof node === "object") {
+    const parts = [];
+
+    if (node.text) {
+      parts.push(String(node.text));
+    }
+
+    if (node.children) {
+      parts.push(extractRichText(node.children));
+    }
+
+    if (node.content) {
+      parts.push(extractRichText(node.content));
+    }
+
+    if (node.value) {
+      parts.push(String(node.value));
+    }
+
+    return normalizeText(
+      parts.filter(Boolean).join("\n")
+    );
+  }
+
+  return "";
+};
+
+const parseCurrencyAmount = (value, unit = "") => {
+  if (!value) return null;
+
+  const cleaned = String(value)
+    .replace(/,/g, "")
+    .replace(/₹/g, "")
+    .replace(/\brs\.?\b/gi, "")
+    .trim();
+
+  const number = parseFloat(cleaned);
+
+  if (!Number.isFinite(number)) {
     return null;
   }
 
-  if (isMonthly || /\b(?:per\s+month|\/month|monthly)\b/i.test(str)) {
-    num *= 12;
-  }
-
-  return Math.round(num);
+  const normalizedUnit = unit.toLowerCase();
+  // Scheme income filters are stored in PostgreSQL INT columns. Treat implausible
+  // or out-of-range parsed thresholds as unknown so one bad source value cannot
+  // abort the entire createMany sync batch.
+  const amount = number * (
+    normalizedUnit.includes("crore") ? 10000000 :
+      normalizedUnit.includes("lakh") || normalizedUnit.includes("lac") ? 100000 :
+        normalizedUnit.includes("thousand") ? 1000 : 1
+  );
+  return Number.isSafeInteger(amount) && amount <= 2147483647 ? amount : null;
 };
 
-// ---------- Extract income from eligibility ----------
-const extractIncomeLimits = (
-  eligibility,
-  fallbackValue = null
-) => {
+const extractIncomeLimits = (text) => {
+  const normalized = normalizeText(text);
+
   let minIncome = null;
   let maxIncome = null;
 
-  if (
-    fallbackValue !== null &&
-    fallbackValue !== undefined &&
-    fallbackValue !== ""
-  ) {
-    const parsed = parseCurrencyAmount(String(fallbackValue));
-    if (parsed !== null) maxIncome = parsed;
-  }
-
-  const text = normalizeText(eligibility);
-  if (!text) {
-    return {
-      minIncome,
-      maxIncome,
-    };
-  }
-
-  // Clause splitting by punctuation to keep context bounded, preserving decimals like 3.5
-  const clauses = text
-    .split(/(?<!\d)\.(?!\d)|[;\n|]+/)
-    .map((c) => c.trim())
-    .filter(Boolean);
-
-  const incomeKeywords =
-    /\b(?:family\s+income|annual\s+income|household\s+income|parental\s+income|gross\s+income|total\s+income|family's\s+income|personal\s+income|income\s+ceiling|income\s+limit|annual\s+turnover|income)\b/i;
-
   const maxPatterns = [
-    /(?:family\s+|personal\s+)?income.{0,60}?(?:less\s+than\s+or\s+equal\s+to|less\s+than|should\s+not\s+exceed|does\s+not\s+exceed|not\s+exceed|must\s+not\s+exceed|below|up\s*to|maximum\s+of|maximum|max|under|not\s+more\s+than|within|ceiling\s+of)\s*[:=]?\s*(?:rs|inr|₹)?\s*([\d,]+(?:\.\d+)?\s*(?:lakhs?|lacs?|crores?|thousands?|k)?(?:\s*\/-)?(?:\s*(?:per\s+annum|per\s+year|p\.a\.|annually|per\s+month|monthly))?)/i,
-    /(?:less\s+than\s+or\s+equal\s+to|less\s+than|should\s+not\s+exceed|does\s+not\s+exceed|not\s+exceed|must\s+not\s+exceed|below|up\s*to|maximum\s+of|maximum|under|not\s+more\s+than)\s*(?:of\s+)?(?:family\s+|personal\s+)?income\s*(?:of\s+)?[:=]?\s*(?:rs|inr|₹)?\s*([\d,]+(?:\.\d+)?\s*(?:lakhs?|lacs?|crores?|thousands?|k)?(?:\s*\/-)?)/i,
-    /(?:rs|inr|₹)\s*([\d,]+(?:\.\d+)?\s*(?:lakhs?|lacs?|crores?|thousands?|k)?)\s*(?:per\s+annum|per\s+year|p\.a\.|annually)?\s*(?:or\s+less|or\s+below|or\s+less\s+than|and\s+below)/i,
+    /\b(?:annual|yearly|family)?\s*income\b.{0,80}?\b(?:not exceed|less than|below|upto|up to|maximum)\s*(?:₹|rs\.?)?\s*([\d,.]+)\s*(crore|crores|lakh|lakhs|lac|lacs|thousand)?/i,
+
+    /\b(?:income|annual income|yearly income)\b.{0,60}?(?:₹|rs\.?)\s*([\d,.]+)\s*(crore|crores|lakh|lakhs|lac|lacs|thousand)?/i,
+
+    /(?:₹|rs\.?)\s*([\d,.]+)\s*(crore|crores|lakh|lakhs|lac|lacs|thousand)?\s*(?:per year|annually|annual)/i,
   ];
+
+  for (const pattern of maxPatterns) {
+    const match = normalized.match(pattern);
+
+    if (!match) continue;
+
+    const amount = parseCurrencyAmount(
+      match[1],
+      match[2]
+    );
+
+    if (amount !== null) {
+      maxIncome = amount;
+      break;
+    }
+  }
 
   const minPatterns = [
-    /(?:family\s+|personal\s+)?income.{0,60}?(?:minimum\s+of|minimum|min|at\s+least|not\s+less\s+than|must\s+not\s+be\s+less\s+than|more\s+than|above|exceeding|greater\s+than)\s*[:=]?\s*(?:rs|inr|₹)?\s*([\d,]+(?:\.\d+)?\s*(?:lakhs?|lacs?|crores?|thousands?|k)?(?:\s*\/-)?(?:\s*(?:per\s+annum|per\s+year|p\.a\.|annually|per\s+month|monthly))?)/i,
+    /\bincome\b.{0,60}?\b(?:minimum|at least|not less than)\s*(?:₹|rs\.?)?\s*([\d,.]+)\s*(crore|crores|lakh|lakhs|lac|lacs|thousand)?/i,
+
+    /(?:₹|rs\.?)\s*([\d,.]+)\s*(crore|crores|lakh|lakhs|lac|lacs|thousand)?\s*(?:minimum|at least)/i,
   ];
 
-  for (const clause of clauses) {
-    if (!incomeKeywords.test(clause) && !/(?:rs|inr|₹)/i.test(clause)) {
-      continue;
-    }
+  for (const pattern of minPatterns) {
+    const match = normalized.match(pattern);
 
-    const rangeMatch = clause.match(
-      /(?:family\s+|personal\s+)?income.{0,40}?(?:between|from)\s*(?:rs|inr|₹)?\s*([\d,]+(?:\.\d+)?\s*(?:lakhs?|lacs?|crores?|thousands?|k)?)\s*(?:and|to|-)\s*(?:rs|inr|₹)?\s*([\d,]+(?:\.\d+)?\s*(?:lakhs?|lacs?|crores?|thousands?|k)?)/i
+    if (!match) continue;
+
+    const amount = parseCurrencyAmount(
+      match[1],
+      match[2]
     );
-    if (rangeMatch) {
-      const isMonthly = /\b(?:per\s+month|\/month|monthly)\b/i.test(clause);
-      const minVal = parseCurrencyAmount(rangeMatch[1], isMonthly);
-      const maxVal = parseCurrencyAmount(rangeMatch[2], isMonthly);
-      if (minVal !== null && maxVal !== null) {
-        minIncome = minIncome === null ? minVal : Math.max(minIncome, minVal);
-        maxIncome = maxIncome === null ? maxVal : Math.min(maxIncome, maxVal);
-        continue;
-      }
-    }
 
-    if (maxIncome === null) {
-      for (const pattern of maxPatterns) {
-        const match = clause.match(pattern);
-        if (match) {
-          const isMonthly = /\b(?:per\s+month|\/month|monthly)\b/i.test(clause);
-          const parsed = parseCurrencyAmount(match[1], isMonthly);
-          if (parsed !== null) {
-            maxIncome = parsed;
-            break;
-          }
-        }
-      }
-    }
-
-    if (minIncome === null) {
-      for (const pattern of minPatterns) {
-        const match = clause.match(pattern);
-        if (match) {
-          const isMonthly = /\b(?:per\s+month|\/month|monthly)\b/i.test(clause);
-          const parsed = parseCurrencyAmount(match[1], isMonthly);
-          if (parsed !== null) {
-            minIncome = parsed;
-            break;
-          }
-        }
-      }
+    if (amount !== null) {
+      minIncome = amount;
+      break;
     }
   }
 
@@ -293,919 +313,1872 @@ const extractIncomeLimits = (
   };
 };
 
-// ---------- Benefits ----------
-const extractBenefitsText = (content) => {
+const extractAgeLimits = (text) => {
+  const normalized = normalizeText(text).toLowerCase();
+
+  const hasQualificationDependentAge =
+    /\b(?:below|under|less than|upto|up to|not exceed)\s+\d{1,3}\s+years?\s+for\s+(?:graduates?|post\s*graduates?|postgraduates?|phd|doctorate|be|btech|mtech|ms)\b/i.test(
+      normalized
+    ) ||
+    /\b\d{1,3}\s+years?\s+(?:for\s+)?(?:graduates?|post\s*graduates?|postgraduates?|phd|doctorate|be|btech|mtech|ms)\b/i.test(
+      normalized
+    ) ||
+    /\b(?:graduates?|post\s*graduates?|postgraduates?|phd|doctorate|be|btech|mtech|ms)\b.{0,100}?\b\d{1,3}\s+years?\b/i.test(
+      normalized
+    ) ||
+    /\b(?:graduates?|post\s*graduates?|postgraduates?|phd|doctorate|be|btech|mtech|ms)\b.{0,100}?\b(?:below|under|less than|upto|up to|not exceed)\s+\d{1,3}\b/i.test(
+      normalized
+    );
+
+  let minAge = null;
+  let maxAge = null;
+
+  const rangeMatch =
+  normalized.match(
+    /\bbetween\s+(\d{1,3})\s+and\s+(\d{1,3})\s+years?\b/i
+  ) ||
+  normalized.match(
+    /\b(\d{1,3})\s*(?:years?\s*)?(?:to|-|–|—)\s*(\d{1,3})\s*years?\b/i
+  );
+
+if (rangeMatch) {
+  minAge = Number(rangeMatch[1]);
+  maxAge = Number(rangeMatch[2]);
+}
+
+  const betweenMatch = normalized.match(
+    /\bbetween\s+(\d{1,3})\s+and\s+(\d{1,3})\s+years?\b/
+  );
+
+  if (betweenMatch) {
+    minAge = Number(betweenMatch[1]);
+    maxAge = Number(betweenMatch[2]);
+  }
+
+  const agedBetweenMatch = normalized.match(
+    /\baged\s+between\s+(\d{1,3})\s+and\s+(\d{1,3})\s+years?\b/
+  );
+
+  if (agedBetweenMatch) {
+    minAge = Number(agedBetweenMatch[1]);
+    maxAge = Number(agedBetweenMatch[2]);
+  }
+
+  const agedOrAboveMatch = normalized.match(
+    /\baged\s+(\d{1,3})\s+years?\s+or\s+above\b/
+  );
+
+  if (agedOrAboveMatch) {
+    minAge = Number(agedOrAboveMatch[1]);
+  }
+
+  const plusMatch = normalized.match(
+    /\bage\s*(?:of\s*)?(\d{1,3})\s*\+/
+  );
+
+  if (plusMatch) {
+    minAge = Number(plusMatch[1]);
+  }
+
+  const aboveMatch = normalized.match(
+    /\b(?:age|aged)?\s*(?:above|over)\s+(\d{1,3})\s*years?\b/
+  );
+
+  if (aboveMatch) {
+    minAge = Number(aboveMatch[1]);
+  }
+
+  const upperMatch = normalized.match(
+    /\b(?:age|aged)?\s*(?:under|below|less than)\s+(\d{1,3})\s*years?\b/
+  );
+
+  if (upperMatch) {
+    maxAge = Number(upperMatch[1]);
+  }
+
+  const exceedMatch = normalized.match(
+    /\bage\b.{0,50}?\b(?:not exceed|should not exceed|maximum|max)\s*(\d{1,3})/i
+  );
+
+  if (exceedMatch) {
+    maxAge = Number(exceedMatch[1]);
+  }
+
+  const upperLimitMatch = normalized.match(
+    /\b(?:upper age limit|upper age)\b.{0,30}?\b(\d{1,3})\b/
+  );
+
+  if (upperLimitMatch) {
+    maxAge = Number(upperLimitMatch[1]);
+  }
+
+  if (hasQualificationDependentAge) {
+    minAge = null;
+    maxAge = null;
+  }
+
+  return {
+    minAge,
+    maxAge,
+  };
+};
+
+const normalizeTags = (tags) => {
+  if (!Array.isArray(tags)) return [];
+
+  return tags
+    .map(normalizeText)
+    .filter(Boolean)
+    .map((tag) => tag.toLowerCase());
+};
+
+const extractBenefitsText = (detail) => {
+  const benefits =
+    detail?.schemeContent?.benefits;
+
+  if (!benefits) return "";
+
+  if (typeof benefits === "string") {
+    return normalizeText(benefits);
+  }
+
+  return extractRichText(benefits);
+};
+
+const extractDocumentsText = (detail) => {
+  const content = detail?.schemeContent;
+
   if (!content) return "";
 
-  if (
-    content.benefits_md &&
-    typeof content.benefits_md === "string"
-  ) {
-    return content.benefits_md.trim();
+  if (content.documentsRequired_md) {
+    return normalizeText(content.documentsRequired_md);
   }
 
-  if (Array.isArray(content.benefits)) {
-    const parts = [];
-
-    for (const item of content.benefits) {
-      if (typeof item === "string") {
-        parts.push(item);
-      } else if (
-        item &&
-        typeof item === "object"
-      ) {
-        if (Array.isArray(item.children)) {
-          const childText = item.children
-            .map((c) =>
-              c && c.text ? c.text : ""
-            )
-            .join(" ");
-
-          if (childText.trim()) {
-            parts.push(childText.trim());
-          }
-        }
-
-        if (item.label || item.value) {
-          parts.push(
-            `${item.label || ""} ${
-              item.value || ""
-            }`.trim()
-          );
-        }
-
-        if (item.text && !item.children) {
-          parts.push(item.text);
-        }
-      }
-    }
-
-    return parts.join(" | ").trim();
+  if (typeof content.documentsRequired === "string") {
+    return normalizeText(content.documentsRequired);
   }
 
-  return (
-    content.detailedDescription_md || ""
-  ).trim();
+  if (content.documentsRequired) {
+    return extractRichText(content.documentsRequired);
+  }
+
+  return "";
 };
 
-// ---------- Eligibility text ----------
-const extractEligibility = (
-  eligibilityObj,
-  basic
-) => {
-  if (!eligibilityObj && !basic) return "";
+const extractEligibility = (detail) => {
+  const eligibilityCriteria =
+    detail?.eligibilityCriteria;
+
+  let eligibilityText = "";
 
   if (
-    eligibilityObj?.eligibilityDescription_md &&
-    typeof eligibilityObj.eligibilityDescription_md ===
-      "string"
+    eligibilityCriteria?.eligibilityDescription_md
   ) {
-    return eligibilityObj
-      .eligibilityDescription_md
-      .trim();
-  }
-
-  if (
-    Array.isArray(eligibilityObj?.criteria)
-  ) {
-    return eligibilityObj.criteria
-      .map((c) => {
-        if (typeof c === "string") return c;
-
-        if (c?.description) {
-          return c.description;
-        }
-
-        if (c?.label && c?.value) {
-          return `${c.label}: ${c.value}`;
-        }
-
-        return "";
-      })
-      .filter(Boolean)
-      .join(" | ");
-  }
-
-  return (
-    basic?.eligibilityNote || ""
-  ).trim();
-};
-
-// ---------- Education ----------
-const parseEducationLevels = (
-  labelsArray,
-  text
-) => {
-  const levels = new Set();
-
-  const lowerText = normalizeText(text);
-
-  const candidates = [
-    ...labelsArray.map((l) => normalizeText(l)),
-    lowerText,
-  ];
-
-  const eduMap = {
-    "below 10th": "below 10th",
-    "10th": "10th",
-    matric: "10th",
-    matriculation: "10th",
-    sslc: "10th",
-
-    "12th": "12th",
-    intermediate: "12th",
-    hsc: "12th",
-    puc: "12th",
-
-    iti: "iti",
-    diploma: "diploma",
-
-    undergraduate: "graduate",
-    bachelor: "graduate",
-    graduate: "graduate",
-
-    "post graduate": "post graduate",
-    postgraduate: "post graduate",
-    master: "post graduate",
-    masters: "post graduate",
-
-    phd: "phd",
-    doctorate: "phd",
-
-    professional: "professional",
-    all: "all",
-  };
-
-  for (const entry of candidates) {
-    for (const [pattern, level] of Object.entries(
-      eduMap
-    )) {
-      if (hasPattern(entry, pattern)) {
-        levels.add(level);
-      }
-    }
-  }
-
-  if (levels.size === 0) {
-    levels.add("all");
-  }
-
-  return Array.from(levels);
-};
-
-// ---------- Gender ----------
-const parseGender = (
-  labelsArray = [],
-  eligibilityText = "",
-  schemeName = ""
-) => {
-  const labels = labelsArray.map((l) => String(l).toLowerCase().trim());
-  const text = normalizeText(`${schemeName} ${eligibilityText}`).toLowerCase();
-
-  const isExclusivelyFemaleLabel =
-    labels.length > 0 &&
-    labels.every((l) =>
-      [
-        "women",
-        "woman",
-        "female",
-        "girl",
-        "girls",
-        "widow",
-        "widows",
-        "pregnant women",
-        "lactating mothers",
-      ].includes(l)
+    eligibilityText = normalizeText(
+      eligibilityCriteria.eligibilityDescription_md
     );
-
-  const explicitFemalePatterns = [
-    /\b(?:only\s+(?:for\s+)?(?:women|female|females|girls|widows))\b/i,
-    /\b(?:exclusively\s+(?:for\s+)?(?:women|female|females|girls|widows))\b/i,
-    /\b(?:applicant\s+(?:must|should)\s+be\s+(?:a\s+)?(?:female|woman|girl|widow))\b/i,
-    /\b(?:scheme\s+is\s+(?:only\s+)?for\s+(?:women|female|girls|widows))\b/i,
-    /\b(?:applicable\s+only\s+to\s+(?:women|female|girls))\b/i,
-    /\b(?:restricted\s+to\s+(?:women|female|girls))\b/i,
-    /\b(?:for\s+(?:female|women|girl)\s+candidates\s+only)\b/i,
-    /\b(?:girl\s+students?\s+only)\b/i,
-    /\b(?:female\s+students?\s+only)\b/i,
-    /\b(?:widow\s+pension)\b/i,
-    /\b(?:destitute\s+women\s+pension)\b/i,
-    /\b(?:sukanya\s+samriddhi)\b/i,
-    /\b(?:beti\s+bachao)\b/i,
-  ];
-
-  const explicitMalePatterns = [
-    /\b(?:only\s+(?:for\s+)?(?:men|male|boys))\b/i,
-    /\b(?:applicant\s+(?:must|should)\s+be\s+(?:a\s+)?(?:male|man|boy))\b/i,
-    /\b(?:for\s+(?:male|boy)\s+candidates\s+only)\b/i,
-  ];
-
-  // Preference / horizontal reservation guards (e.g. 33% quota for women or preference does not make scheme female-exclusive)
-  const isPreferenceOnly =
-    /\b(?:preference\s+(?:will\s+be\s+)?given\s+to\s+(?:women|female)|33%\s*(?:reservation|quota)?\s*for\s+women)\b/i.test(
-      text
+  } else if (
+    eligibilityCriteria?.eligibilityDescription
+  ) {
+    eligibilityText = extractRichText(
+      eligibilityCriteria.eligibilityDescription
     );
+  } else if (eligibilityCriteria) {
+    eligibilityText =
+      extractRichText(eligibilityCriteria);
+  }
 
-  const isFemale =
-    !isPreferenceOnly &&
-    (isExclusivelyFemaleLabel ||
-      explicitFemalePatterns.some((p) => p.test(text)));
-  const isMale = explicitMalePatterns.some((p) => p.test(text));
+  const exclusions =
+    detail?.schemeContent?.exclusions;
 
-  if (isFemale && !isMale) {
+  let exclusionText = "";
+
+  if (typeof exclusions === "string") {
+    exclusionText = normalizeText(exclusions);
+  } else if (exclusions) {
+    exclusionText =
+      extractRichText(exclusions);
+  }
+
+  if (exclusionText) {
+    return `${eligibilityText}\n\nExclusions: ${exclusionText}`;
+  }
+
+  return eligibilityText;
+};
+
+const splitEligibilityAndExclusions = (text) => {
+  const normalized = normalizeText(text);
+
+  const match = normalized.match(
+    /\bExclusions?\s*:/i
+  );
+
+  if (!match) {
     return {
-      gender: "female",
-      isFemaleOnly: true,
-      allowedGenders: ["female"],
+      positive: normalized,
+      exclusions: "",
     };
   }
 
-  if (isMale && !isFemale) {
+  return {
+    positive: normalized
+      .slice(0, match.index)
+      .trim(),
+
+    exclusions: normalized
+      .slice(match.index + match[0].length)
+      .trim(),
+  };
+};
+
+const splitIntoClauses = (text) => {
+  if (!text) return [];
+
+  const prepared = normalizeText(text)
+    .replace(
+      /\b(Essential Qualifications?)\b/gi,
+      "\n$1\n"
+    )
+    .replace(
+      /\b(Desirable Qualifications?)\b/gi,
+      "\n$1\n"
+    )
+    .replace(
+      /\b(Preference\s*\/\s*Weightage)\b/gi,
+      "\n$1\n"
+    )
+    .replace(
+      /\b(Age Limit)\b/gi,
+      "\n$1\n"
+    )
+    .replace(
+      /\b(Exclusions?)\s*:/gi,
+      "\n$1:\n"
+    );
+
+  return prepared
+    .split(/\n+|(?<=[.!?;])\s+/)
+    .map((clause) =>
+      clause
+        .replace(/^\s*[-*•]\s*/, "")
+        .replace(/^\s*\d+[.)]\s*/, "")
+        .trim()
+    )
+    .filter(
+      (clause) => clause.length >= 8
+    );
+};
+
+const isRelaxationClause = (clause) => {
+  const text = clause.toLowerCase();
+
+  return (
+    /\bage relaxation\b/.test(text) ||
+    /\brelaxation of\b/.test(text) ||
+    /\brelaxation\b.*\byears?\b/.test(text) ||
+    /\brelaxed by\b/.test(text)
+  );
+};
+
+const isMentorClause = (clause) => {
+  const text = clause.toLowerCase();
+
+  return (
+    /\bmentor\b/.test(text) ||
+    /\bguide\b/.test(text) ||
+    /\bco-guide\b/.test(text) ||
+    /\bco guide\b/.test(text)
+  );
+};
+
+const isNoteClause = (clause) => {
+  const text = clause
+    .toLowerCase()
+    .trim()
+    .replace(/^>+\s*/, "")
+    .replace(/^\*{1,3}\s*/, "")
+    .replace(/^\*{1,3}\s*:\s*/, ":")
+    .trim();
+
+  return (
+    /^note\s*:/.test(text) ||
+    /^note\b/.test(text) ||
+    /\bfor information only\b/.test(text) ||
+    /\bplease note\b/.test(text)
+  );
+};
+
+const isOperationalClause = (clause) => {
+  const text = clause.toLowerCase().trim();
+
+  return (
+    /\battendance\b/.test(text) ||
+    /\bbiometric\b/.test(text) ||
+    /\baebas\b/.test(text) ||
+    /\bon the job training\b/.test(text) ||
+    /\bojt\b/.test(text) ||
+    /\btraining provider\b/.test(text) ||
+    /\bfinal assessment\b/.test(text) ||
+    /\bcompletion of ojt\b/.test(text) ||
+    /\bspecial exemptions?\b/.test(text) ||
+    /\bproject work\b/.test(text)
+  );
+};
+
+const isContinuationClause = (clause) => {
+  const text = clause.toLowerCase().trim();
+
+  return /^(should|must|shall|may|can|and|or|also|such|whose|which|that|provided|provided that)\b/.test(
+    text
+  );
+};
+
+const isMentorContinuationClause = (clause) => {
+  const text = clause.toLowerCase().trim();
+
+  return (
+    isContinuationClause(clause) ||
+    /^degree\b/.test(text) ||
+    /^in\s+(science|engineering|technology|medicine|arts|commerce)\b/.test(
+      text
+    )
+  );
+};
+
+const hasExplicitApplicantSignal = (clause) => {
+  const text = clause.toLowerCase();
+
+  return (
+    /\bapplicant\b/.test(text) ||
+    /\bapplicants\b/.test(text) ||
+    /\bcandidate\b/.test(text) ||
+    /\bcandidates\b/.test(text) ||
+    /\bstudent\b/.test(text) ||
+    /\bstudents\b/.test(text) ||
+    /\bfellow\b/.test(text) ||
+    /\bfellows\b/.test(text) ||
+    /\bbeneficiary\b/.test(text) ||
+    /\bbeneficiaries\b/.test(text)
+  );
+};
+
+const isGeneralInstitutionClause = (clause) => {
+  const text = clause.toLowerCase();
+
+  return (
+    /\bhost institution\b/.test(text) ||
+    /\binstitution should\b/.test(text) ||
+    /\bresearch institution\b/.test(text)
+  );
+};
+
+const isPreferenceClause = (clause) => {
+  const text = clause.toLowerCase().trim();
+
+  return (
+    /^preference\s*\/\s*weightage\b/.test(text) ||
+    /\bpreference will be given\b/.test(text) ||
+    /\bpreference shall be given\b/.test(text) ||
+    /\bpreference is given\b/.test(text) ||
+    /\bpreference to\b/.test(text) ||
+    /\bpriority will be given\b/.test(text) ||
+    /\bpriority shall be given\b/.test(text) ||
+    /\bpriority is given\b/.test(text) ||
+    /\btie[-\s]?breaker\b/.test(text) ||
+    /\bin case of a tie\b/.test(text) ||
+    /\bin the event of a tie\b/.test(text) ||
+    /\bwhere multiple applicants\b.*\bpreference\b/.test(text)
+  );
+};
+
+const isDefinitionClause = (clause) => {
+  const text = clause.toLowerCase().trim();
+
+  return (
+    /^the word .+ means\b/.test(text) ||
+    /^the term .+ means\b/.test(text) ||
+    /\bwill be considered part of the family\b/.test(
+      text
+    ) ||
+    /\bconsidered part of the family\b/.test(text)
+  );
+};
+
+const getQualificationSection = (clause) => {
+  const text = clause.toLowerCase().trim();
+
+  if (/^essential qualifications?$/.test(text)) {
+    return "essential";
+  }
+
+  if (/^desirable qualifications?$/.test(text)) {
+    return "desirable";
+  }
+
+  return null;
+};
+
+const isPreferenceHeading = (clause) => {
+  const text = clause.toLowerCase().trim();
+
+  return /^preference\s*\/\s*weightage\b/.test(text);
+};
+
+const isAgeHeading = (clause) => {
+  return /^age limit\b/i.test(clause.trim());
+};
+
+const classifyClause = (
+  clause,
+  previousType = null,
+  previousClause = "",
+  qualificationContext = null
+) => {
+  const qualificationSection =
+    getQualificationSection(clause);
+
+  if (qualificationSection === "essential") {
+    return "essential-section";
+  }
+
+  if (qualificationSection === "desirable") {
+    return "desirable-section";
+  }
+
+  if (isPreferenceHeading(clause)) {
+    return "preference-section";
+  }
+
+  if (isAgeHeading(clause)) {
+    return "age-section";
+  }
+
+  if (isRelaxationClause(clause)) {
+    return "relaxation";
+  }
+
+  if (isNoteClause(clause)) {
+    return "note";
+  }
+
+  if (isPreferenceClause(clause)) {
+    return "preference";
+  }
+
+  if (isDefinitionClause(clause)) {
+    return "definition";
+  }
+
+  if (isOperationalClause(clause)) {
+    return "operational";
+  }
+
+  if (isMentorClause(clause)) {
+    return "mentor";
+  }
+
+  if (isGeneralInstitutionClause(clause)) {
+    return "institution";
+  }
+
+  if (qualificationContext === "preference") {
+    return "preference";
+  }
+
+  if (qualificationContext === "desirable") {
+    return "desirable";
+  }
+
+  if (qualificationContext === "essential") {
+    return "eligibility";
+  }
+
+  if (
+    previousType === "mentor" &&
+    isMentorContinuationClause(clause) &&
+    !hasExplicitApplicantSignal(clause)
+  ) {
+    return "mentor";
+  }
+
+  if (
+    previousType === "institution" &&
+    isContinuationClause(clause) &&
+    !hasExplicitApplicantSignal(clause)
+  ) {
+    return "institution";
+  }
+
+  return "eligibility";
+};
+
+const classifyClausesWithContext = (
+  clauses
+) => {
+  const classified = [];
+
+  let previousType = null;
+  let previousClause = "";
+  let qualificationContext = null;
+
+  for (const clause of clauses) {
+    const trimmed = clause.trim();
+
+    const section =
+      getQualificationSection(clause);
+
+    if (section === "essential") {
+      qualificationContext = "essential";
+
+      classified.push({
+        clause,
+        type: "essential-section",
+        qualificationContext,
+      });
+
+      previousType = "essential-section";
+      previousClause = clause;
+      continue;
+    }
+
+    if (section === "desirable") {
+      qualificationContext = "desirable";
+
+      classified.push({
+        clause,
+        type: "desirable-section",
+        qualificationContext,
+      });
+
+      previousType = "desirable-section";
+      previousClause = clause;
+      continue;
+    }
+
+    if (isPreferenceHeading(clause)) {
+      qualificationContext = "preference";
+
+      classified.push({
+        clause,
+        type: "preference-section",
+        qualificationContext,
+      });
+
+      previousType = "preference-section";
+      previousClause = clause;
+      continue;
+    }
+
+    if (isAgeHeading(clause)) {
+      qualificationContext = null;
+
+      classified.push({
+        clause,
+        type: "age-section",
+        qualificationContext: null,
+      });
+
+      previousType = "age-section";
+      previousClause = clause;
+      continue;
+    }
+
+    if (/^exclusions?\s*:/i.test(trimmed)) {
+      qualificationContext = null;
+
+      classified.push({
+        clause,
+        type: "exclusion-section",
+        qualificationContext: null,
+      });
+
+      previousType = "exclusion-section";
+      previousClause = clause;
+      continue;
+    }
+
+    const type = classifyClause(
+      clause,
+      previousType,
+      previousClause,
+      qualificationContext
+    );
+
+    let finalType = type;
+
+    if (
+      previousType === "age-section" &&
+      isNoteClause(clause)
+    ) {
+      finalType = "note";
+    }
+
+    if (
+      previousType === "age-section" &&
+      !isNoteClause(clause) &&
+      !isRelaxationClause(clause)
+    ) {
+      finalType = "age-eligibility";
+    }
+
+    classified.push({
+      clause,
+      type: finalType,
+      qualificationContext,
+    });
+
+    previousType = finalType;
+    previousClause = clause;
+  }
+
+  return classified;
+};
+
+const extractExplicitCategories = (text) => {
+  const normalized =
+    normalizeText(text).toLowerCase();
+
+  const categories = new Set();
+
+  const rules = [
+    {
+      key: "sc",
+      patterns: [
+        /\bscheduled caste\b/i,
+        /\bscheduled castes\b/i,
+        /\bsc\s+category\b/i,
+        /\bsc\s*\/\s*st\b/i,
+      ],
+    },
+
+    {
+      key: "st",
+      patterns: [
+        /\bscheduled tribe\b/i,
+        /\bscheduled tribes\b/i,
+        /\bst\s+category\b/i,
+        /\bsc\s*\/\s*st\b/i,
+      ],
+    },
+
+    {
+      key: "obc",
+      patterns: [
+        /\bother backward class\b/i,
+        /\bother backward classes\b/i,
+        /\bobc\s+category\b/i,
+        /\bobc\b/i,
+      ],
+    },
+
+    {
+      key: "mbc",
+      patterns: [
+        /\bmost backward class\b/i,
+        /\bmost backward classes\b/i,
+        /\bmbc\b/i,
+      ],
+    },
+
+    {
+      key: "ews",
+      patterns: [
+        /\beconomically weaker section\b/i,
+        /\beconomically weaker sections\b/i,
+        /\bews\s+category\b/i,
+        /\bews\b/i,
+      ],
+    },
+
+    {
+      key: "dnt",
+      patterns: [
+        /\bde[-\s]?notified\b/i,
+        /\bdenotified\b/i,
+        /\bnomadic\b/i,
+        /\bsemi[-\s]?nomadic\b/i,
+        /\bdnt\b/i,
+      ],
+    },
+
+    {
+      key: "minority",
+      patterns: [
+        /\bminority community\b/i,
+        /\bminority communities\b/i,
+        /\bminorities\b/i,
+        /\breligious minority\b/i,
+      ],
+    },
+  ];
+
+  for (const rule of rules) {
+    if (
+      hasAnyPattern(
+        normalized,
+        rule.patterns
+      )
+    ) {
+      categories.add(rule.key);
+    }
+  }
+
+  return [...categories];
+};
+
+const extractExplicitGender = (text) => {
+  const normalized =
+    normalizeText(text).toLowerCase();
+
+  const femaleApplicant =
+    /\b(?:female|women|woman|girl|girls)\s+(?:applicant|applicants|beneficiary|beneficiaries|candidate|candidates)\b/.test(
+      normalized
+    ) ||
+    /\b(?:applicant|applicants|beneficiary|beneficiaries|candidate|candidates)\s+(?:must be|should be|shall be|is|are)\s+(?:a\s+)?(?:female|woman|girl)\b/.test(
+      normalized
+    );
+
+  const maleApplicant =
+    /\b(?:male|men|man|boy|boys)\s+(?:applicant|applicants|beneficiary|beneficiaries|candidate|candidates)\b/.test(
+      normalized
+    ) ||
+    /\b(?:applicant|applicants|beneficiary|beneficiaries|candidate|candidates)\s+(?:must be|should be|shall be|is|are)\s+(?:a\s+)?(?:male|man|boy)\b/.test(
+      normalized
+    );
+
+  if (
+    femaleApplicant &&
+    !maleApplicant
+  ) {
+    return {
+      gender: "female",
+      allowedGenders: ["female"],
+      isFemaleOnly: true,
+    };
+  }
+
+  if (
+    maleApplicant &&
+    !femaleApplicant
+  ) {
     return {
       gender: "male",
-      isFemaleOnly: false,
       allowedGenders: ["male"],
+      isFemaleOnly: false,
     };
   }
 
   return {
     gender: "all",
+    allowedGenders: [],
     isFemaleOnly: false,
-    allowedGenders: ["all"],
   };
 };
 
-// ---------- Categories ----------
-const parseCategories = (
-  beneficiaryLabels = [],
-  eligibilityText = "",
-  schemeName = ""
+const extractExplicitEducation = (
+  text
 ) => {
-  const allowedCategories = new Set();
-  const text = normalizeText(`${schemeName} ${eligibilityText}`).toLowerCase();
+  const normalized =
+    normalizeText(text).toLowerCase();
 
-  const isOpenToAll =
-    /\b(?:all\s+categories|irrespective\s+of\s+caste|general\s+and\s+reserved|open\s+category|all\s+communities|no\s+caste\s+restriction)\b/i.test(
-      text
+  const education = new Set();
+
+  const hasCombinedDoctoralForm =
+    /\bph\s*\.?\s*d\s*\.?\s*\/\s*m\s*\.?\s*d\s*\.?\s*\/\s*m\s*\.?\s*s\s*\.?\b/.test(
+      normalized
     );
 
-  if (isOpenToAll) {
-    return ["all"];
+  const hasPhd =
+    /\bph\s*\.?\s*d\s*\.?\b/.test(
+      normalized
+    ) ||
+    /\bdoctoral degree\b/.test(
+      normalized
+    ) ||
+    /\bdoctoral\b/.test(normalized) ||
+    /\bdoctorate\b/.test(normalized) ||
+    /\bpost[-\s]?doctoral\b/.test(
+      normalized
+    );
+
+  if (
+    hasPhd ||
+    hasCombinedDoctoralForm
+  ) {
+    education.add("phd");
   }
 
-  // Remove degree abbreviations before testing to prevent B.Sc / M.Sc false positives for SC
-  const sanitizedText = text.replace(/\b(?:b\.?\s*sc|m\.?\s*sc)\b/gi, "");
+  if (
+    /\bclass\s*9\b/.test(normalized) ||
+    /\b9th\s*(?:class|standard)?\b/.test(
+      normalized
+    )
+  ) {
+    education.add("9th");
+  }
 
-  const categoryRegexes = {
-    sc: /\b(?:scheduled\s+caste|scheduled\s+castes|sc\s+category|sc\s+candidates?|sc\s+students?|dalit|\bsc\b)\b/i,
-    st: /\b(?:scheduled\s+tribe|scheduled\s+tribes|st\s+category|st\s+candidates?|st\s+students?|adivasi|tribals?|\bst\b)\b/i,
-    obc: /\b(?:other\s+backward\s+class(?:es)?|obc\s+category|obc\s+candidates?|obc\s+students?|backward\s+class(?:es)?|\bobc\b)\b/i,
-    ews: /\b(?:economically\s+weaker\s+section(?:s)?|ews\s+category|ews\s+candidates?|ews\s+students?|\bews\b)\b/i,
-    minority:
-      /\b(?:minority\s+communit(?:y|ies)|religious\s+minority|notified\s+minorities|minority\s+students?|\bminority\b)\b/i,
-  };
+  if (
+    /\bclass\s*10\b/.test(normalized) ||
+    /\b10th\s*(?:class|standard)?\b/.test(
+      normalized
+    ) ||
+    /\bmatriculation\b/.test(
+      normalized
+    ) ||
+    /\bsecondary school\b/.test(
+      normalized
+    )
+  ) {
+    education.add("10th");
+  }
 
-  for (const [cat, regex] of Object.entries(categoryRegexes)) {
-    if (regex.test(sanitizedText)) {
-      allowedCategories.add(cat);
+  if (
+    /\bclass\s*11\b/.test(normalized) ||
+    /\b11th\s*(?:class|standard)?\b/.test(
+      normalized
+    )
+  ) {
+    education.add("11th");
+  }
+
+  if (
+    /\bclass\s*12\b/.test(normalized) ||
+    /\b12th\s*(?:class|standard)?\b/.test(
+      normalized
+    ) ||
+    /\bsenior secondary\b/.test(
+      normalized
+    ) ||
+    /\bhigher secondary\b/.test(
+      normalized
+    ) ||
+    /\bintermediate\b/.test(normalized) ||
+    /\bplus two\b/.test(normalized) ||
+    /\bhsslc\b/.test(normalized) ||
+    /\bhigher\s+secondary\s+(?:school\s+)?leaving\s+certificate\b/.test(
+      normalized
+    )
+  ) {
+    education.add("12th");
+  }
+
+  if (
+    /\bdiploma\b/.test(normalized) ||
+    /\bpolytechnic\b/.test(normalized)
+  ) {
+    education.add("diploma");
+  }
+
+  if (
+    /\bundergraduate\b/.test(
+      normalized
+    ) ||
+    /\bbachelor(?:'s)? degree\b/.test(
+      normalized
+    ) ||
+    /\bgraduate degree\b/.test(
+      normalized
+    )
+  ) {
+    education.add("undergraduate");
+  }
+
+  const hasMastersDegree =
+    /\bmaster(?:'s)? degree\b/.test(
+      normalized
+    ) ||
+    /\bmaster degree\b/.test(
+      normalized
+    ) ||
+    /\bpostgraduate\b/.test(
+      normalized
+    ) ||
+    /\bpost graduation\b/.test(
+      normalized
+    ) ||
+    /\bm\s*\.?\s*s\s*\.?\s*(?:degree|in)\b/.test(
+      normalized
+    );
+
+  const hasMedicalDegree =
+    /\bm\s*\.?\s*d\s*\.?\s*(?:degree|in)\b/.test(
+      normalized
+    ) ||
+    /\bmedical degree\b/.test(
+      normalized
+    );
+
+  if (
+    hasMastersDegree ||
+    hasMedicalDegree
+  ) {
+    if (!hasCombinedDoctoralForm) {
+      education.add("postgraduate");
     }
   }
 
-  // Default to 'all' if no specific category restriction is identified (never assume General-only)
-  if (allowedCategories.size === 0) {
-    return ["all"];
+  if (
+    /\bprofessional course\b/.test(
+      normalized
+    ) ||
+    /\bprofessional degree\b/.test(
+      normalized
+    ) ||
+    /\bprofessional qualification\b/.test(
+      normalized
+    )
+  ) {
+    education.add("professional");
   }
 
-  return Array.from(allowedCategories);
+  if (
+    /\bbelow\s+(?:class\s*)?10\b/.test(
+      normalized
+    ) ||
+    /\bbelow\s+10th\b/.test(
+      normalized
+    )
+  ) {
+    education.add("below 10th");
+  }
+
+  return [...education];
 };
 
-// ---------- Occupations ----------
-const parseOccupations = (
-  beneficiaryLabels,
-  eligibilityText
+const extractExplicitOccupations = (
+  text
 ) => {
-  const occSet = new Set();
+  const normalized =
+    normalizeText(text).toLowerCase();
 
-  const labels =
-    beneficiaryLabels.map(normalizeText);
+  const occupations = new Set();
 
-  const eligibility =
-    normalizeText(eligibilityText);
+  const rules = [
+    {
+      key: "farmer",
+      patterns: [
+        /\bcultivator\b/i,
+        /\bfarmers?\b/i,
+        /\bagricultural worker\b/i,
+        /\bperson engaged in farming\b/i,
+      ],
+    },
 
-  const occMap = {
-    farmer: [
-      "farmer",
-      "farmers",
-      "kisan",
-      "agriculturist",
-      "agricultural worker",
-      "cultivator",
-    ],
+    {
+      key: "fisherman",
+      patterns: [
+        /\bfisherman\b/i,
+        /\bfishermen\b/i,
+        /\bfisher\b/i,
+        /\bperson engaged in fishing\b/i,
+      ],
+    },
 
-    student: [
-      "student",
-      "students",
-      "vidyarthi",
-      "pupil",
-      "scholar",
-    ],
+    {
+      key: "weaver",
+      patterns: [
+        /\bweaver\b/i,
+        /\bhandloom weaver\b/i,
+      ],
+    },
 
-    worker: [
-      "worker",
-      "workers",
-      "labour",
-      "labor",
-      "labourer",
-      "laborer",
-      "mazdoor",
-      "shramik",
-      "daily wage worker",
-    ],
+    {
+      key: "student",
+      patterns: [
+        /\bstudent\b/i,
+        /\bschool student\b/i,
+        /\bcollege student\b/i,
+        /\bpupil\b/i,
+      ],
+    },
 
-    startup: [
-      "entrepreneur",
-      "entrepreneurs",
-      "startup",
-      "startups",
-      "udyami",
-      "self employed",
-      "self-employed",
-      "business owner",
-    ],
+    {
+      key: "artisan",
+      patterns: [
+        /\bartisan\b/i,
+        /\bcraftsperson\b/i,
+        /\bcraft worker\b/i,
+      ],
+    },
 
-    unemployed: [
-      "unemployed",
-      "unemployment",
-      "berozgaar",
-      "jobless",
-    ],
+    {
+      key: "entrepreneur",
+      patterns: [
+        /\bentrepreneur\b/i,
+        /\bbusiness owner\b/i,
+        /\bbusinessperson\b/i,
+      ],
+    },
 
-    housewife: [
-      "housewife",
-      "homemaker",
-      "grihini",
-    ],
+    {
+      key: "worker",
+      patterns: [
+        /\blabou?rer\b/i,
+        /\bwage worker\b/i,
+        /\bdaily wage worker\b/i,
+      ],
+    },
+  ];
 
-    widow: [
-      "widow",
-      "widows",
-      "vidhwa",
-    ],
-
-    artisan: [
-      "artisan",
-      "artisans",
-      "weaver",
-      "weavers",
-      "handicraft",
-      "potter",
-      "potters",
-    ],
-
-    fisherman: [
-      "fisherman",
-      "fishermen",
-      "fisher",
-      "fisheries worker",
-      "machhuara",
-    ],
-  };
-
-  for (const [
-    occupation,
-    patterns,
-  ] of Object.entries(occMap)) {
-    const found =
+  for (const rule of rules) {
+    if (
       hasAnyPattern(
-        eligibility,
-        patterns
-      ) ||
-      labels.some((label) =>
-        hasAnyPattern(label, patterns)
-      );
-
-    if (found) {
-      occSet.add(occupation);
+        normalized,
+        rule.patterns
+      )
+    ) {
+      occupations.add(rule.key);
     }
   }
 
-  if (occSet.size === 0) {
-    occSet.add("all");
-  }
-
-  return Array.from(occSet);
+  return [...occupations];
 };
 
-// ---------- Scholarship ----------
-const SCHOLARSHIP_PATTERNS = [
-  "scholarship",
-  "fee reimbursement",
-  "tuition fee",
-  "student aid",
-  "student support",
-  "student welfare",
-  "stipend",
-  "post matric",
-  "pre matric",
-  "jee",
-  "neet",
-  "gate",
-  "upsc",
-  "fellowship",
-  "studentship",
-  "education loan",
-  "vidyadhan",
-  "pratibha",
-  "merit cum means",
-  "free education",
-  "freeship",
-  "grant",
-];
+const getEmbeddingPipeline = async () => {
+  if (!embeddingPipeline) {
+    embeddingPipeline = await pipeline(
+      "feature-extraction",
+      SEMANTIC_MODEL
+    );
+  }
 
-// ---------- Age extraction ----------
-const extractAgeLimits = (
-  eligibility,
-  fallbackAge = null
-) => {
-  let minAge = null;
-  let maxAge = null;
+  return embeddingPipeline;
+};
 
-  if (fallbackAge && typeof fallbackAge === "object") {
-    for (const key of Object.keys(fallbackAge)) {
-      const range = fallbackAge[key];
-      if (!range) continue;
-      if (range.gte != null) {
-        minAge =
-          minAge === null
-            ? Number(range.gte)
-            : Math.max(minAge, Number(range.gte));
-      }
-      if (range.lte != null) {
-        maxAge =
-          maxAge === null
-            ? Number(range.lte)
-            : Math.min(maxAge, Number(range.lte));
-      }
+const getEmbedding = async (text) => {
+  const extractor =
+    await getEmbeddingPipeline();
+
+  const output = await extractor(
+    text,
+    {
+      pooling: "mean",
+      normalize: true,
     }
+  );
+
+  return Array.from(output.data);
+};
+
+const cosineSimilarity = (a, b) => {
+  if (
+    !a ||
+    !b ||
+    a.length !== b.length
+  ) {
+    return 0;
   }
 
-  const text = normalizeText(eligibility);
-  if (!text) {
-    return {
-      minAge,
-      maxAge,
-    };
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
   }
 
-  const clauses = text
-    .split(/(?<!\d)\.(?!\d)|[;\n|]+/)
-    .map((c) => c.trim())
-    .filter(Boolean);
+  if (
+    normA === 0 ||
+    normB === 0
+  ) {
+    return 0;
+  }
 
-  const isNonAgeExperienceOrTenure = (clause, matchIndex) => {
-    const surrounding = clause.slice(
-      Math.max(0, matchIndex - 30),
-      matchIndex + 60
+  return (
+    dot /
+    (Math.sqrt(normA) *
+      Math.sqrt(normB))
+  );
+};
+
+const getCanonicalEmbedding = async (
+  concept
+) => {
+  if (
+    canonicalEmbeddingCache.has(
+      concept
+    )
+  ) {
+    return canonicalEmbeddingCache.get(
+      concept
     );
-    return /\b(?:experience|service|residen(?:ce|t)|staying|tenure|imprisonment|sentence|course\s+duration)\b/i.test(
-      surrounding
-    );
+  }
+
+  const embedding =
+    await getEmbedding(concept);
+
+  canonicalEmbeddingCache.set(
+    concept,
+    embedding
+  );
+
+  return embedding;
+};
+
+const extractSemanticFilters = async (
+  clauses,
+  threshold = SEMANTIC_THRESHOLD
+) => {
+  const result = {
+    occupation: new Set(),
+    education: new Set(),
   };
 
-  const rangePatterns = [
-    /(?:applicant|candidate|person)?\s*(?:must\s+be\s+)?(?:between|from)\s+(\d{1,2})\s*(?:years?|yrs?)?\s*(?:and|to|-|–)\s*(\d{1,2})\s*(?:years?|yrs?)(?:\s+of\s+age)?/i,
-    /\bage\s*(?:limit|criteria|group|bracket)?\s*(?:is|should\s+be|between)?\s*[:=]?\s*(\d{1,2})\s*(?:to|-|–)\s*(\d{1,2})\s*(?:years?|yrs?)?/i,
-    /\b(\d{1,2})\s*(?:to|-|–)\s*(\d{1,2})\s*(?:years?|yrs?)\s+of\s+age\b/i,
-    /\bage\s*(?:group\s+of|between)\s*(\d{1,2})\s*(?:to|-|–|and)\s*(\d{1,2})\b/i,
-  ];
+  const debug = {
+    clauses: [],
+    matches: {
+      occupation: [],
+      education: [],
+    },
+  };
 
-  const maxPatterns = [
-    /\b(?:age|aged).{0,30}?(?:less\s+than|below|under|up\s*to|at\s+most|maximum|not\s+exceeding|not\s+more\s+than)\s*(\d{1,2})\s*(?:years?|yrs?)(?:\s+of\s+age)?\b/i,
-    /\bmaximum\s+age\s*(?:limit|criteria)?\s*(?:is|should\s+be)?\s*[:=]?\s*(\d{1,2})\s*(?:years?|yrs?)?\b/i,
-    /\b(?:below|under|not\s+exceeding|at\s+most)\s+(\d{1,2})\s*(?:years?|yrs?)\s+of\s+age\b/i,
-    /\b(\d{1,2})\s*(?:years?|yrs?)\s*(?:or\s+less|or\s+below)\b/i,
-  ];
+  for (const clauseInfo of clauses) {
+    const {
+      clause,
+      type,
+    } = clauseInfo;
 
-  const minPatterns = [
-    /\b(?:age|aged).{0,30}?(?:more\s+than|above|over|at\s+least|minimum|not\s+less\s+than)\s*(\d{1,2})\s*(?:years?|yrs?)(?:\s+of\s+age)?\b/i,
-    /\bminimum\s+age\s*(?:limit|criteria)?\s*(?:is|should\s+be)?\s*[:=]?\s*(\d{1,2})\s*(?:years?|yrs?)?\b/i,
-    /\b(?:applicant|candidate).{0,30}?(?:not\s+be\s+less\s+than|at\s+least)\s*(\d{1,2})\s*(?:years?|yrs?)\s+of\s+age\b/i,
-    /\b(?:above|over|at\s+least)\s+(\d{1,2})\s*(?:years?|yrs?)\s+of\s+age\b/i,
-  ];
+    if (type !== "eligibility") {
+      debug.clauses.push({
+        clause,
+        type,
+        skipped: true,
+        reason:
+          "Not an applicant eligibility clause",
+        matches: [],
+      });
 
-  for (const clause of clauses) {
-    if (minAge === null || maxAge === null) {
-      for (const pattern of rangePatterns) {
-        const match = clause.match(pattern);
-        if (match && !isNonAgeExperienceOrTenure(clause, match.index || 0)) {
-          const a1 = parseInt(match[1], 10);
-          const a2 = parseInt(match[2], 10);
-          if (a1 >= 0 && a1 <= 100 && a2 >= 0 && a2 <= 100) {
-            const low = Math.min(a1, a2);
-            const high = Math.max(a1, a2);
-            minAge = minAge === null ? low : Math.max(minAge, low);
-            maxAge = maxAge === null ? high : Math.min(maxAge, high);
-            break;
+      continue;
+    }
+
+    const clauseEmbedding =
+      await getEmbedding(clause);
+
+    const clauseDebug = {
+      clause,
+      type,
+      skipped: false,
+      matches: [],
+    };
+
+    for (const [
+      conceptType,
+      concepts,
+    ] of Object.entries(
+      SEMANTIC_CONCEPTS
+    )) {
+      for (const [
+        key,
+        phrases,
+      ] of Object.entries(concepts)) {
+        let bestScore = -1;
+        let bestPhrase = "";
+
+        for (const phrase of phrases) {
+          const canonicalEmbedding =
+            await getCanonicalEmbedding(
+              phrase
+            );
+
+          const score =
+            cosineSimilarity(
+              clauseEmbedding,
+              canonicalEmbedding
+            );
+
+          if (
+            score > bestScore
+          ) {
+            bestScore = score;
+            bestPhrase = phrase;
           }
         }
+
+        clauseDebug.matches.push({
+          type: conceptType,
+          key,
+          score: Number(
+            bestScore.toFixed(4)
+          ),
+          matchedPhrase:
+            bestPhrase,
+        });
       }
     }
 
-    if (maxAge === null) {
-      for (const pattern of maxPatterns) {
-        const match = clause.match(pattern);
-        if (match && !isNonAgeExperienceOrTenure(clause, match.index || 0)) {
-          const parsed = parseInt(match[1], 10);
-          if (parsed >= 0 && parsed <= 100) {
-            maxAge = parsed;
-            break;
-          }
-        }
+    clauseDebug.matches.sort(
+      (a, b) =>
+        b.score - a.score
+    );
+
+    const allMatches =
+      clauseDebug.matches;
+
+    clauseDebug.matches =
+      allMatches.slice(0, 12);
+
+    for (const conceptType of [
+      "occupation",
+      "education",
+    ]) {
+      const typeMatches =
+        allMatches
+          .filter(
+            (match) =>
+              match.type ===
+              conceptType
+          )
+          .sort(
+            (a, b) =>
+              b.score - a.score
+          );
+
+      if (
+        typeMatches.length === 0
+      ) {
+        continue;
+      }
+
+      const best =
+        typeMatches[0];
+
+      const second =
+        typeMatches[1];
+
+      const margin = second
+        ? best.score -
+          second.score
+        : best.score;
+
+      const accepted =
+        best.score >=
+          threshold &&
+        margin >=
+          SEMANTIC_MARGIN;
+
+      if (accepted) {
+        result[
+          conceptType
+        ].add(best.key);
+
+        debug.matches[
+          conceptType
+        ].push({
+          clause,
+          key: best.key,
+          score: best.score,
+          matchedPhrase:
+            best.matchedPhrase,
+          margin: Number(
+            margin.toFixed(4)
+          ),
+        });
       }
     }
 
-    if (minAge === null) {
-      for (const pattern of minPatterns) {
-        const match = clause.match(pattern);
-        if (match && !isNonAgeExperienceOrTenure(clause, match.index || 0)) {
-          const parsed = parseInt(match[1], 10);
-          if (parsed >= 0 && parsed <= 100) {
-            minAge = parsed;
-            break;
-          }
-        }
-      }
-    }
+    debug.clauses.push(
+      clauseDebug
+    );
   }
 
   return {
-    minAge,
-    maxAge,
+    filters: {
+      occupation: [
+        ...result.occupation,
+      ],
+      education: [
+        ...result.education,
+      ],
+    },
+    debug,
   };
 };
 
-// ---------- Main normalizer ----------
-export const normalizeMyScheme = (
-  detailData,
-  searchFields = {}
+const extractStructuredFilters = async (
+  eligibilityText
 ) => {
-  if (!detailData) return null;
-
-  const basic =
-    detailData.basicDetails || {};
-
-  const content =
-    detailData.schemeContent || {};
-
-  const eligibilityObj =
-    detailData.eligibilityCriteria || {};
-
-  const externalId =
-    searchFields.slug ||
-    basic.schemeSlug ||
-    detailData._id;
-
-  if (!externalId) return null;
-
-  const name = (
-    basic.schemeName ||
-    "Untitled Scheme"
-  ).trim();
-
-  const description =
-    (
-      content.briefDescription ||
-      ""
-    ).trim();
-
-  const benefits =
-    extractBenefitsText(content);
-
-  const eligibility =
-    extractEligibility(
-      eligibilityObj,
-      basic
+  const {
+    positive,
+    exclusions,
+  } =
+    splitEligibilityAndExclusions(
+      eligibilityText
     );
 
-  const tags =
-    normalizeTags(basic.tags);
+  const allClauses =
+    splitIntoClauses(
+      positive
+    );
 
-  const category =
-    basic.schemeCategory?.length
-      ? basic.schemeCategory
-          .map((c) => c.label || c)
-          .join(", ")
-      : "General";
+  const classifiedClauses =
+    classifyClausesWithContext(
+      allClauses
+    );
 
-  const ministry =
-    (
-      typeof basic.nodalMinistryName ===
-      "string"
-        ? basic.nodalMinistryName
-        : basic.nodalMinistryName?.label
-    ) ||
-    (
-      typeof basic.nodalDepartmentName ===
-      "string"
-        ? basic.nodalDepartmentName
-        : basic.nodalDepartmentName?.label
-    ) ||
-    "Central Government";
+  const eligibilityOnly =
+    classifiedClauses.filter(
+      (item) =>
+        item.type ===
+        "eligibility"
+    );
 
-  // ---------- State extraction ----------
-  let rawState = "All India";
-  const allowedStates = [];
+  const eligibilityTextOnly =
+    eligibilityOnly
+      .map(
+        (item) => item.clause
+      )
+      .join(" ");
 
-  const extractStateList = (
-    source
-  ) => {
-    if (!source) return [];
+  const explicitCategories =
+    extractExplicitCategories(
+      eligibilityTextOnly
+    );
 
-    if (Array.isArray(source)) {
-      return source
-        .filter(Boolean)
-        .map((s) =>
-          String(s).trim()
-        )
-        .filter(
-          (s) =>
-            s &&
-            s.toLowerCase() !==
-              "all india" &&
-            s.toLowerCase() !== "all"
-        );
-    }
+  const explicitEducation =
+    extractExplicitEducation(
+      eligibilityTextOnly
+    );
 
-    if (
-      typeof source === "string" &&
-      source.trim()
+  const explicitOccupations =
+    extractExplicitOccupations(
+      eligibilityTextOnly
+    );
+
+  const explicitGender =
+    extractExplicitGender(
+      eligibilityTextOnly
+    );
+
+  const age =
+    extractAgeLimits(
+      positive
+    );
+
+  const income =
+    extractIncomeLimits(
+      eligibilityTextOnly
+    );
+
+  const semantic =
+    await extractSemanticFilters(
+      classifiedClauses
+    );
+
+  const categories = [
+    ...new Set(
+      explicitCategories
+    ),
+  ];
+
+  const educationLevels = [
+    ...new Set([
+      ...explicitEducation,
+      ...semantic.filters.education,
+    ]),
+  ];
+
+  const occupations = [
+    ...new Set([
+      ...explicitOccupations,
+      ...semantic.filters.occupation,
+    ]),
+  ];
+
+  return {
+    allowedCategories:
+      categories,
+
+    allowedEducationLevels:
+      educationLevels,
+
+    allowedOccupations:
+      occupations,
+
+    genderInfo:
+      explicitGender,
+
+    minAge:
+      age.minAge,
+
+    maxAge:
+      age.maxAge,
+
+    minIncome:
+      income.minIncome,
+
+    maxIncome:
+      income.maxIncome,
+
+    semanticDebug: {
+      clauses:
+        semantic.debug.clauses,
+
+      matches:
+        semantic.debug.matches,
+
+      classifiedClauses,
+    },
+
+    exclusions,
+  };
+};
+
+const normalizeState = (
+  state
+) => {
+  if (!state) return "all";
+
+  const normalized =
+    normalizeText(state)
+      .toLowerCase();
+
+  return (
+    stateMap[
+      normalized
+    ] ||
+    normalized.replace(
+      /[^a-z0-9]/g,
+      ""
+    )
+  );
+};
+
+const extractStateList = (
+  detail,
+  fallback = {}
+) => {
+  const states = new Set();
+
+  const basicState =
+    detail?.basicDetails?.state
+      ?.label ||
+    detail?.basicDetails?.state
+      ?.name;
+
+  if (basicState) {
+    states.add(
+      normalizeState(
+        basicState
+      )
+    );
+  }
+
+  const beneficiaryState =
+    fallback?.beneficiaryState;
+
+  if (
+    Array.isArray(
+      beneficiaryState
+    )
+  ) {
+    for (
+      const state of beneficiaryState
     ) {
-      const trimmed =
-        source.trim();
-
       if (
-        trimmed.toLowerCase() !==
-          "all india" &&
-        trimmed.toLowerCase() !== "all"
+        state &&
+        normalizeText(
+          state
+        ).toLowerCase() !==
+          "all"
       ) {
-        return [trimmed];
+        states.add(
+          normalizeState(
+            state
+          )
+        );
       }
     }
+  }
 
-    return [];
-  };
+  if (states.size === 0) {
+    return ["all"];
+  }
 
-  const stateCandidates = [
-    ...extractStateList(
-      basic.allowedStates
-    ),
-    ...extractStateList(
-      searchFields.beneficiaryState
-    ),
-    ...extractStateList(
-      basic.state
-    ),
+  return [
+    ...states,
   ];
+};
 
-  const uniqueStates = [
-    ...new Set(stateCandidates),
-  ];
+const extractApplicationLink = (
+  detail
+) => {
+  const applicationProcess =
+    detail?.schemeContent
+      ?.applicationProcess;
 
-  if (uniqueStates.length > 0) {
-    const normalizedStates =
-      uniqueStates
-        .map((state) =>
-          normalizeState(state)
-        )
-        .filter(Boolean);
+  if (
+    Array.isArray(
+      applicationProcess
+    )
+  ) {
+    for (
+      const item of applicationProcess
+    ) {
+      if (item?.url) {
+        return item.url;
+      }
 
-    rawState =
-      normalizedStates.join(", ");
-
-    for (const state of normalizedStates) {
-      if (
-        !allowedStates.includes(state)
-      ) {
-        allowedStates.push(state);
+      if (item?.link) {
+        return item.link;
       }
     }
   }
 
   if (
-    allowedStates.length === 0
+    detail?.applicationLink
   ) {
-    allowedStates.push("all");
+    return detail.applicationLink;
   }
 
-  // ---------- Beneficiaries ----------
-  const targetBeneficiaries =
-    Array.isArray(
-      basic.targetBeneficiaries
-    )
-      ? basic.targetBeneficiaries
-      : [];
+  return null;
+};
 
-  const beneficiaryLabels =
-    targetBeneficiaries
-      .map(
-        (b) =>
-          (
-            b?.label ||
-            b ||
-            ""
-          )
-            .toString()
-            .toLowerCase()
-            .trim()
-      )
-      .filter(Boolean);
-
-  // ---------- Categories ----------
-  const finalAllowedCategories =
-    parseCategories(
-      beneficiaryLabels,
-      eligibility,
-      name
-    );
-
-  // ---------- Occupations ----------
-  const allowedOccupations =
-    parseOccupations(
-      beneficiaryLabels,
-      eligibility
-    );
-
-  // ---------- Scholarship ----------
-  const combinedScholarshipText =
+const detectScholarship = (
+  name,
+  tags,
+  eligibility
+) => {
+  const text =
     normalizeText(
-      `${name} ${description} ${eligibility} ${tags.join(
+      `${name || ""} ${tags.join(
         " "
-      )}`
-    );
+      )} ${eligibility || ""}`
+    ).toLowerCase();
 
-  const isScholarship =
-    SCHOLARSHIP_PATTERNS.some(
-      (pattern) =>
-        hasPattern(
-          combinedScholarshipText,
-          pattern
-        )
-    );
-
-  // ---------- Scheme metadata ----------
-  const schemeFor =
-    basic.schemeFor ||
-    "Individual";
-
-  // ---------- Age ----------
-  const {
-    minAge,
-    maxAge,
-  } = extractAgeLimits(
-    eligibility,
-    searchFields.age ||
-      basic.age
-  );
-
-  // ---------- Income ----------
-  const {
-    minIncome,
-    maxIncome,
-  } = extractIncomeLimits(
-    eligibility,
-    searchFields.familyIncomeLimit ||
-      basic.familyIncomeLimit
-  );
-
-  // ---------- Education ----------
-  const educationLabels =
-    Array.isArray(
-      basic.educationLevel
+  return (
+    /\bscholarship\b/.test(
+      text
+    ) ||
+    /\bscholarships\b/.test(
+      text
     )
-      ? basic.educationLevel.map(
-          (e) => e?.label || e
+  );
+};
+
+export const normalizeMyScheme =
+  async (
+    detail,
+    searchFields = {}
+  ) => {
+    if (!detail) {
+      return null;
+    }
+
+    const basicDetails =
+      detail.basicDetails ||
+      {};
+
+    const name =
+      basicDetails.schemeName ||
+      searchFields.schemeName ||
+      "";
+
+    const description =
+      normalizeText(
+        basicDetails.briefDescription ||
+          basicDetails.description ||
+          searchFields.briefDescription ||
+          ""
+      );
+
+    const eligibility =
+      extractEligibility(
+        detail
+      );
+
+    const tags =
+      normalizeTags(
+        detail.tags ||
+          basicDetails.tags ||
+          searchFields.tags ||
+          []
+      );
+
+    const benefits =
+      extractBenefitsText(
+        detail
+      );
+
+    const structured =
+      await extractStructuredFilters(
+        eligibility
+      );
+
+    const allowedStates =
+      extractStateList(
+        detail,
+        searchFields
+      );
+
+    const category =
+      searchFields
+        .schemeCategory?.[0] ||
+      basicDetails
+        .schemeCategory?.[0] ||
+      "all";
+
+    const ministryValue =
+      basicDetails
+        .nodalMinistryName ||
+      searchFields
+        .nodalMinistryName ||
+      "Central Government";
+    // The portal sometimes returns a ministry as a { label, value } object.
+    // Keep the normalized record and its checksum aligned with the String DB column.
+    const ministry =
+      ministryValue && typeof ministryValue === "object"
+        ? ministryValue.label || ministryValue.name || ministryValue.value || "Central Government"
+        : ministryValue;
+
+    const schemeFor =
+      basicDetails.schemeFor ||
+      searchFields.schemeFor ||
+      "Individual";
+
+    const applicationLink =
+      extractApplicationLink(
+        detail
+      );
+
+    const externalId =
+      detail.slug ||
+      basicDetails.slug ||
+      searchFields.slug ||
+      "";
+
+    const sourceUrl = externalId
+      ? `https://www.myscheme.gov.in/schemes/${externalId}`
+      : null;
+
+    const isScholarship =
+      detectScholarship(
+        name,
+        tags,
+        eligibility
+      );
+
+    const normalizedForChecksum =
+      {
+        name,
+        description,
+        benefits,
+        eligibility,
+        category,
+        ministry,
+        allowedStates,
+        allowedCategories:
+          structured.allowedCategories,
+        allowedGenders:
+          structured.genderInfo
+            .allowedGenders,
+        allowedOccupations:
+          structured.allowedOccupations,
+        allowedEducationLevels:
+          structured.allowedEducationLevels,
+        minIncome:
+          structured.minIncome,
+        maxIncome:
+          structured.maxIncome,
+        minAge:
+          structured.minAge,
+        maxAge:
+          structured.maxAge,
+        isScholarship,
+      };
+
+    const checksum =
+      crypto
+        .createHash("sha256")
+        .update(
+          JSON.stringify(
+            normalizedForChecksum
+          )
         )
-      : [];
+        .digest("hex");
 
-  const educationLevels =
-    parseEducationLevels(
-      educationLabels,
-      `${eligibility} ${description}`
-    );
-
-  const primaryEducation =
-    educationLevels[0];
-
-  // ---------- Gender ----------
-  const genderInfo =
-    parseGender(
-      beneficiaryLabels,
+    return {
+      externalId,
+      name,
+      description,
+      benefits,
       eligibility,
-      name
-    );
+      category,
+      ministry,
 
-// ---------- Documents ----------
-let documentsRequired = null;
+      state:
+        allowedStates[0] ||
+        "all",
 
-if (Array.isArray(eligibilityObj.documentsRequired)) {
-  documentsRequired = eligibilityObj.documentsRequired
-    .map((d) => d?.label || d)
-    .filter(Boolean)
-    .join(", ");
-} else if (typeof eligibilityObj.documentsRequired === "string") {
-  documentsRequired = eligibilityObj.documentsRequired
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .join(", ");
-} else if (Array.isArray(content.documentsRequired)) {
-  documentsRequired = content.documentsRequired
-    .map((d) => d?.label || d)
-    .filter(Boolean)
-    .join(", ");
-} else if (typeof content.documentsRequired === "string") {
-  documentsRequired = content.documentsRequired
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .join(", ");
-}
+      occupation:
+        structured
+          .allowedOccupations[0] ||
+        "all",
 
-  // ---------- Final normalized object ----------
-  const normalized = {
-    externalId:
-      String(externalId).trim(),
+      educationLevel:
+        structured
+          .allowedEducationLevels[0] ||
+        "all",
 
-    name,
-    description,
-    benefits,
-    eligibility,
+      gender:
+        structured.genderInfo
+          .gender || "all",
 
-    category,
-    ministry,
+      allowedCategories:
+        structured
+          .allowedCategories
+          .length
+          ? structured
+              .allowedCategories
+          : ["all"],
 
-    state: rawState,
+      allowedStates,
 
-    occupation:
-      allowedOccupations[0],
+      allowedGenders:
+        structured.genderInfo
+          .allowedGenders,
 
-    educationLevel:
-      primaryEducation,
+      allowedOccupations:
+        structured
+          .allowedOccupations
+          .length
+          ? structured
+              .allowedOccupations
+          : ["all"],
 
-    gender:
-      genderInfo.gender,
+      allowedEducationLevels:
+        structured
+          .allowedEducationLevels
+          .length
+          ? structured
+              .allowedEducationLevels
+          : ["all"],
 
-    allowedCategories:
-      finalAllowedCategories,
+      minIncome:
+        structured.minIncome,
 
-    allowedStates,
+      maxIncome:
+        structured.maxIncome,
 
-    allowedGenders:
-      genderInfo.allowedGenders,
+      minAge:
+        structured.minAge,
 
-    allowedOccupations,
+      maxAge:
+        structured.maxAge,
 
-    allowedEducationLevels:
-      educationLevels,
+      isScholarship,
 
-    minIncome,
-    maxIncome,
+      isFemaleOnly:
+        structured.genderInfo
+          .isFemaleOnly,
 
-    minAge,
-    maxAge,
+      schemeFor,
+      applicationLink,
+      sourceUrl,
 
-    isScholarship,
+      documentsRequired:
+        extractDocumentsText(detail),
 
-    isFemaleOnly:
-      genderInfo.isFemaleOnly,
+      tags,
 
-    schemeFor,
+      sourceId: "myscheme",
 
-    applicationLink:
-      searchFields.applicationLink ||
-      basic.applicationLink ||
-      null,
+      checksum,
 
-    sourceUrl:
-      searchFields.sourceUrl ||
-      basic.sourceUrl ||
-      null,
-
-    documentsRequired,
-
-    tags,
+      _semanticDebug:
+        structured.semanticDebug,
+    };
   };
 
-  const checksum = crypto
-    .createHash("md5")
-    .update(
-      stableStringify(normalized)
-    )
-    .digest("hex");
+export {
+  classifyClausesWithContext,
+};
 
-  return {
-    ...normalized,
-    sourceId: "myscheme",
-    checksum,
+export const debugSemanticFilters =
+  async (
+    detailOrEligibility
+  ) => {
+    let eligibilityText = "";
+
+    if (
+      typeof detailOrEligibility ===
+      "string"
+    ) {
+      eligibilityText =
+        detailOrEligibility;
+    } else {
+      eligibilityText =
+        extractEligibility(
+          detailOrEligibility
+        );
+    }
+
+    const {
+      positive,
+      exclusions,
+    } =
+      splitEligibilityAndExclusions(
+        eligibilityText
+      );
+
+    const structured =
+      await extractStructuredFilters(
+        eligibilityText
+      );
+
+    return {
+      positiveEligibility:
+        positive,
+
+      exclusions,
+
+      final: {
+        categories:
+          structured
+            .allowedCategories,
+
+        education:
+          structured
+            .allowedEducationLevels,
+
+        occupations:
+          structured
+            .allowedOccupations,
+
+        gender:
+          structured.genderInfo,
+
+        age: {
+          minAge:
+            structured.minAge,
+          maxAge:
+            structured.maxAge,
+        },
+
+        income: {
+          minIncome:
+            structured.minIncome,
+          maxIncome:
+            structured.maxIncome,
+        },
+      },
+
+      semantic:
+        structured.semanticDebug,
+    };
   };
+
+export {
+  extractAgeLimits,
+  extractIncomeLimits,
+  extractExplicitCategories,
+  extractExplicitEducation,
+  extractExplicitOccupations,
+  extractExplicitGender,
+  extractSemanticFilters,
+  splitEligibilityAndExclusions,
+  splitIntoClauses,
+  classifyClause,
 };
