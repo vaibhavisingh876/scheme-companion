@@ -38,7 +38,7 @@ const app = express();
 app.set("trust proxy", 1);
 
 // ─── Allowed Frontend Origins ───────────────────────────────────────────
-const allowedOrigins = [
+const allowedOrigins = new Set([
   "https://scheme-companion.vercel.app",
 
   // Local development
@@ -46,7 +46,18 @@ const allowedOrigins = [
   "http://127.0.0.1:5173",
   "http://localhost:3000",
   "http://127.0.0.1:3000",
-];
+  ...(process.env.CORS_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+]);
+
+const isAllowedOrigin = (origin) => {
+  if (allowedOrigins.has(origin)) return true;
+
+  // Allow Vercel preview deployments for this project, but not arbitrary Vercel apps.
+  return /^https:\/\/scheme-companion(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin);
+};
 
 // ─── CORS ────────────────────────────────────────────────────────────────
 app.use(
@@ -57,7 +68,7 @@ app.use(
         return callback(null, true);
       }
 
-      if (allowedOrigins.includes(origin)) {
+      if (isAllowedOrigin(origin)) {
         return callback(null, true);
       }
 

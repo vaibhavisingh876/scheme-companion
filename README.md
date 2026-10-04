@@ -8,6 +8,11 @@ The application combines large language models, semantic search, eligibility fil
 
 https://scheme-companion.vercel.app/
 
+For a custom frontend domain, add its origin to the backend's `CORS_ORIGINS`
+environment variable as a comma-separated list (for example,
+`https://app.example.com,https://staging.example.com`). The backend also allows
+this project's Vercel preview deployments.
+
 ## Overview
 
 Finding the right government scheme can be difficult because users often do not know the exact scheme name or the eligibility criteria they need to search for.
