@@ -4232,6 +4232,47 @@ html[data-theme="dark"] body:not(:has(.hero)) .find .loadmore .btn--outline:hove
 }
 html[data-theme="dark"] body:not(:has(.hero)) .find .loadmore small { color: #d4d2e2 !important; }
 
+/* Keep the auth form and every field comfortably inside its card. */
+.auth {
+  min-height: 100vh;
+  min-height: 100svh;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.auth__aside,
+.auth__panel,
+.auth__form { min-width: 0; }
+.auth__aside .auth__brand .brand__word,
+.auth__aside .auth__brand .brand__word b { color: #fff !important; }
+.auth__panel { padding: clamp(20px, 4vw, 56px); }
+.auth__form {
+  width: min(100%, 460px);
+  max-width: 460px;
+  padding: clamp(24px, 3.5vw, 40px);
+  overflow: hidden;
+}
+.auth__form .head,
+.auth__form .head h1,
+.auth__form .head p,
+.auth__form .auth__switch { min-width: 0; overflow-wrap: anywhere; }
+.auth__form .control,
+.auth__form .control input,
+.auth__form .btn--block { width: 100%; min-width: 0; }
+.auth__form .field { min-width: 0; }
+.auth__form .btn--block { white-space: normal; }
+@media (max-width: 900px) {
+  .auth { grid-template-columns: minmax(0, 1fr); }
+  .auth__panel { min-height: 100vh; min-height: 100svh; }
+  .auth__form { width: min(100%, 480px); }
+}
+@media (max-width: 480px) {
+  .auth__panel { align-items: flex-start; padding: 18px 14px; }
+  .auth__form { padding: 24px 20px; border-radius: 18px !important; }
+  .auth__form .head { margin-bottom: 24px; }
+  .auth__form h1 { font-size: clamp(28px, 9vw, 34px); }
+  .auth__fields { gap: 15px; }
+  .auth__switch { font-size: 13px; }
+}
+
 /* Expand scheme details in place instead of mounting them abruptly on click. */
 .rcard__expand {
   display: grid;
