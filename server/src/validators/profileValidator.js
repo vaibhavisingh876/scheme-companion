@@ -32,6 +32,13 @@ const nullableIncome = z.preprocess(
 );
 
 export const profileSchema = z.object({
+  // Search-friendly paraphrase of the need, generated from the user's own
+  // message. It is used only for semantic retrieval, never eligibility facts.
+  searchQuery: z.preprocess(
+    (value) => (typeof value === "string" ? value.trim() : ""),
+    z.string().max(1200).default("")
+  ),
+
   age: nullableNumber,
 
   gender: z

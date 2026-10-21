@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { syncMyScheme } from "../sync/myschemeSync.js";
 import { updateMissingEmbeddings } from "../../services/ai/embeddingService.js";
+import { invalidateCandidateCache, warmCandidateCache } from "../../services/ai/recommendation/recommendationService.js";
 
 let isSyncRunning = false;
 
@@ -18,10 +19,13 @@ export const startMySchemeCron = () => {
 
       console.log("⏰ Scheduled Sync Started");
 
-      await syncMyScheme();
+      const result = await syncMyScheme();
+      if (result?.success !== false) invalidateCandidateCache();
 
       console.log("🤖 Checking Missing Embeddings...");
       await updateMissingEmbeddings();
+      invalidateCandidateCache();
+      await warmCandidateCache();
 
       console.log("✅ Scheduled Sync Finished");
     } catch (err) {

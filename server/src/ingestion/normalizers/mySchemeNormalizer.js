@@ -1987,6 +1987,8 @@ export const normalizeMyScheme =
         maxAge:
           structured.maxAge,
         isScholarship,
+        tags,
+        schemeFor,
       };
 
     const checksum =

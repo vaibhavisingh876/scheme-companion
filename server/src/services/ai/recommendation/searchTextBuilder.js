@@ -11,6 +11,22 @@ const cleanText = (value) => {
 export const buildQueryText = (profile, rawMessage = "") => {
   const parts = [];
 
+  // 1. Translated scheme vocabulary is the primary retrieval anchor
+  if (profile.searchQuery && profile.searchQuery.trim()) {
+    parts.push(`scheme search query: ${profile.searchQuery.trim()}`);
+  }
+
+  // 2. Beneficiary primary intent
+  if (
+    profile.primaryIntent &&
+    profile.primaryIntent !== "unknown"
+  ) {
+    parts.push(
+      `intent: ${profile.primaryIntent.replace(/-/g, " ")}`
+    );
+  }
+
+  // 3. Beneficiary demographic & eligibility attributes
   if (
     profile.occupation &&
     profile.occupation !== "unknown"
@@ -19,10 +35,26 @@ export const buildQueryText = (profile, rawMessage = "") => {
   }
 
   if (
+    profile.gender &&
+    profile.gender !== "unknown"
+  ) {
+    parts.push(`gender: ${profile.gender}`);
+  }
+
+  if (
     profile.state &&
     profile.state !== "unknown"
   ) {
     parts.push(`state: ${profile.state}`);
+  }
+
+  if (
+    profile.casteCategory &&
+    profile.casteCategory !== "unknown"
+  ) {
+    parts.push(
+      `caste: ${profile.casteCategory}`
+    );
   }
 
   if (
@@ -35,22 +67,6 @@ export const buildQueryText = (profile, rawMessage = "") => {
         : "school level";
 
     parts.push(`education: ${education}`);
-  }
-
-  if (
-    profile.primaryIntent &&
-    profile.primaryIntent !== "unknown"
-  ) {
-    parts.push(
-      `intent: ${profile.primaryIntent.replace(/-/g, " ")}`
-    );
-  }
-
-  if (
-    profile.gender &&
-    profile.gender !== "unknown"
-  ) {
-    parts.push(`gender: ${profile.gender}`);
   }
 
   if (
@@ -67,17 +83,9 @@ export const buildQueryText = (profile, rawMessage = "") => {
     parts.push(`age: ${profile.age}`);
   }
 
-  if (
-    profile.casteCategory &&
-    profile.casteCategory !== "unknown"
-  ) {
-    parts.push(
-      `caste: ${profile.casteCategory}`
-    );
-  }
-
+  // 4. Raw user message context
   if (rawMessage && rawMessage.trim()) {
-    parts.push(`query: ${rawMessage}`);
+    parts.push(`original query: ${rawMessage.trim()}`);
   }
 
   return (

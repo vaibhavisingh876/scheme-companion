@@ -1,16 +1,14 @@
 import { useEffect, useState } from "react";
 import { getPaginatedSchemes } from "../services/api";
-import Chakra from "../components/Chakra";
 
-const SchemeTile = ({ scheme, onViewDetails, duplicate = false }) => (
+const SchemeTile = ({ scheme, onViewDetails }) => (
   <article
     className="scheme"
-    onClick={() => !duplicate && onViewDetails?.(scheme)}
+    onClick={() => onViewDetails?.(scheme)}
     role="button"
-    tabIndex={duplicate ? -1 : 0}
-    aria-hidden={duplicate || undefined}
+    tabIndex={0}
     onKeyDown={(e) => {
-      if (!duplicate && e.key === "Enter") onViewDetails?.(scheme);
+      if (e.key === "Enter") onViewDetails?.(scheme);
     }}
   >
     <div className="scheme__top">
@@ -106,15 +104,17 @@ const LandingHome = ({ onViewDetails, onTabChange }) => {
             )}
           </div>
 
-          <div className="hero__orrery">
-            <Chakra />
-          </div>
         </div>
 
         <div className="hero__showcase container container--wide">
           <div className="hero__showcase-head">
             <div>
-              <h2>Schemes people are <em>checking right now.</em></h2>
+              <h2 className="showcase-ticker" aria-label="Schemes people are checking right now.">
+                <span className="showcase-ticker__track">
+                  <span>Schemes people are <em>checking right now.</em></span>
+                  <span aria-hidden="true">Schemes people are <em>checking right now.</em></span>
+                </span>
+              </h2>
             </div>
             <button type="button" className="tlink" onClick={goToSearch}>
               See the full list <span className="arw">→</span>
@@ -123,32 +123,24 @@ const LandingHome = ({ onViewDetails, onTabChange }) => {
 
           <div className="hero__scheme-rail" aria-label="Featured schemes">
             <div className="hero__scheme-track">
-              {[false, true].map((duplicate) => (
-                <div
-                  className="hero__scheme-group"
-                  key={duplicate ? "reel-copy" : "reel-main"}
-                  aria-hidden={duplicate || undefined}
-                  inert={duplicate}
-                >
-                  {loading
-                    ? [0, 1, 2, 3, 4, 5].map((n) => (
-                        <div className="scheme hero__scheme-skeleton" key={`${duplicate}-${n}`} aria-hidden="true">
-                          <div className="index-skeleton" style={{ padding: 0, border: 0, flex: 1 }}>
-                            <div style={{ width: "42%", height: 20 }} />
-                            <div style={{ width: "70%", height: 12 }} />
-                          </div>
+              <div className="hero__scheme-group">
+                {loading
+                  ? [0, 1, 2, 3, 4, 5].map((n) => (
+                      <div className="scheme hero__scheme-skeleton" key={n} aria-hidden="true">
+                        <div className="index-skeleton" style={{ padding: 0, border: 0, flex: 1 }}>
+                          <div style={{ width: "42%", height: 20 }} />
+                          <div style={{ width: "70%", height: 12 }} />
                         </div>
-                      ))
-                    : schemes.map((scheme, i) => (
-                        <SchemeTile
-                          key={`${duplicate ? "copy-" : ""}${scheme.id || `${scheme.name}-${i}`}`}
-                          scheme={scheme}
-                          onViewDetails={onViewDetails}
-                          duplicate={duplicate}
-                        />
-                      ))}
-                </div>
-              ))}
+                      </div>
+                    ))
+                  : schemes.map((scheme, i) => (
+                      <SchemeTile
+                        key={scheme.id || `${scheme.name}-${i}`}
+                        scheme={scheme}
+                        onViewDetails={onViewDetails}
+                      />
+                    ))}
+              </div>
             </div>
           </div>
 
@@ -188,9 +180,9 @@ const LandingHome = ({ onViewDetails, onTabChange }) => {
       {/* HOW IT WORKS */}
       <section className="band-night section" id="how-it-works">
         <div className="container">
-          <div className="sec-head reveal">
+          <div className="sec-head">
             <span className="kicker">The process</span>
-            <h2>Three steps, <em>start to finish.</em></h2>
+            <h2 className="steps-heading reveal">Three steps, <em>start to finish.</em></h2>
             <p className="lede">
               No forms to file here — we point you to the official page for each scheme.
             </p>

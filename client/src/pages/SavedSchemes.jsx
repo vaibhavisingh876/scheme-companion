@@ -1,12 +1,10 @@
 import RecommendationCard from "../components/RecommendationCard.jsx";
-import Chakra from "../components/Chakra.jsx";
 
 const SavedSchemes = ({ savedList = [], onRemoveScheme, onViewDetails, onTabChange }) => {
   const items = Array.isArray(savedList) ? savedList : [];
 
   return (
     <div className="view section" style={{ paddingTop: "clamp(36px,5vw,60px)" }}>
-      <div className="page__chakra" aria-hidden="true"><Chakra /></div>
       <div className="container">
         <header className="page-head">
           <div className="page-head__row">

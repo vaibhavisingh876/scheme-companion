@@ -5,7 +5,7 @@ const BATCH_SIZE = 5;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const buildDescriptionText = (scheme) => {
+export const buildDescriptionEmbeddingText = (scheme) => {
   const parts = [
     `name: ${scheme.name || ""}`,
     `description: ${scheme.description || ""}`,
@@ -24,39 +24,38 @@ const buildDescriptionText = (scheme) => {
     .trim();
 };
 
-const buildEligibilityText = (scheme) => {
+export const buildEligibilityEmbeddingText = (scheme) => {
   return String(scheme.eligibility || "")
     .toLowerCase()
     .replace(/\s+/g, " ")
     .trim();
 };
 
-const generateEmbeddings = async (scheme, extractor) => {
-  const descriptionText = buildDescriptionText(scheme);
-  const eligibilityText = buildEligibilityText(scheme);
+const generateEmbeddings = async (scheme, extractor, { force = false } = {}) => {
+  const data = {};
+  const needsDescription = force || !scheme.descriptionEmbedding?.length;
+  const needsEligibility = (force || !scheme.eligibilityEmbedding?.length) && Boolean(String(scheme.eligibility || "").trim());
+  const descriptionText = needsDescription ? buildDescriptionEmbeddingText(scheme) : "";
+  const eligibilityText = needsEligibility ? buildEligibilityEmbeddingText(scheme) : "";
 
-  if (!descriptionText || !eligibilityText) {
-    throw new Error("Missing description or eligibility text");
+  if (needsDescription && !descriptionText) throw new Error("Missing description text");
+
+  const pending = [];
+  if (needsDescription) {
+    pending.push(extractor(descriptionText, { pooling: "mean", normalize: true }).then((out) => {
+      data.descriptionEmbedding = Array.from(out.data);
+    }));
   }
-
-  const [descriptionOutput, eligibilityOutput] = await Promise.all([
-    extractor(descriptionText, {
-      pooling: "mean",
-      normalize: true,
-    }),
-    extractor(eligibilityText, {
-      pooling: "mean",
-      normalize: true,
-    }),
-  ]);
-
-  return {
-    descriptionEmbedding: Array.from(descriptionOutput.data),
-    eligibilityEmbedding: Array.from(eligibilityOutput.data),
-  };
+  if (needsEligibility) {
+    pending.push(extractor(eligibilityText, { pooling: "mean", normalize: true }).then((out) => {
+      data.eligibilityEmbedding = Array.from(out.data);
+    }));
+  }
+  await Promise.all(pending);
+  return data;
 };
 
-const processSchemes = async (schemes, extractor) => {
+const processSchemes = async (schemes, extractor, { force = false } = {}) => {
   let successCount = 0;
   let failCount = 0;
 
@@ -66,10 +65,7 @@ const processSchemes = async (schemes, extractor) => {
     await Promise.all(
       batch.map(async (scheme) => {
         try {
-          const embeddings = await generateEmbeddings(
-            scheme,
-            extractor
-          );
+          const embeddings = await generateEmbeddings(scheme, extractor, { force });
 
           await prisma.scheme.update({
             where: { id: scheme.id },
@@ -107,6 +103,8 @@ const schemeSelect = {
   description: true,
   benefits: true,
   eligibility: true,
+  descriptionEmbedding: true,
+  eligibilityEmbedding: true,
   category: true,
   ministry: true,
   tags: true,
@@ -145,7 +143,8 @@ export const regenerateAllEmbeddings = async () => {
 
     const { successCount, failCount } = await processSchemes(
       schemes,
-      extractor
+      extractor,
+      { force: true }
     );
 
     console.log(
@@ -169,12 +168,15 @@ export const updateMissingEmbeddings = async () => {
       FROM "Scheme"
       WHERE "isActive" = true
         AND (
-          "descriptionEmbedding" IS NULL
-          OR array_length("descriptionEmbedding", 1) IS NULL
-          OR array_length("descriptionEmbedding", 1) = 0
-          OR "eligibilityEmbedding" IS NULL
-          OR array_length("eligibilityEmbedding", 1) IS NULL
-          OR array_length("eligibilityEmbedding", 1) = 0
+          (
+            ("descriptionEmbedding" IS NULL OR array_length("descriptionEmbedding", 1) IS NULL OR array_length("descriptionEmbedding", 1) = 0)
+            AND btrim(concat_ws(' ', "name", "description", "benefits")) <> ''
+          )
+          OR
+          (
+            ("eligibilityEmbedding" IS NULL OR array_length("eligibilityEmbedding", 1) IS NULL OR array_length("eligibilityEmbedding", 1) = 0)
+            AND btrim(coalesce("eligibility", '')) <> ''
+          )
         )
     `;
 

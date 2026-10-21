@@ -2,6 +2,10 @@ import prisma from "../../config/prisma.js";
 import { fetchAllMySchemes } from "../connectors/mySchemeBulkfetcher.js";
 import { normalizeMyScheme } from "../normalizers/mySchemeNormalizer.js";
 import { fetchSchemeDetail, fetchSchemeDocuments } from "../connectors/mySchemeDetailFetcher.js";
+import {
+  buildDescriptionEmbeddingText,
+  buildEligibilityEmbeddingText,
+} from "../../services/ai/embeddingService.js";
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -131,7 +135,21 @@ export const syncMyScheme = async () => {
 
   const existingSchemes = await prisma.scheme.findMany({
     where: { sourceId: "myscheme" },
-    select: { id: true, externalId: true, checksum: true, version: true, isActive: true },
+    select: {
+      id: true,
+      externalId: true,
+      checksum: true,
+      version: true,
+      isActive: true,
+      name: true,
+      description: true,
+      benefits: true,
+      eligibility: true,
+      category: true,
+      ministry: true,
+      tags: true,
+      schemeFor: true,
+    },
   });
 
   const existingMap = new Map(existingSchemes.map(s => [s.externalId, s]));
@@ -146,9 +164,22 @@ export const syncMyScheme = async () => {
     if (!existing) {
       createBatch.push({ ...dbScheme, version: 1, lastSyncedAt: new Date(), isActive: true });
     } else if (existing.checksum !== dbScheme.checksum || !existing.isActive) {
+      const staleEmbeddings = {};
+      if (buildDescriptionEmbeddingText(existing) !== buildDescriptionEmbeddingText(dbScheme)) {
+        staleEmbeddings.descriptionEmbedding = [];
+      }
+      if (buildEligibilityEmbeddingText(existing) !== buildEligibilityEmbeddingText(dbScheme)) {
+        staleEmbeddings.eligibilityEmbedding = [];
+      }
       updateBatch.push({
         id: existing.id,
-        data: { ...dbScheme, version: existing.version + 1, lastSyncedAt: new Date(), isActive: true },
+        data: {
+          ...dbScheme,
+          ...staleEmbeddings,
+          version: existing.version + 1,
+          lastSyncedAt: new Date(),
+          isActive: true,
+        },
       });
     }
   }
@@ -160,8 +191,10 @@ export const syncMyScheme = async () => {
   }
 
   if (updateBatch.length) {
-    for (let i = 0; i < updateBatch.length; i += 50) {
-      const chunk = updateBatch.slice(i, i + 50);
+    // Keep concurrent writes well below the Supabase session pool limit.
+    const UPDATE_CONCURRENCY = 3;
+    for (let i = 0; i < updateBatch.length; i += UPDATE_CONCURRENCY) {
+      const chunk = updateBatch.slice(i, i + UPDATE_CONCURRENCY);
       await Promise.allSettled(chunk.map(u => prisma.scheme.update({ where: { id: u.id }, data: u.data })));
     }
   }

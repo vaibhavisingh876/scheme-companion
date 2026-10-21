@@ -125,3 +125,23 @@ model Bookmark {
 
   @@unique([userId, schemeId])
 }
+
+// Cached, reusable eligibility rules extracted from a scheme's raw eligibility
+// text. Kept in a SEPARATE table so the original Scheme.eligibility text is
+// never overwritten (design rule). Extraction is on-demand and keyed by
+// sourceHash so updated eligibility text invalidates the cache and re-extracts.
+model SchemeEligibility {
+  id             String   @id @default(cuid())
+  schemeId       String   @unique
+  sourceHash     String
+  extractedRules Json?
+  status         String   @default("pending") // success | failed | pending
+  modelVersion   String   @default("unknown")
+  attempts       Int      @default(0)
+  lastError      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status])
+  @@index([sourceHash])
+}

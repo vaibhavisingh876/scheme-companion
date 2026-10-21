@@ -4,8 +4,22 @@ import { scoreScheme } from "../scoringEngine.js";
 import { embeddingCache, candidateCache } from "../../../utils/cache.js";
 import { buildQueryText } from "./searchTextBuilder.js";
 import { extractUserProfile } from "../groqService.js";
+import { keywordSearch } from "./keywordSearch.js";
+import { reciprocalRankFusion } from "./rrf.js";
+import { rerank, isRerankerActive } from "./reranker.js";
+import { getCachedEligibilityRules, enqueueEligibilityExtraction } from "./eligibilityService.js";
+import { verifyEligibility } from "./verification.js";
+import { createMetrics, logMetrics } from "./metrics.js";
 
 const MAX_RESULTS = 20;
+
+// Hybrid retrieval configuration. Values are initial/experimental per the
+// design doc; tune against the eval harness (server/eval).
+const VECTOR_TOP_K = 100; // semantic candidates (recall-focused)
+const KEYWORD_TOP_K = 100; // full-text candidates (recall-focused)
+const CANDIDATE_POOL = 200; // max unique candidates after RRF fusion
+const RERANK_INPUT = 50; // candidates passed to the reranker stage
+const ELIGIBILITY_TOP_N = 30; // top candidates that get eligibility extraction+verification
 
 // Only what scoring + hard filtering need. Embeddings dominate payload size, so
 // text/display columns are fetched separately for the final top results.
@@ -16,6 +30,7 @@ const CANDIDATE_SELECT = {
   benefits: true,
   eligibility: true,
   category: true,
+  state: true,
   tags: true,
   externalId: true,
   gender: true,
@@ -66,23 +81,34 @@ const DISPLAY_SELECT = {
   tags: true,
 };
 
-// One 4.7k-row embedding fetch is large enough to drop the Postgres connection,
-// so page it into smaller round-trips.
-const CANDIDATE_PAGE = 800;
+const CANDIDATE_PAGE = 300;
 let candidatesLoadPromise = null;
 
 const loadCandidates = async () => {
+  // Read the current catalogue from PostgreSQL. A persistent JSON snapshot can
+  // silently hide schemes added or changed by the six-hour sync.
   const rows = [];
   let skip = 0;
 
   for (;;) {
-    const page = await prisma.scheme.findMany({
-      where: { isActive: true },
-      select: CANDIDATE_SELECT,
-      orderBy: { id: "asc" },
-      skip,
-      take: CANDIDATE_PAGE,
-    });
+    let page = null;
+    let attempts = 0;
+    while (attempts < 3) {
+      try {
+        attempts++;
+        page = await prisma.scheme.findMany({
+          where: { isActive: true },
+          select: CANDIDATE_SELECT,
+          orderBy: { id: "asc" },
+          skip,
+          take: CANDIDATE_PAGE,
+        });
+        break;
+      } catch (err) {
+        if (attempts >= 3) throw err;
+        await new Promise((r) => setTimeout(r, 1000 * attempts));
+      }
+    }
 
     rows.push(...page);
     if (page.length < CANDIDATE_PAGE) break;
@@ -96,8 +122,6 @@ const getCandidates = async () => {
   const cached = candidateCache.get("active");
   if (cached) return cached;
 
-  // A cold cache can coincide with startup warmup and several incoming searches.
-  // Share one database read so each request does not start its own 5k-row scan.
   if (!candidatesLoadPromise) {
     candidatesLoadPromise = loadCandidates()
       .then((rows) => {
@@ -119,6 +143,16 @@ export const warmCandidateCache = async () => {
   } catch (err) {
     console.error("❌ Candidate cache warm failed:", err.message);
   }
+  // Warm the Prisma connection + full-text path.
+  try {
+    await keywordSearch("pension", 1);
+  } catch (err) {
+    console.warn("⚠️ FTS warm skipped:", err.message);
+  }
+};
+
+export const invalidateCandidateCache = () => {
+  candidateCache.del("active");
 };
 
 const cosineSimilarity = (a, b) => {
@@ -296,10 +330,12 @@ export const checkHardEligibility = (scheme, profile, rawMessage = "") => {
   // identify the applicant as belonging to that group.
   const targetRules = [
     { pattern: /\b(?:safai karamchari|sanitation worker|scavenger)\b/i, allowed: /\b(?:safai karamchari|sanitation worker|scavenger)\b/i.test(rawMessage) },
+    { pattern: /\b(?:unorganised|unorganized)\s+(?:sector\s+)?workers?|\bcrafts(?:wo)?men\b/i, allowed: profile.occupation === "worker" || /\b(?:unorganised|unorganized)\s+(?:sector\s+)?workers?|\bcrafts(?:wo)?men\b/i.test(rawMessage) },
     { pattern: /\b(?:construction worker|building worker|registered construction labourer)\b/i, allowed: /\b(?:construction worker|building worker|labou?rer|mazdoor)\b/i.test(rawMessage) },
     { pattern: /\b(?:ex[- ]servicemen|ex[- ]serviceman|veteran)\b/i, allowed: /\b(?:ex[- ]servicemen|ex[- ]serviceman|veteran|army|navy|air force)\b/i.test(rawMessage) },
     { pattern: /\b(?:central armed police|police force personnel|paramilitary personnel)\b/i, allowed: /\b(?:central armed police|police force|paramilitary)\b/i.test(rawMessage) },
     { pattern: /\b(?:farmer|agricultural worker|cultivator)\b/i, allowed: profile.occupation === "farmer" || /\b(?:farmer|farming|agriculture)\b/i.test(rawMessage) },
+    { pattern: /\b(?:teachers?|lecturers?)\b/i, allowed: /\b(?:teachers?|lecturers?)\b/i.test(rawMessage) },
   ];
   if (targetRules.some(({ pattern, allowed }) => pattern.test(titleAndTags) && !allowed)) {
     conflicts.push("target_group_mismatch");
@@ -343,13 +379,21 @@ export const checkHardEligibility = (scheme, profile, rawMessage = "") => {
         .replace(/[^a-z0-9]/g, "")
         .trim()
     );
+    // Many catalogue rows have a single scheme.state but no allowedStates
+    // array. Use that state for regional filtering instead of treating them as
+    // location-neutral. Explicit "all India" values remain unrestricted.
+    const applicableStates = allowedStates.length
+      ? allowedStates
+      : scheme.state
+      ? [String(scheme.state).toLowerCase().replace(/[^a-z0-9]/g, "").trim()]
+      : [];
 
     if (
-      allowedStates.length > 0 &&
-      !allowedStates.includes("all") &&
-      !allowedStates.includes("allindia")
+      applicableStates.length > 0 &&
+      !applicableStates.includes("all") &&
+      !applicableStates.includes("allindia")
     ) {
-      if (!allowedStates.includes(userState)) {
+      if (!applicableStates.includes(userState)) {
         conflicts.push("state_mismatch");
       }
     }
@@ -369,6 +413,60 @@ const getSchemeSearchText = (scheme) =>
   [scheme.name, scheme.description, scheme.benefits, scheme.eligibility, scheme.category, ...(scheme.tags || [])]
     .filter(Boolean)
     .join(" ");
+
+const detectMedicalTreatmentRequest = (rawMessage) =>
+  /\b(?:cancer|tumou?rs?|chemotherap\w*|radiotherap\w*|dialysis|organ transplant|critical illness|serious illness|incurable disease|treatment|medical care)\b/i.test(rawMessage);
+
+const hasMedicalTreatmentEvidence = (scheme) => {
+  if (scheme.category === "Education & Learning" || scheme.isScholarship) {
+    return false;
+  }
+
+  const text = [scheme.name, scheme.description, scheme.benefits, scheme.eligibility, ...(scheme.tags || [])]
+    .filter(Boolean)
+    .join(" ");
+
+  if (
+    /\b(?:studying medical|medical (?:college|education|courses?|students?))\b/i.test(text) &&
+    !/\b(?:cancer|chemotherap\w*|radiotherap\w*|dialysis|organ transplant|incurable disease|patient|treatment)\b/i.test(text)
+  ) {
+    return false;
+  }
+
+  const diseaseEvidence =
+    /\b(?:cancer|tumou?rs?|chemotherap\w*|radiotherap\w*|dialysis|organ transplant|critical illness|serious illness|incurable diseases?|medical treatment|treatment of (?:a )?diseases?)\b/i.test(text);
+  const medicalAidEvidence =
+    /\b(?:medical|health(?:care)?|hospital)\s+(?:assistance|support|aid|treatment|care|expenses?|costs?|loan|insurance|fund)\b|\b(?:financial assistance|reimbursement|health insurance)\b.{0,80}\b(?:medical|health|hospital|treatment|disease|illness|cancer)\b/i.test(text);
+  return diseaseEvidence || medicalAidEvidence;
+};
+
+const isCancerTreatmentRequest = (rawMessage) =>
+  /\b(?:cancer|tumou?rs?|oncolog\w*|chemotherap\w*|radiotherap\w*)\b/i.test(rawMessage);
+
+const filterForCancerTreatment = (schemes) => {
+  const directTreatment =
+    /\b(?:cancer|tumou?rs?|oncolog\w*|chemotherap\w*|radiotherap\w*)\b/i;
+  const financialAid =
+    /\b(?:financial assistance|medical assistance|treatment assistance|patient fund|treatment cost|medical expenses?|grant|relief fund|cashless treatment|health cover|health insurance)\b/i;
+  const researchOrRecognition =
+    /\b(?:research|fellowship|training|award|best state|population decline|entrepreneurship)\b/i;
+
+  return schemes.filter((scheme) => {
+    const fullText = getSchemeSearchText(scheme);
+    const namedText = [scheme.name, ...(scheme.tags || [])].filter(Boolean).join(" ");
+    const explicitCancerScheme = directTreatment.test(namedText) && financialAid.test(fullText);
+    const generalMedicalGrant =
+      /\bhealth minister(?:'s)? discretionary grant\b/i.test(scheme.name || "") &&
+      /\b(?:medical|treatment|hospital|illness)\b/i.test(fullText) &&
+      financialAid.test(fullText);
+
+    // A disease mention in a research, award, or population programme is not
+    // evidence that the scheme pays for a patient's treatment.
+    if (!explicitCancerScheme && !generalMedicalGrant) return false;
+    if (researchOrRecognition.test(namedText) && !financialAid.test(namedText)) return false;
+    return true;
+  });
+};
 
 const filterForStudyAbroad = (schemes, profile, rawMessage) => {
   const asksForStudyAbroad =
@@ -485,6 +583,85 @@ const hasIntentEvidence = (scheme, intent) => {
 };
 
 /**
+ * Ranks all in-memory candidates by the SAME dual cosine similarity the scorer
+ * uses (0.5*description + 0.5*eligibility), returning the top-K as a ranked
+ * list for RRF fusion. Pure/in-memory — no I/O.
+ */
+const vectorSearchRank = (candidates, queryEmbedding, topK) => {
+  const scored = [];
+  for (const s of candidates) {
+    const hasDesc = Array.isArray(s.descriptionEmbedding) && s.descriptionEmbedding.length > 0;
+    const hasElig = Array.isArray(s.eligibilityEmbedding) && s.eligibilityEmbedding.length > 0;
+    if (!hasDesc && !hasElig) continue;
+
+    const descSim = hasDesc ? cosineSimilarity(queryEmbedding, s.descriptionEmbedding) : 0;
+    const eligSim = hasElig ? cosineSimilarity(queryEmbedding, s.eligibilityEmbedding) : 0;
+
+    let sim;
+    if (hasDesc && hasElig) sim = 0.5 * descSim + 0.5 * eligSim;
+    else if (hasDesc) sim = descSim;
+    else sim = eligSim;
+
+    scored.push({ id: s.id, score: sim });
+  }
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, topK);
+};
+
+/**
+ * Hybrid retrieval: parallel vector + keyword search fused with RRF, then
+ * deduplicated into a candidate pool of full scheme objects.
+ * Degrades gracefully — if keyword search fails it returns [], and fusion
+ * becomes vector-only, so retrieval never hard-fails the request.
+ */
+const hybridRetrieve = async (allCandidates, queryEmbedding, keywordText) => {
+  const keywordPromise = keywordSearch(keywordText, KEYWORD_TOP_K);
+  const vectorRanked = vectorSearchRank(allCandidates, queryEmbedding, VECTOR_TOP_K);
+  const keywordRanked = await keywordPromise;
+
+  const fused = reciprocalRankFusion([vectorRanked, keywordRanked]);
+  const poolIds = fused.slice(0, CANDIDATE_POOL).map((f) => f.id);
+
+  const byId = new Map(allCandidates.map((s) => [s.id, s]));
+
+  // Keyword search hits the live DB, so it can surface schemes added since
+  // this process loaded its in-memory candidate catalogue. Backfill those ids.
+  const missingIds = poolIds.filter((id) => !byId.has(id));
+  if (missingIds.length) {
+    try {
+      const rows = await prisma.scheme.findMany({
+        where: { id: { in: missingIds } },
+        select: CANDIDATE_SELECT,
+      });
+      rows.forEach((r) => byId.set(r.id, r));
+    } catch (err) {
+      console.warn("[hybrid] backfill of keyword-only candidates failed:", err.message);
+    }
+  }
+
+  const schemes = [];
+  const rrfById = new Map();
+  for (const f of fused) {
+    if (schemes.length >= CANDIDATE_POOL) break;
+    const scheme = byId.get(f.id);
+    if (!scheme) continue;
+    schemes.push(scheme);
+    rrfById.set(f.id, f.rrfScore);
+  }
+
+  return {
+    schemes,
+    rrfById,
+    counts: {
+      vector: vectorRanked.length,
+      keyword: keywordRanked.length,
+      fused: fused.length,
+      pool: schemes.length,
+    },
+  };
+};
+
+/**
  * Main recommendation pipeline:
  * User query -> User query embedding -> Dual cosine similarities (description + eligibility)
  * -> Hard eligibility filter gate -> Scoring -> Deduplication -> Top recommendations (NO diversification)
@@ -493,21 +670,69 @@ export const recommendSchemes = async (message) => {
   const trimmed = (message || "").trim();
   if (!trimmed) return { error: "message is required" };
 
+  const metrics = createMetrics();
+
   // 1. Extract structured profile from user conversation
-  const profile = await extractUserProfile(trimmed);
+  const profile = await metrics.time("profileExtraction", () => extractUserProfile(trimmed, {
+    onLLMCall: () => metrics.addLlm(1),
+    onUsage: (usage) => metrics.addTokens(usage.total_tokens || 0),
+  }));
 
   // 2. Build semantic query text and generate query embedding
   const queryText = buildQueryText(profile, trimmed);
-  const queryEmbedding = await getQueryEmbedding(queryText);
+  const queryEmbedding = await metrics.time("queryEmbedding", () => getQueryEmbedding(queryText));
 
-  // 3. Retrieve all active schemes (cached) for in-memory semantic scoring
-  const candidateSchemes = await getCandidates();
+  // 3. Load all active schemes (cached), then narrow to a hybrid candidate pool
+  //    (vector + keyword search fused via RRF).
+  const allCandidates = await metrics.time("loadCandidates", () => getCandidates());
 
-  if (!candidateSchemes.length) {
+  if (!allCandidates.length) {
     return {
       profile: { ...profile },
       schemes: [],
-      meta: { total: 0, candidatesEvaluated: 0 },
+      meta: { total: 0, candidatesEvaluated: 0, engine: "hybrid" },
+    };
+  }
+
+  // Keyword search targets the official-vocabulary paraphrase plus the raw
+  // message; comma-separated phrases become OR clauses for recall.
+  const keywordText = [profile.searchQuery, trimmed].filter(Boolean).join(", ");
+  const retrieval = await metrics.time("hybridRetrieval", () =>
+    hybridRetrieve(allCandidates, queryEmbedding, keywordText)
+  );
+  metrics.count("vectorCandidates", retrieval.counts.vector);
+  metrics.count("keywordCandidates", retrieval.counts.keyword);
+  metrics.count("fusedCandidates", retrieval.counts.fused);
+  metrics.count("candidatePool", retrieval.counts.pool);
+
+  // Rerank the recall-focused hybrid pool before eligibility and legacy scoring.
+  // Keep the remaining candidates in their RRF order as a fallback tail.
+  const rerankInput = retrieval.schemes.slice(0, RERANK_INPUT).map((scheme) => ({
+    ...scheme,
+    relevance: retrieval.rrfById.get(scheme.id) || 0,
+  }));
+  const reranked = (await metrics.time("rerank", () => rerank(queryText, rerankInput))).map(
+    ({ relevance, reranked: _rerankedFlag, _rerankIndex, ...scheme }) => scheme
+  );
+  const rerankedIds = new Set(reranked.map((scheme) => scheme.id));
+  const candidateSchemes = [
+    ...reranked,
+    ...retrieval.schemes.filter((scheme) => !rerankedIds.has(scheme.id)),
+  ];
+  metrics.count("rerankCandidates", rerankInput.length);
+
+  if (!candidateSchemes.length) {
+    const summary = metrics.summary();
+    logMetrics("empty-pool", summary);
+    return {
+      profile: { ...profile },
+      schemes: [],
+      meta: {
+        total: 0,
+        candidatesEvaluated: allCandidates.length,
+        engine: "hybrid",
+        monitoring: summary,
+      },
     };
   }
 
@@ -517,12 +742,24 @@ export const recommendSchemes = async (message) => {
   // an empty list.
   const abroadMatches = filterForStudyAbroad(candidateSchemes, profile, trimmed);
   const widowMatches = filterForWidowSupport(candidateSchemes, profile, trimmed);
+  const asksForMedicalTreatment = detectMedicalTreatmentRequest(trimmed);
+  const cancerSpecificRequest = isCancerTreatmentRequest(trimmed);
+  const medicallyRelevantMatches = asksForMedicalTreatment
+    ? candidateSchemes.filter(hasMedicalTreatmentEvidence)
+    : candidateSchemes;
+  const medicalMatches = cancerSpecificRequest
+    ? filterForCancerTreatment(medicallyRelevantMatches)
+    : medicallyRelevantMatches;
   const asksForStudyAbroad =
     profile.primaryIntent === "scholarship" &&
     /\b(?:abroad|overseas|outside\s+india|foreign\s+(?:university|study|education))\b/i.test(trimmed);
   const asksForWidowSupport = profile.primaryIntent === "widow-support";
 
-  if ((asksForStudyAbroad && abroadMatches.length === 0) || (asksForWidowSupport && widowMatches.length === 0)) {
+  if (
+    (asksForStudyAbroad && abroadMatches.length === 0) ||
+    (asksForWidowSupport && widowMatches.length === 0) ||
+    (asksForMedicalTreatment && medicalMatches.length === 0)
+  ) {
     return {
       profile: { ...profile },
       schemes: [],
@@ -534,7 +771,7 @@ export const recommendSchemes = async (message) => {
     ? widowMatches
     : asksForStudyAbroad
     ? abroadMatches
-    : candidateSchemes;
+    : medicalMatches;
   const loanPurposes = detectLoanPurposes(trimmed);
   const purposeCandidates = loanPurposes.length
     ? intentCandidates.filter((scheme) => loanPurposes.some((purpose) => matchesLoanPurpose(scheme, purpose)))
@@ -611,13 +848,80 @@ export const recommendSchemes = async (message) => {
   const poolToRank = passingThreshold.length > 0 ? passingThreshold : eligibleSchemes;
 
   // 7. Sort by composite score descending
-  poolToRank.sort((a, b) => b._score - a._score);
+  poolToRank.sort((a, b) => {
+    if (cancerSpecificRequest) {
+      const priority = (scheme) => {
+        const namedText = [scheme.name, ...(scheme.tags || [])].filter(Boolean).join(" ");
+        return /\b(?:cancer|tumou?rs?|oncolog\w*|chemotherap\w*|radiotherap\w*)\b/i.test(namedText) ? 1 : 0;
+      };
+      const priorityDifference = priority(b) - priority(a);
+      if (priorityDifference !== 0) return priorityDifference;
+    }
+    return b._score - a._score;
+  });
 
   // 8. Deduplicate identical schemes
   const deduped = deduplicateSchemes(poolToRank);
 
-  // 9. Take top results (NO DIVERSIFICATION)
-  const topResults = deduped.slice(0, MAX_RESULTS);
+  // 10. Eligibility verification from CACHED rules (no LLM in the request path).
+  //     Missing/stale schemes are enqueued for rate-limited background
+  //     extraction, so the cache warms over time without adding latency or
+  //     tripping the provider token budget. Uncached schemes stay "unknown".
+  const eligibilityCandidates = [...deduped].sort((a, b) => {
+    if (isRerankerActive() && Number.isFinite(a.crossEncoderScore) && Number.isFinite(b.crossEncoderScore)) {
+      return b.crossEncoderScore - a.crossEncoderScore;
+    }
+    return b._score - a._score;
+  });
+  const eligInput = eligibilityCandidates.slice(0, ELIGIBILITY_TOP_N);
+  let verified = eligInput.map((s) => ({ ...s, _eligibilityStatus: "unknown", _eligibilityChecks: [] }));
+  try {
+    const { rules, missing, stats } = await metrics.time("eligibilityCache", () =>
+      getCachedEligibilityRules(eligInput.map((s) => ({ id: s.id, eligibility: s.eligibility })))
+    );
+    metrics.addEligibilityStats({ cacheHits: stats.cacheHits, missing: stats.missing });
+    metrics.count("eligibilityMissing", stats.missing);
+
+    if (missing.length) {
+      const enqueued = enqueueEligibilityExtraction(missing);
+      metrics.count("eligibilityEnqueued", enqueued);
+    }
+
+    verified = eligInput.map((s) => {
+      const v = verifyEligibility(rules.get(s.id) || null, profile);
+      return { ...s, _eligibilityStatus: v.status, _eligibilityChecks: v.checks };
+    });
+  } catch (err) {
+    console.warn("[eligibility] verification stage skipped:", err.message);
+  }
+  metrics.count("verifiedCandidates", verified.length);
+
+  // 11. Final ranking — relevance and eligibility kept SEPARATE. Confirmed
+  //     mismatch is excluded; confirmed match is prioritized; unknown is kept
+  //     but ranked lower (never treated as confirmed eligible).
+  const cancerPriority = (scheme) => {
+    if (!cancerSpecificRequest) return 0;
+    const namedText = [scheme.name, ...(scheme.tags || [])].filter(Boolean).join(" ");
+    return /\b(?:cancer|tumou?rs?|oncolog\w*|chemotherap\w*|radiotherap\w*)\b/i.test(namedText) ? 1 : 0;
+  };
+  const statusRank = (s) =>
+    s._eligibilityStatus === "match" ? 0 : s._eligibilityStatus === "unknown" ? 1 : 2;
+
+  const finalRanked = verified
+    .filter((s) => s._eligibilityStatus !== "no_match")
+    .sort((a, b) => {
+      const cd = cancerPriority(b) - cancerPriority(a);
+      if (cd !== 0) return cd;
+      const sd = statusRank(a) - statusRank(b);
+      if (sd !== 0) return sd;
+      if (isRerankerActive() && Number.isFinite(a.crossEncoderScore) && Number.isFinite(b.crossEncoderScore)) {
+        return b.crossEncoderScore - a.crossEncoderScore;
+      }
+      return b._score - a._score;
+    });
+
+  const resultLimit = asksForMedicalTreatment ? Math.min(MAX_RESULTS, 8) : MAX_RESULTS;
+  const topResults = finalRanked.slice(0, resultLimit);
 
   // 10. Attach full display fields for the top results only, then format
   const displayRows = await prisma.scheme.findMany({
@@ -637,13 +941,20 @@ export const recommendSchemes = async (message) => {
       _hardConflicts,
       _conflictReasons,
       _score,
+      _eligibilityStatus,
+      _eligibilityChecks,
       ...rest
     }) => ({
       ...rest,
       ...displayById.get(rest.id),
       relevanceScore: Math.round(_score * 100),
+      eligibilityStatus: _eligibilityStatus,
+      eligibilityChecks: _eligibilityChecks,
     })
   );
+
+  const summary = metrics.summary();
+  logMetrics(profile.primaryIntent || "query", summary);
 
   return {
     profile: { ...profile },
@@ -651,6 +962,9 @@ export const recommendSchemes = async (message) => {
     meta: {
       total: results.length,
       candidatesEvaluated: candidateSchemes.length,
+      engine: "hybrid",
+      rerankerActive: isRerankerActive(),
+      monitoring: summary,
     },
   };
 };

@@ -1,0 +1,1352 @@
+{
+  "label": "baseline-current-pipeline",
+  "generatedAt": "2026-10-21T07:01:48.435Z",
+  "results": [
+    {
+      "id": "q01",
+      "label": "student scholarship Delhi",
+      "query": "I'm a 22-year-old female student from Delhi looking for scholarships",
+      "ms": 5189,
+      "count": 20,
+      "meta": {
+        "total": 20,
+        "candidatesEvaluated": 5152
+      },
+      "profile": {
+        "searchQuery": "post-matric scholarship, higher education financial assistance, merit-cum-means scholarship, tuition fee reimbursement",
+        "age": 22,
+        "gender": "female",
+        "occupation": "student",
+        "state": "delhi",
+        "income": null,
+        "educationLevel": "higher_education",
+        "casteCategory": "unknown",
+        "primaryIntent": "scholarship"
+      },
+      "schemes": [
+        {
+          "rank": 0,
+          "id": "cmupuiqns03iz135fpzv2o01p",
+          "name": "Delhi Higher & Technical Education Support Scheme",
+          "relevanceScore": 57,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 1,
+          "id": "cmups7wuw000rrhr0wz3rocps",
+          "name": "Pragati Scholarship Scheme For Girl Students (Technical Diploma)",
+          "relevanceScore": 56,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 2,
+          "id": "cmups7wuv000jrhr05e8w1tj8",
+          "name": "Pragati Scholarship Scheme For Girl Students (Technical Degree)",
+          "relevanceScore": 55,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 3,
+          "id": "cmups7wv90046rhr09jy3wrvq",
+          "name": "National Talent Scholarship Undergraduate",
+          "relevanceScore": 53,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 4,
+          "id": "cmups7wvy00agrhr0q7zwlz6z",
+          "name": "Merit Cum Means Linked Financial Assistance Scheme",
+          "relevanceScore": 52,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 5,
+          "id": "cmups7wv90045rhr0ovg0hxrv",
+          "name": "Merit·cum·Means Scholarships For Under Graduate Studies In Various Branches Of Agriculture And Animal Science Subjects",
+          "relevanceScore": 51,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 6,
+          "id": "cmups7wv60037rhr0wc06og3g",
+          "name": "Post Graduate Indira Gandhi Scholarship For Single Girl Child",
+          "relevanceScore": 51,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 7,
+          "id": "cmups7wv20029rhr0b0e1xqoa",
+          "name": "AICTE – Saksham Scholarship Scheme For Specially-Abled Student (Diploma)",
+          "relevanceScore": 50,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 8,
+          "id": "cmups7wv7003prhr0zxwpy0ka",
+          "name": "Post Graduate Merit Scholarship Scheme For University Rank Holders At Under-Graduate Level Applicable",
+          "relevanceScore": 50,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 9,
+          "id": "cmups7wv20028rhr0a3s9rvub",
+          "name": "AICTE – Saksham Scholarship Scheme For Specially-Abled Student (Degree)",
+          "relevanceScore": 49,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 10,
+          "id": "cmups7wv2002crhr0290vtdne",
+          "name": "Pradhan Mantri Uchchatar Shiksha Protsahan (PM-USP) Central Sector Scheme of Scholarship for College and University students",
+          "relevanceScore": 49,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 11,
+          "id": "cmups7wv4002qrhr05mb9vp3s",
+          "name": "CBSE Merit Scholarship Scheme For Single Girl Child",
+          "relevanceScore": 48,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 12,
+          "id": "cmups7wux000yrhr0dsvlfaiq",
+          "name": "Post Matric Scholarship Students With Disabilities",
+          "relevanceScore": 48,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 13,
+          "id": "cmups7wuw000vrhr0t3gpd3bu",
+          "name": "Pre Matric Scholarship For Students With Disabilities",
+          "relevanceScore": 48,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 14,
+          "id": "cmups7wvc004vrhr0s5rtmj3g",
+          "name": "Pre-Matric Scholarship",
+          "relevanceScore": 47,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 15,
+          "id": "cmups7wv2002drhr0q245i2vb",
+          "name": "Financial Support To The Students Of N.E.R For Higher Professional Courses (NEC Merit Scholarship)",
+          "relevanceScore": 47,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 16,
+          "id": "cmups7wv90049rhr0i7kc85bu",
+          "name": "National Talent Scholarship Postgraduate",
+          "relevanceScore": 47,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 17,
+          "id": "cmups7wve005crhr0cc2ytuvm",
+          "name": "Indian Agricultural Research Institute - Scholarship",
+          "relevanceScore": 46,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 18,
+          "id": "cmups7wv4002rrhr0kpsc8u0x",
+          "name": "AICTE-Swanath Scholarship Scheme For Students",
+          "relevanceScore": 46,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 19,
+          "id": "cmupuij5x02gu135f7h5q2zoo",
+          "name": "Pradhan Mantri Uchchatar Shiksha Protsahan Yojana - Special Scholarship Scheme for Jammu & Kashmir and Ladakh",
+          "relevanceScore": 46,
+          "eligibilityStatus": null
+        }
+      ]
+    },
+    {
+      "id": "q02",
+      "label": "farmer crop insurance",
+      "query": "Farmer from Maharashtra needing crop insurance support",
+      "ms": 2323,
+      "count": 20,
+      "meta": {
+        "total": 20,
+        "candidatesEvaluated": 5152
+      },
+      "profile": {
+        "searchQuery": "Pradhan Mantri Fasal Bima Yojana, crop insurance, agricultural risk coverage, compensation for crop damage",
+        "age": null,
+        "gender": "unknown",
+        "occupation": "farmer",
+        "state": "maharashtra",
+        "income": null,
+        "educationLevel": "unknown",
+        "casteCategory": "unknown",
+        "primaryIntent": "farmer"
+      },
+      "schemes": [
+        {
+          "rank": 0,
+          "id": "cmupuiewd01v0135fz7nv9jsk",
+          "name": "National Agriculture Insurance Scheme",
+          "relevanceScore": 52,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 1,
+          "id": "cmups7wv10020rhr00w9n2gbr",
+          "name": "Pradhan Mantri Kisan Samman Nidhi",
+          "relevanceScore": 47,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 2,
+          "id": "cmupui7kx00rd135f3g9x89rr",
+          "name": "Bhausaheb Fundkar Falbag Lagvad Scheme",
+          "relevanceScore": 46,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 3,
+          "id": "cmupui7ky00rp135f5748606j",
+          "name": "Gopinath Munde Shetkari Apghat Suraksha Sanugrah Audhan Yojana",
+          "relevanceScore": 46,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 4,
+          "id": "cmupui4vo0033135fnyk1q7mv",
+          "name": "Pradhan Mantri Krishi Sinchayee Yojana: Per Drop More Crop",
+          "relevanceScore": 46,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 5,
+          "id": "cmupuia3200sx135fi6clpks9",
+          "name": "Nanaji Deshmukh Krishi Sanjivani Prakalp",
+          "relevanceScore": 45,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 6,
+          "id": "cmups7wva004grhr05ur3hg62",
+          "name": "Pradhan Mantri Fasal Bima Yojna (PMFBY)",
+          "relevanceScore": 44,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 7,
+          "id": "cmupui4wi00bu135fgd4o0m8s",
+          "name": "RKVY Soil Health and Fertility - Soil Health Card",
+          "relevanceScore": 44,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 8,
+          "id": "cmupuiof203b1135fzwqvhjp2",
+          "name": "Pradhan Mantri Kisan Maandhan Yojana",
+          "relevanceScore": 44,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 9,
+          "id": "cmups7wvb004rrhr0cqt82k25",
+          "name": "Agricultural Extension",
+          "relevanceScore": 44,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 10,
+          "id": "cmupui4wi00c2135fzlbcufk0",
+          "name": "Paramparagat Krishi Vikas Yojana",
+          "relevanceScore": 44,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 11,
+          "id": "cmupuia2y00rw135fprx2byyx",
+          "name": "Namo Shetkari Mahasanman Nidhi Yojana",
+          "relevanceScore": 44,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 12,
+          "id": "cmups7wuy0017rhr03wdg9lco",
+          "name": "Pradhan Mantri Garib Kalyan Anna Yojana",
+          "relevanceScore": 44,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 13,
+          "id": "cmupuico601is135fx8dfi3ns",
+          "name": "Craftsman Training Scheme - Maharashtra",
+          "relevanceScore": 44,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 14,
+          "id": "cmupui4wk00cn135fgfscst5w",
+          "name": "National Food Security Mission NFSM",
+          "relevanceScore": 42,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 15,
+          "id": "cmupui4wi00bw135ft5863pir",
+          "name": "National Bamboo Mission",
+          "relevanceScore": 42,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 16,
+          "id": "cmupui4wi00bx135f4jq8izzv",
+          "name": "Rainfed Area Development",
+          "relevanceScore": 42,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 17,
+          "id": "cmupui4wj00c3135fqb5jtssk",
+          "name": "Mission on Integrated Development of Horticulture- NHM and HMNEH",
+          "relevanceScore": 42,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 18,
+          "id": "cmupuievp01od135fthzomji7",
+          "name": "Mahila Samridhi Yojana (Maharashtra)",
+          "relevanceScore": 42,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 19,
+          "id": "cmups7wvc004trhr0qkj0d3jh",
+          "name": "Sub-mission On Agriculture Mechanization",
+          "relevanceScore": 41,
+          "eligibilityStatus": null
+        }
+      ]
+    },
+    {
+      "id": "q03",
+      "label": "unemployed skill training",
+      "query": "Unemployed youth from Bihar seeking skill training and stipend",
+      "ms": 2724,
+      "count": 20,
+      "meta": {
+        "total": 20,
+        "candidatesEvaluated": 5152
+      },
+      "profile": {
+        "searchQuery": "skill development training, stipend for skill training, Pradhan Mantri Kaushal Vikas Yojana, National Skill Development Mission, apprenticeship stipend scheme",
+        "age": null,
+        "gender": "unknown",
+        "occupation": "unemployed",
+        "state": "bihar",
+        "income": null,
+        "educationLevel": "unknown",
+        "casteCategory": "unknown",
+        "primaryIntent": "unemployed"
+      },
+      "schemes": [
+        {
+          "rank": 0,
+          "id": "cmupui4vm002i135fn98wp2hb",
+          "name": "Mukhyamantri Nischay Swayam Sahayata Bhatta Yojna",
+          "relevanceScore": 46,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 1,
+          "id": "cmups7wuy001crhr0n5jfsati",
+          "name": "National Apprenticeship Promotion Scheme-2",
+          "relevanceScore": 44,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 2,
+          "id": "cmups7wuz001jrhr0f93fjrlx",
+          "name": "Pradhan Mantri Kaushal Vikas Yojana - Short Term Training",
+          "relevanceScore": 43,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 3,
+          "id": "cmupuih2m0230135f8evwm7v9",
+          "name": "Prime Minister’s Internship Scheme",
+          "relevanceScore": 41,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 4,
+          "id": "cmupuieva01kg135f7anu0mib",
+          "name": "Mukhyamantri Shramshakti Yojana",
+          "relevanceScore": 41,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 5,
+          "id": "cmupuiqnx03kc135fyb1ungo4",
+          "name": "Financial Assistance for Education to the Wards of Beedi/Cine/IOMC/LSDM Workers – Pre & Post-Matric",
+          "relevanceScore": 40,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 6,
+          "id": "cmupuilrw02rh135fzc3rjce9",
+          "name": "Scheme for Economic Empowerment of De-notified, Nomadic and Semi-Nomadic Tribes - \"Educational Empowerment\" Component",
+          "relevanceScore": 40,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 7,
+          "id": "cmupuilsu030s135frpjq545t",
+          "name": "Pradhan Mantri Virasat ka Samvardhan",
+          "relevanceScore": 39,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 8,
+          "id": "cmupui7jp00ey135ft6h8qvmv",
+          "name": "National Scheme of Apprenticeship Training",
+          "relevanceScore": 39,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 9,
+          "id": "cmupuiew801tr135fn27j8qb8",
+          "name": "Satat Jeevikoparjan Yojana (SJY)",
+          "relevanceScore": 39,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 10,
+          "id": "cmupui7jp00f1135f52uotnj6",
+          "name": "National Action Plan for Skill Development of Persons with Disabilities",
+          "relevanceScore": 38,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 11,
+          "id": "cmups7wuu000arhr0ezjro9lb",
+          "name": "Deen Dayal Upadhyay Grameen Kaushalya Yojana",
+          "relevanceScore": 38,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 12,
+          "id": "cmupui4vm002h135fnbrwxtt3",
+          "name": "Bihar Student Credit Card Scheme",
+          "relevanceScore": 38,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 13,
+          "id": "cmupuiqnn03hp135fgte1ada6",
+          "name": "PM SETU (Pradhan Mantri Skilling and Employability Transformation through Upgraded ITIs) – Component II: Capacity Augmentation of Five National Skill Training Institutes (NSTIs) and Setting up of Five National Centres of Excellence for Skilling",
+          "relevanceScore": 38,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 14,
+          "id": "cmups7wux000xrhr01idctnic",
+          "name": "SMILE - Comprehensive Rehabilitation For Welfare Of Transgender Persons – Skill Development And Training",
+          "relevanceScore": 38,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 15,
+          "id": "cmupuiofb03ds135fg8lx0zro",
+          "name": "Scheme for ‘Skill Development in ESDM for Digital India’",
+          "relevanceScore": 37,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 16,
+          "id": "cmupui4wh00bo135fhepeogzn",
+          "name": "PM Vishwakarma",
+          "relevanceScore": 37,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 17,
+          "id": "cmupuiew501t7135fv01e4tia",
+          "name": "Mukhyamantri Ati Pichhada Varg Udyami Yojana",
+          "relevanceScore": 37,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 18,
+          "id": "cmupuiew601tb135f683gbkyi",
+          "name": "Mukhyamantri Alpasankhyak Udyami Yojana",
+          "relevanceScore": 37,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 19,
+          "id": "cmups7wve005brhr0qx0u4hlj",
+          "name": "Students Ready",
+          "relevanceScore": 37,
+          "eligibilityStatus": null
+        }
+      ]
+    },
+    {
+      "id": "q04",
+      "label": "education financial aid",
+      "query": "I am a 22-year-old woman from Delhi looking for financial assistance for education",
+      "ms": 2612,
+      "count": 20,
+      "meta": {
+        "total": 20,
+        "candidatesEvaluated": 5152
+      },
+      "profile": {
+        "searchQuery": "higher education scholarship, merit-cum-means scholarship, tuition fee reimbursement, post-matric scholarship",
+        "age": 22,
+        "gender": "female",
+        "occupation": "unknown",
+        "state": "delhi",
+        "income": null,
+        "educationLevel": "unknown",
+        "casteCategory": "unknown",
+        "primaryIntent": "scholarship"
+      },
+      "schemes": [
+        {
+          "rank": 0,
+          "id": "cmupuiqns03iz135fpzv2o01p",
+          "name": "Delhi Higher & Technical Education Support Scheme",
+          "relevanceScore": 55,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 1,
+          "id": "cmups7wuv000jrhr05e8w1tj8",
+          "name": "Pragati Scholarship Scheme For Girl Students (Technical Degree)",
+          "relevanceScore": 54,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 2,
+          "id": "cmups7wuw000rrhr0wz3rocps",
+          "name": "Pragati Scholarship Scheme For Girl Students (Technical Diploma)",
+          "relevanceScore": 54,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 3,
+          "id": "cmups7wv2002crhr0290vtdne",
+          "name": "Pradhan Mantri Uchchatar Shiksha Protsahan (PM-USP) Central Sector Scheme of Scholarship for College and University students",
+          "relevanceScore": 52,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 4,
+          "id": "cmups7wvy00agrhr0q7zwlz6z",
+          "name": "Merit Cum Means Linked Financial Assistance Scheme",
+          "relevanceScore": 51,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 5,
+          "id": "cmups7wv20029rhr0b0e1xqoa",
+          "name": "AICTE – Saksham Scholarship Scheme For Specially-Abled Student (Diploma)",
+          "relevanceScore": 51,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 6,
+          "id": "cmups7wv20028rhr0a3s9rvub",
+          "name": "AICTE – Saksham Scholarship Scheme For Specially-Abled Student (Degree)",
+          "relevanceScore": 51,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 7,
+          "id": "cmups7wv90046rhr09jy3wrvq",
+          "name": "National Talent Scholarship Undergraduate",
+          "relevanceScore": 50,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 8,
+          "id": "cmups7wv4002qrhr05mb9vp3s",
+          "name": "CBSE Merit Scholarship Scheme For Single Girl Child",
+          "relevanceScore": 49,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 9,
+          "id": "cmups7wvc004vrhr0s5rtmj3g",
+          "name": "Pre-Matric Scholarship",
+          "relevanceScore": 49,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 10,
+          "id": "cmups7wv90045rhr0ovg0hxrv",
+          "name": "Merit·cum·Means Scholarships For Under Graduate Studies In Various Branches Of Agriculture And Animal Science Subjects",
+          "relevanceScore": 49,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 11,
+          "id": "cmups7wuw000vrhr0t3gpd3bu",
+          "name": "Pre Matric Scholarship For Students With Disabilities",
+          "relevanceScore": 49,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 12,
+          "id": "cmups7wv2002arhr0yy37sqra",
+          "name": "“Ishan Uday” Special Scholarship Scheme For North Eastern Region",
+          "relevanceScore": 49,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 13,
+          "id": "cmupuiqnx03kc135fyb1ungo4",
+          "name": "Financial Assistance for Education to the Wards of Beedi/Cine/IOMC/LSDM Workers – Pre & Post-Matric",
+          "relevanceScore": 48,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 14,
+          "id": "cmups7wv60037rhr0wc06og3g",
+          "name": "Post Graduate Indira Gandhi Scholarship For Single Girl Child",
+          "relevanceScore": 48,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 15,
+          "id": "cmups7wux000yrhr0dsvlfaiq",
+          "name": "Post Matric Scholarship Students With Disabilities",
+          "relevanceScore": 47,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 16,
+          "id": "cmups7wv2002drhr0q245i2vb",
+          "name": "Financial Support To The Students Of N.E.R For Higher Professional Courses (NEC Merit Scholarship)",
+          "relevanceScore": 46,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 17,
+          "id": "cmups7wv7003prhr0zxwpy0ka",
+          "name": "Post Graduate Merit Scholarship Scheme For University Rank Holders At Under-Graduate Level Applicable",
+          "relevanceScore": 46,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 18,
+          "id": "cmupuij5x02gu135f7h5q2zoo",
+          "name": "Pradhan Mantri Uchchatar Shiksha Protsahan Yojana - Special Scholarship Scheme for Jammu & Kashmir and Ladakh",
+          "relevanceScore": 46,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 19,
+          "id": "cmups7wv4002rrhr0kpsc8u0x",
+          "name": "AICTE-Swanath Scholarship Scheme For Students",
+          "relevanceScore": 46,
+          "eligibilityStatus": null
+        }
+      ]
+    },
+    {
+      "id": "q05",
+      "label": "widow support Delhi",
+      "query": "Financial assistance for widows in Delhi",
+      "ms": 16414,
+      "count": 4,
+      "meta": {
+        "total": 4,
+        "candidatesEvaluated": 5152
+      },
+      "profile": {
+        "searchQuery": "widow pension scheme, financial assistance for widows, destitute women welfare, social security pension, widow livelihood support",
+        "age": null,
+        "gender": "female",
+        "occupation": "unknown",
+        "state": "delhi",
+        "income": null,
+        "educationLevel": "unknown",
+        "casteCategory": "unknown",
+        "primaryIntent": "widow-support"
+      },
+      "schemes": [
+        {
+          "rank": 0,
+          "id": "cmups7wv7003irhr0gxdeyr6e",
+          "name": "Delhi Pension Scheme To Women In Distress (Widow Pension)",
+          "relevanceScore": 61,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 1,
+          "id": "cmups7wuu000crhr0gl0h3z5m",
+          "name": "Indira Gandhi National Widow Pension Scheme",
+          "relevanceScore": 54,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 2,
+          "id": "cmupuiqnr03is135fzez4vro4",
+          "name": "The Delhi Family Benefit Scheme",
+          "relevanceScore": 47,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 3,
+          "id": "cmups7wuy001brhr09v0vgghl",
+          "name": "National Family Benefit Scheme",
+          "relevanceScore": 38,
+          "eligibilityStatus": null
+        }
+      ]
+    },
+    {
+      "id": "q06",
+      "label": "father cancer loan",
+      "query": "Loan for my father's cancer treatment, family income less than 3 lakh",
+      "ms": 14597,
+      "count": 5,
+      "meta": {
+        "total": 5,
+        "candidatesEvaluated": 5152
+      },
+      "profile": {
+        "searchQuery": "financial assistance for cancer treatment, medical care financial aid, critical illness treatment loan, health welfare scheme, Ayushman Bharat",
+        "age": null,
+        "gender": "male",
+        "occupation": "unknown",
+        "state": "unknown",
+        "income": 300000,
+        "educationLevel": "unknown",
+        "casteCategory": "unknown",
+        "primaryIntent": "treatment"
+      },
+      "schemes": [
+        {
+          "rank": 0,
+          "id": "cmupuicmp018s135fyl9ad2qa",
+          "name": "Financial Assistance for Stage III & IV Cancer Patients",
+          "relevanceScore": 50,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 1,
+          "id": "cmups7wuy001drhr02gpezqug",
+          "name": "Rastriya Arogya Nidhi - Health Minister’s Cancer Patient Fund",
+          "relevanceScore": 43,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 2,
+          "id": "cmupui7kl00no135f27z6cf3z",
+          "name": "Financial Assistance to Old Age Pensioner Suffering From TB/ Cancer",
+          "relevanceScore": 41,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 3,
+          "id": "cmupui4wa009l135ftasq48v0",
+          "name": "Grant Of Financial Assistance For The Funeral Expenses Of Old Age/ Destitute Pensioner",
+          "relevanceScore": 39,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 4,
+          "id": "cmupuiqnz03kw135frwyri7tf",
+          "name": "Mizoram Building and Other Construction Workers Welfare Board (MBOCWWB): Benefits in the Event of Illness and Accidental Injury",
+          "relevanceScore": 27,
+          "eligibilityStatus": null
+        }
+      ]
+    },
+    {
+      "id": "q07",
+      "label": "study abroad girl UP",
+      "query": "Scholarship for study abroad, I am a girl from Uttar Pradesh",
+      "ms": 20523,
+      "count": 20,
+      "meta": {
+        "total": 20,
+        "candidatesEvaluated": 5152
+      },
+      "profile": {
+        "searchQuery": "study abroad scholarship, overseas higher education financial assistance, government funded foreign education scholarship, international scholarship scheme, scholarship for foreign studies",
+        "age": null,
+        "gender": "female",
+        "occupation": "unknown",
+        "state": "uttar pradesh",
+        "income": null,
+        "educationLevel": "unknown",
+        "casteCategory": "unknown",
+        "primaryIntent": "scholarship"
+      },
+      "schemes": [
+        {
+          "rank": 0,
+          "id": "cmups7wv2002brhr0ronzukfp",
+          "name": "National Means-cum-Merit Scholarship Scheme",
+          "relevanceScore": 41,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 1,
+          "id": "cmupui4wo00dl135febsm0nuq",
+          "name": "Prime Minister's Scholarship Scheme for Railway Protection Force",
+          "relevanceScore": 40,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 2,
+          "id": "cmupui7kv00qt135fwlcabxhp",
+          "name": "Prime Minister’s Scholarship Scheme for the Wards of States/UTs Police Personnel",
+          "relevanceScore": 39,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 3,
+          "id": "cmupuils402to135faxftxpnj",
+          "name": "Research Study/Seminar (Grant-in-Aid Scheme)",
+          "relevanceScore": 38,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 4,
+          "id": "cmupuilsr0303135f4w9dcfzb",
+          "name": "Education Loan Scheme of NMDFC",
+          "relevanceScore": 37,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 5,
+          "id": "cmupui7jw00gq135ff9ppjaop",
+          "name": "SERB International Research Experience",
+          "relevanceScore": 36,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 6,
+          "id": "cmupui4w3007h135fv7m0y32c",
+          "name": "Summer Internship Scheme Of DGFT",
+          "relevanceScore": 35,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 7,
+          "id": "cmupuih2u024x135fegtdy9kv",
+          "name": "Pradhan Mantri Vidyalaxmi (PM-Vidyalaxmi) Scheme",
+          "relevanceScore": 35,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 8,
+          "id": "cmups7wv8003qrhr08n4imz4d",
+          "name": "Free Education For Sports Medal Winners / Participants Of National/ International Events",
+          "relevanceScore": 35,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 9,
+          "id": "cmups7wvb004mrhr0ax9vs8pt",
+          "name": "NITI Internship Scheme",
+          "relevanceScore": 35,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 10,
+          "id": "cmups7wva004drhr0cagldplu",
+          "name": "Netaji Subhas - ICAR International Fellowship",
+          "relevanceScore": 35,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 11,
+          "id": "cmupuia3f00w8135f48hn9g4q",
+          "name": "Rashtriya Gram Swaraj Abhiyan - Internship Program",
+          "relevanceScore": 35,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 12,
+          "id": "cmupui7jo00ek135fo4db1dce",
+          "name": "Tagore National Fellowship for Cultural Research",
+          "relevanceScore": 34,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 13,
+          "id": "cmupuiqnw03k5135fy24x3acj",
+          "name": "Global Engagement Scheme: Grant-In-Aid To Indo-Foreign Friendship Cultural Societies",
+          "relevanceScore": 34,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 14,
+          "id": "cmupui7k300il135fctr2z66m",
+          "name": "ASEAN-India Research Training Fellowship ",
+          "relevanceScore": 34,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 15,
+          "id": "cmupui7jw00gp135fpcvf9uct",
+          "name": "Visiting Advanced Joint Research Faculty Scheme",
+          "relevanceScore": 34,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 16,
+          "id": "cmupui7jv00ge135fof7qx949",
+          "name": "Abdul Kalam Technology Innovation National Fellowship",
+          "relevanceScore": 34,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 17,
+          "id": "cmups7wva004frhr052o5x4hf",
+          "name": "ICAR Senior Research Fellowship For Post-Graduate Studies In Agricultural Sciences",
+          "relevanceScore": 34,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 18,
+          "id": "cmups7wv4002wrhr0uhapk458",
+          "name": "AICTE-INAE Travel Grant Scheme For Engineering Students From AICTE Approved Engineering College/Institution",
+          "relevanceScore": 33,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 19,
+          "id": "cmupui7jp00ex135fn9uml2w2",
+          "name": "Short Term Fellowship under the Human Resource Development Programme for Health Research ",
+          "relevanceScore": 33,
+          "eligibilityStatus": null
+        }
+      ]
+    },
+    {
+      "id": "q08",
+      "label": "general cat engineering",
+      "query": "I am a general category engineering student, need tuition fee scholarship",
+      "ms": 19045,
+      "count": 20,
+      "meta": {
+        "total": 20,
+        "candidatesEvaluated": 5152
+      },
+      "profile": {
+        "searchQuery": "higher education scholarship, tuition fee reimbursement, merit-cum-means scholarship, post-matric scholarship, engineering student scholarship",
+        "age": null,
+        "gender": "unknown",
+        "occupation": "student",
+        "state": "unknown",
+        "income": null,
+        "educationLevel": "higher_education",
+        "casteCategory": "general",
+        "primaryIntent": "scholarship"
+      },
+      "schemes": [
+        {
+          "rank": 0,
+          "id": "cmups7wv7003prhr0zxwpy0ka",
+          "name": "Post Graduate Merit Scholarship Scheme For University Rank Holders At Under-Graduate Level Applicable",
+          "relevanceScore": 53,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 1,
+          "id": "cmupui7jz00hb135fq3h7sa31",
+          "name": "Technical Education Scholarship Scheme For Diploma Level",
+          "relevanceScore": 52,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 2,
+          "id": "cmups7wuw000rrhr0wz3rocps",
+          "name": "Pragati Scholarship Scheme For Girl Students (Technical Diploma)",
+          "relevanceScore": 51,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 3,
+          "id": "cmups7ww600c3rhr0xnvnmhna",
+          "name": "Scholarships For Higher Education Abroad To Meritorious Boys And Girls From Open Category",
+          "relevanceScore": 51,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 4,
+          "id": "cmups7wuv000jrhr05e8w1tj8",
+          "name": "Pragati Scholarship Scheme For Girl Students (Technical Degree)",
+          "relevanceScore": 50,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 5,
+          "id": "cmupui7jz00ha135fslujn5bj",
+          "name": "Technical Education Scholarship Scheme For Degree Level",
+          "relevanceScore": 50,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 6,
+          "id": "cmupui7jt00ft135f8ugz4pft",
+          "name": "Safai Karmakar Ke Bachche Hetu Chhatravrtti Yojana",
+          "relevanceScore": 50,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 7,
+          "id": "cmups7wv90046rhr09jy3wrvq",
+          "name": "National Talent Scholarship Undergraduate",
+          "relevanceScore": 49,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 8,
+          "id": "cmupuih2901z7135frszdc0gz",
+          "name": "State Merit Scholarship to Under Graduate Girls Students",
+          "relevanceScore": 49,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 9,
+          "id": "cmupuih30026k135fsuodrccw",
+          "name": "Merit Scholarship: Engineering University",
+          "relevanceScore": 49,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 10,
+          "id": "cmupuij5i02dj135fuv3kah04",
+          "name": "Scholarship to Poor Students",
+          "relevanceScore": 49,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 11,
+          "id": "cmupuils702ui135fj1k5e7lq",
+          "name": "Award of Merit Scholarship for Agricultural Engineering Students (B.Tech 3rd/4th Year)",
+          "relevanceScore": 49,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 12,
+          "id": "cmups7wv90045rhr0ovg0hxrv",
+          "name": "Merit·cum·Means Scholarships For Under Graduate Studies In Various Branches Of Agriculture And Animal Science Subjects",
+          "relevanceScore": 48,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 13,
+          "id": "cmupuih2w025f135f8u4oey2q",
+          "name": "BPL (Below Poverty Line) Student Welfare Scholarship - Technical Education",
+          "relevanceScore": 48,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 14,
+          "id": "cmupuij6l02no135fk9xkzt60",
+          "name": "Scholarship on Merit Basis",
+          "relevanceScore": 48,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 15,
+          "id": "cmupuilsz032c135fid1to4mk",
+          "name": "Need and Merit Scholarship",
+          "relevanceScore": 48,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 16,
+          "id": "cmupuih30026o135fjj287uod",
+          "name": "Scholarship for Chhattisgarh Students Studying Outside the State",
+          "relevanceScore": 48,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 17,
+          "id": "cmups7ww300blrhr04s82k53s",
+          "name": "Border Areas Scholarship",
+          "relevanceScore": 48,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 18,
+          "id": "cmupuih30026m135ffvz6f8pq",
+          "name": "Merit cum Means Scholarship: Engineering University",
+          "relevanceScore": 48,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 19,
+          "id": "cmups7wvz00aqrhr0aktamxo9",
+          "name": "Post Matric Merit Scholarship",
+          "relevanceScore": 47,
+          "eligibilityStatus": null
+        }
+      ]
+    },
+    {
+      "id": "q09",
+      "label": "mother widow pension",
+      "query": "Widow pension for my mother who is 55 years old, from Rajasthan",
+      "ms": 11644,
+      "count": 9,
+      "meta": {
+        "total": 9,
+        "candidatesEvaluated": 5152
+      },
+      "profile": {
+        "searchQuery": "widow pension scheme, financial assistance for widows, destitute women welfare, social security pension, widow pension scheme India",
+        "age": 55,
+        "gender": "female",
+        "occupation": "unknown",
+        "state": "rajasthan",
+        "income": null,
+        "educationLevel": "unknown",
+        "casteCategory": "unknown",
+        "primaryIntent": "widow-support"
+      },
+      "schemes": [
+        {
+          "rank": 0,
+          "id": "cmups7wuu000crhr0gl0h3z5m",
+          "name": "Indira Gandhi National Widow Pension Scheme",
+          "relevanceScore": 58,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 1,
+          "id": "cmupui4w2007d135fupdafmyr",
+          "name": "Widow B.Ed Scheme-Rajasthan",
+          "relevanceScore": 47,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 2,
+          "id": "cmupuia3b00vd135fv76wsmpw",
+          "name": "Indira Gandhi National Vidhva Pension yojana",
+          "relevanceScore": 46,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 3,
+          "id": "cmupuioeb033a135ftb642exg",
+          "name": "Widow/ Abandoned Chief Minister (B. Ed) Sambal Yojana",
+          "relevanceScore": 42,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 4,
+          "id": "cmupuih2w025c135f9a00s8ym",
+          "name": "Samman Bhatta to War Widows and Parents of Martyrs",
+          "relevanceScore": 41,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 5,
+          "id": "cmupuioey039z135fimqrqjzj",
+          "name": "Free Travel Facility for Widows of Freedom Fighters",
+          "relevanceScore": 38,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 6,
+          "id": "cmups7wuy001brhr09v0vgghl",
+          "name": "National Family Benefit Scheme",
+          "relevanceScore": 37,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 7,
+          "id": "cmupuioee0341135fwjbv3o97",
+          "name": "Silicosis Policy – Provision for Sustenance of Family",
+          "relevanceScore": 32,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 8,
+          "id": "cmupuih2i021p135fm5dd08v1",
+          "name": "Mahila Swayamsiddha Yojana Rajasthan",
+          "relevanceScore": 31,
+          "eligibilityStatus": null
+        }
+      ]
+    },
+    {
+      "id": "q10",
+      "label": "woman startup funding",
+      "query": "Startup seed funding for a woman entrepreneur in Karnataka",
+      "ms": 7307,
+      "count": 20,
+      "meta": {
+        "total": 20,
+        "candidatesEvaluated": 5152
+      },
+      "profile": {
+        "searchQuery": "startup seed funding, entrepreneurship financial assistance, women entrepreneur scheme, PMEGP, MUDRA loan",
+        "age": null,
+        "gender": "female",
+        "occupation": "startup",
+        "state": "karnataka",
+        "income": null,
+        "educationLevel": "unknown",
+        "casteCategory": "unknown",
+        "primaryIntent": "startup-funding"
+      },
+      "schemes": [
+        {
+          "rank": 0,
+          "id": "cmupuiqnx03kd135f8cldtl3r",
+          "name": "AgriSURE – Agri Fund for Startups & Rural Enterprises",
+          "relevanceScore": 46,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 1,
+          "id": "cmupuioek035v135flax9ul6u",
+          "name": "Fund of Funds for Startups",
+          "relevanceScore": 43,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 2,
+          "id": "cmupui7k600jj135f1ikb52gc",
+          "name": "Startup India Seed Fund Scheme- For Startups",
+          "relevanceScore": 40,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 3,
+          "id": "cmupuiofb03e1135fsfdtpd1r",
+          "name": "GEN-NEXT Support for Innovative Startups (GENESIS)",
+          "relevanceScore": 39,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 4,
+          "id": "cmupuiqnw03ka135fdbm4szoq",
+          "name": "LEAP Fund – Launching Entrepreneurial Driven Affordable Products",
+          "relevanceScore": 39,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 5,
+          "id": "cmupui7ko00oo135fi7e1tucs",
+          "name": "Technology Development Fund (TDF) Scheme",
+          "relevanceScore": 39,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 6,
+          "id": "cmupui7k600jf135fel13vmlx",
+          "name": "Startup India Seed Fund Scheme- For Incubators",
+          "relevanceScore": 37,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 7,
+          "id": "cmupuiqnx03kf135fu82kby0c",
+          "name": "Innovation & Agri-Entrepreneurship Program (RKVY)",
+          "relevanceScore": 36,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 8,
+          "id": "cmupuiqnt03jd135fmntosv80",
+          "name": "NIDHI – Seed Support Program (SSP)",
+          "relevanceScore": 36,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 9,
+          "id": "cmupui7k200if135f7q6wcpgq",
+          "name": "Innovations for Defence Excellence",
+          "relevanceScore": 35,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 10,
+          "id": "cmupuiqnw03k9135f43kohein",
+          "name": "BIRAC Incubator SEED Fund (SEED)",
+          "relevanceScore": 34,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 11,
+          "id": "cmupui7k900k6135flpvbbyz1",
+          "name": "National Startup Awards",
+          "relevanceScore": 34,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 12,
+          "id": "cmupuiqny03kn135fdt11om3f",
+          "name": "STPI – Next Generation Incubation Scheme (NGIS)",
+          "relevanceScore": 34,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 13,
+          "id": "cmupuiqnl03h5135fwqvhiy1q",
+          "name": "Biotechnology Research Innovation And Entrepreneurship Development (Bio-RIDE)",
+          "relevanceScore": 34,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 14,
+          "id": "cmupuiqnv03jq135f3ervf0gy",
+          "name": "NIDHI – Promoting and Accelerating Young and Aspiring Innovators and Startups (PRAYAS)",
+          "relevanceScore": 34,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 15,
+          "id": "cmupuioej035t135fc18kjhbr",
+          "name": "Credit Guarantee Scheme for Startups",
+          "relevanceScore": 33,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 16,
+          "id": "cmupui7k800k5135fcc4gfsge",
+          "name": "Biotechnology Ignition Grant Scheme",
+          "relevanceScore": 33,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 17,
+          "id": "cmupuih2i021m135f0w0hth3p",
+          "name": "National Livestock Mission: Establishment of Entrepreneurship for Breed Development of Rural Poultry",
+          "relevanceScore": 31,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 18,
+          "id": "cmupuia3000s6135fe9n5k7cw",
+          "name": "Telecom Technology Development Fund",
+          "relevanceScore": 31,
+          "eligibilityStatus": null
+        },
+        {
+          "rank": 19,
+          "id": "cmupuiofi03fr135fez2mnjho",
+          "name": "Pradhan Mantri Skilling and Employability Transformation through Upgraded ITIs (PM‑SETU) : Component I ",
+          "relevanceScore": 29,
+          "eligibilityStatus": null
+        }
+      ]
+    }
+  ]
+}

@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 const applyUrlFor = (scheme) =>
   scheme.applicationLink?.trim()
     ? scheme.applicationLink
@@ -18,7 +20,8 @@ const EligibilityPill = ({ icon, label }) => (
   </span>
 );
 
-const RecommendationCard = ({ scheme, onViewDetails, action }) => {
+const RecommendationCard = ({ scheme, action }) => {
+  const [expanded, setExpanded] = useState(false);
   if (!scheme?.name) return null;
 
   const applyUrl = applyUrlFor(scheme);
@@ -38,14 +41,16 @@ const RecommendationCard = ({ scheme, onViewDetails, action }) => {
 
   return (
     <article
-      className="rcard"
-      onClick={() => onViewDetails?.(scheme)}
+      className={`rcard${expanded ? " is-expanded" : ""}`}
+      onClick={() => setExpanded((value) => !value)}
       role="button"
       tabIndex={0}
+      aria-expanded={expanded}
       onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          onViewDetails?.(scheme);
+          setExpanded((value) => !value);
         }
       }}
     >
@@ -74,6 +79,32 @@ const RecommendationCard = ({ scheme, onViewDetails, action }) => {
       {scheme.description && (
         <p className="rcard__desc">{scheme.description}</p>
       )}
+
+      <div
+        className={`rcard__expand${expanded ? " is-open" : ""}`}
+        aria-hidden={!expanded}
+        inert={!expanded}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="rcard__details">
+          {scheme.eligibility && <section><h4>Eligibility</h4><p>{scheme.eligibility}</p></section>}
+          {scheme.benefits && <section><h4>Benefits</h4><p>{scheme.benefits}</p></section>}
+          {scheme.documentsRequired && <section><h4>Documents required</h4><p>{scheme.documentsRequired}</p></section>}
+          {(scheme.minAge != null || scheme.maxAge != null || scheme.minIncome != null || scheme.maxIncome != null || scheme.allowedStates?.length > 0 || scheme.allowedOccupations?.length > 0) && (
+            <section>
+              <h4>At a glance</h4>
+              <ul>
+                {(scheme.minAge != null || scheme.maxAge != null) && <li>Age: {ageLabel}</li>}
+                {(scheme.minIncome != null || scheme.maxIncome != null) && <li>Income: {scheme.minIncome ? `from ${formatIncome(scheme.minIncome)}` : ""}{scheme.minIncome && scheme.maxIncome ? " · " : ""}{scheme.maxIncome ? `up to ${formatIncome(scheme.maxIncome)}` : ""}</li>}
+                {scheme.allowedStates?.length > 0 && <li>States: {scheme.allowedStates.join(", ")}</li>}
+                {scheme.allowedOccupations?.length > 0 && <li>Occupations: {scheme.allowedOccupations.join(", ")}</li>}
+              </ul>
+            </section>
+          )}
+          {!scheme.eligibility && !scheme.benefits && !scheme.documentsRequired && !scheme.description && <p>More details are available on the official scheme page.</p>}
+          <button type="button" className="rcard__collapse" onClick={() => setExpanded(false)}>Collapse details ↑</button>
+        </div>
+      </div>
 
       {(ageLabel || incomeLabel || scheme.allowedGenders?.length > 0) && (
         <div className="rcard__elig">

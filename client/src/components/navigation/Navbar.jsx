@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../../context/AuthContext";
 
 const NAV_ITEMS = [
@@ -16,6 +16,14 @@ const Wordmark = () => (
 const Navbar = ({ activeTab, onTabChange }) => {
   const { user, logout } = useContext(AuthContext);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(
+    () => localStorage.getItem("scheme-companion-theme") === "dark"
+  );
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = darkMode ? "dark" : "light";
+    localStorage.setItem("scheme-companion-theme", darkMode ? "dark" : "light");
+  }, [darkMode]);
 
   const go = (tab) => {
     onTabChange(tab);
@@ -52,6 +60,17 @@ const Navbar = ({ activeTab, onTabChange }) => {
         </div>
 
         <div className="nav__right">
+          <button
+            type="button"
+            className="theme-toggle"
+            onClick={() => setDarkMode((value) => !value)}
+            aria-label={`Switch to ${darkMode ? "light" : "dark"} mode`}
+            aria-pressed={darkMode}
+            title={`Switch to ${darkMode ? "light" : "dark"} mode`}
+          >
+            <span aria-hidden="true">{darkMode ? "☀" : "☾"}</span>
+            <span className="theme-toggle__label">{darkMode ? "Light" : "Dark"}</span>
+          </button>
           {user?.loggedIn ? (
             <>
               <span className="user-chip">

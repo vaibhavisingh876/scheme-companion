@@ -21,7 +21,7 @@ Scheme Companion allows users to describe their situation in natural language, f
 
 > I am a student from Uttar Pradesh looking for scholarship schemes.
 
-The system extracts relevant information from the user's message, searches the scheme database using semantic similarity, applies eligibility rules, and returns a ranked list of relevant schemes.
+The system extracts relevant information from the user's message, retrieves candidates with semantic and PostgreSQL full-text search, fuses and reranks them, then checks cached eligibility rules against the profile.
 
 The application supports both English and Hinglish queries.
 
@@ -48,37 +48,21 @@ The application supports both English and Hinglish queries.
 The recommendation flow can be summarized as:
 
 ```text
-User Query
-    |
-    v
-Natural Language Profile Extraction
-    |
-    v
-Zod Validation
-    |
-    v
-Query Text Construction
-    |
-    v
-MiniLM Embedding
-    |
-    v
-Candidate Schemes from PostgreSQL
-    |
-    v
-Cosine Similarity
-    |
-    v
-Intent and Eligibility Filtering
-    |
-    v
-Hybrid Relevance Scoring
-    |
-    v
-Deduplication and Ranking
-    |
-    v
-Ranked Recommendations
+User query -> Groq profile extraction -> MiniLM query embedding
+     |                                      |
+     +------ PostgreSQL full-text search ---+
+                        |
+                 RRF candidate fusion
+                        |
+       Local MiniLM cross-encoder reranking
+                        |
+            Intent + hard conflict checks
+                        |
+     Cached eligibility rules (source-hash keyed)
+                        |
+       Deterministic match / no-match / unknown
+                        |
+                Top recommendations
 ```
 
 ## AI Recommendation Pipeline
@@ -113,13 +97,15 @@ The structured profile and original user message are converted into a searchable
 
 This allows the recommendation system to consider both explicit profile information and the user's original intent.
 
-### 3. Semantic Search
+### 3. Hybrid Retrieval and Reranking
 
 Scheme Companion uses the `Xenova/all-MiniLM-L6-v2` embedding model to convert query and scheme text into numerical vectors.
 
-The system calculates cosine similarity between the user's query embedding and scheme embeddings.
+The system calculates cosine similarity between the user's query embedding and stored scheme embeddings. In parallel, PostgreSQL full-text search matches scheme names, eligibility text, descriptions, and benefits. Reciprocal Rank Fusion combines both ranked lists without comparing their raw scores.
 
 This allows semantically related schemes to be discovered even when the user does not use the exact terminology present in the scheme data.
+
+The fused candidate pool is reranked with the local `Xenova/ms-marco-MiniLM-L-6-v2` cross-encoder. It loads on first use and runs through the Transformers.js dependency already used for embeddings. Set `RERANKER_ENABLED=false` to disable it or `RERANKER_MODEL` to select another compatible model. If model loading fails, recommendations fall back to the RRF ranking.
 
 ### 4. Eligibility Filtering
 
@@ -134,7 +120,7 @@ The system therefore applies eligibility rules based on available scheme informa
 * Caste category
 * State
 
-These checks remove schemes that clearly conflict with the profile or with explicit request constraints, including targeted use cases such as overseas study, startup funding, and loan purpose.
+Structured catalogue checks remove clear conflicts. Separately, source-hash keyed rules are extracted from raw eligibility text only when missing or stale, then verified deterministically. The original eligibility text is preserved. A scheme is labeled as matching only when at least one stated rule is confirmed; missing, ambiguous, or non-machine-checkable rules remain unknown and are never presented as confirmed eligibility.
 
 ### 5. Hybrid Scoring
 
@@ -142,9 +128,8 @@ The final recommendation score combines semantic relevance with rule-based relev
 
 ```text
 Final Score =
-    80% Semantic Similarity
-    +
-    20% Rule-Based Relevance
+    Retrieval relevance + rule-based relevance
+    Eligibility status remains a separate signal
 ```
 
 The 20% component reflects rule-based relevance adjustments; eligibility conflicts are handled separately as a hard filter.
@@ -197,9 +182,10 @@ A scheduled synchronization job runs periodically to keep the database updated.
 
 * Groq API
 * `openai/gpt-oss-120b`
-* `Xenova/all-MiniLM-L6-v2`
-* Transformers.js and 384-dimensional embeddings
-* Cosine similarity with an 80:20 semantic-to-rule-based relevance score
+* `Xenova/all-MiniLM-L6-v2` embeddings (384 dimensions)
+* `Xenova/ms-marco-MiniLM-L-6-v2` local cross-encoder reranking
+* PostgreSQL full-text search and Reciprocal Rank Fusion
+* Cosine similarity with separate eligibility verification
 
 ### Authentication
 
@@ -414,6 +400,7 @@ npx prisma generate
 
 ```bash
 npx prisma db push
+npm run setup:hybrid
 ```
 
 ### 7. Start the backend
@@ -457,7 +444,12 @@ npm run dev
 npm start
 npx prisma generate
 npx prisma db push
+npm run setup:hybrid
+npm run eval -- eval/results/current.json
+npm run warm:eligibility -- 100
 ```
+
+`setup:hybrid` creates the separate eligibility cache table if needed and the weighted PostgreSQL GIN full-text index. Run it after applying the Prisma schema and before serving search traffic. Eligibility warming makes Groq extraction calls, so run it deliberately and use a limit when evaluating.
 
 ## Background Synchronization
 

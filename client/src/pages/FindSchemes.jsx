@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect } from "react";
 import { getAIRecommendations, searchSchemes } from "../services/api";
 import ProfileCard from "../components/ProfileCard.jsx";
 import RecommendationCard from "../components/RecommendationCard.jsx";
-import Chakra from "../components/Chakra.jsx";
 
 const PAGE_SIZE = 8;
 
@@ -217,7 +216,6 @@ const FindSchemes = ({
 
   return (
     <div className="view find">
-      <div className="page__chakra" aria-hidden="true"><Chakra /></div>
       <div className="container container--narrow" style={{ maxWidth: 900 }}>
         <header className="find__head">
           <span className="kicker">Discovery</span>
