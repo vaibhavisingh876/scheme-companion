@@ -46,6 +46,8 @@ const connectWithRetry = async (retries = 5, delayMs = 2000) => {
 
 export const syncMyScheme = async () => {
   console.log("⏰ Sync Started...");
+  const startedAt = new Date();
+  let syncJob = null;
 
   try {
     await connectWithRetry();
@@ -54,10 +56,9 @@ export const syncMyScheme = async () => {
     return { success: false, error: err.message };
   }
 
-  await prisma.schemeSource.upsert({
-    where: { id: "myscheme" },
-    update: { lastSyncAt: new Date() },
-    create: { id: "myscheme", name: "MyScheme Portal", sourceUrl: "https://www.myscheme.gov.in", lastSyncAt: new Date() },
+  try {
+  syncJob = await prisma.syncJob.create({
+    data: { source: "myscheme", status: "running", startedAt },
   });
 
   let searchHits = [];
@@ -65,14 +66,27 @@ export const syncMyScheme = async () => {
     searchHits = await fetchAllMySchemes();
   } catch (e) {
     console.error("Fetch failed:", e.message);
+    await prisma.syncJob.update({
+      where: { id: syncJob.id },
+      data: { status: "failed", finishedAt: new Date(), error: { message: e.message } },
+    });
     await prisma.$disconnect();
-    return { success: false };
+    return { success: false, error: e.message };
   }
 
   if (searchHits.length < 1000) {
     console.error(`🚨 Low count: ${searchHits.length}`);
+    await prisma.syncJob.update({
+      where: { id: syncJob.id },
+      data: {
+        status: "failed",
+        finishedAt: new Date(),
+        recordsRead: searchHits.length,
+        error: { message: `Safety check failed: only ${searchHits.length} source records fetched` },
+      },
+    });
     await prisma.$disconnect();
-    return { success: false };
+    return { success: false, error: "Source record count below safety threshold" };
   }
 
   const slugMap = new Map();
@@ -84,6 +98,19 @@ export const syncMyScheme = async () => {
 
   const slugs = Array.from(slugMap.keys());
   console.log(`🔍 ${slugs.length} slugs to enrich`);
+  if (slugs.length < 1000) {
+    await prisma.syncJob.update({
+      where: { id: syncJob.id },
+      data: {
+        status: "failed",
+        finishedAt: new Date(),
+        recordsRead: searchHits.length,
+        error: { message: `Safety check failed: only ${slugs.length} unique scheme slugs fetched` },
+      },
+    });
+    await prisma.$disconnect();
+    return { success: false, error: "Unique source scheme count below safety threshold" };
+  }
 
   // ✅ Fast – pehle wale jaisa concurrency
   const BATCH_SIZE = 8;
@@ -132,6 +159,20 @@ export const syncMyScheme = async () => {
   }
 
   console.log(`📊 Enriched: ${enrichedSchemes.length}`);
+  if (enrichedSchemes.length !== slugs.length) {
+    const message = `Incomplete enrichment (${enrichedSchemes.length}/${slugs.length}); skipped database updates and deactivation`;
+    await prisma.syncJob.update({
+      where: { id: syncJob.id },
+      data: {
+        status: "failed",
+        finishedAt: new Date(),
+        recordsRead: searchHits.length,
+        error: { message },
+      },
+    });
+    await prisma.$disconnect();
+    return { success: false, error: message };
+  }
 
   const existingSchemes = await prisma.scheme.findMany({
     where: { sourceId: "myscheme" },
@@ -195,11 +236,53 @@ export const syncMyScheme = async () => {
     const UPDATE_CONCURRENCY = 3;
     for (let i = 0; i < updateBatch.length; i += UPDATE_CONCURRENCY) {
       const chunk = updateBatch.slice(i, i + UPDATE_CONCURRENCY);
-      await Promise.allSettled(chunk.map(u => prisma.scheme.update({ where: { id: u.id }, data: u.data })));
+      await Promise.all(chunk.map(u => prisma.scheme.update({ where: { id: u.id }, data: u.data })));
     }
   }
 
-  console.log(`🏁 Created: ${createBatch.length} | Updated: ${updateBatch.length}`);
+  // Stamp every seen scheme, including unchanged records. This gives the
+  // deactivation query a complete-sync marker without a huge NOT IN list.
+  await prisma.scheme.updateMany({
+    where: { sourceId: "myscheme", externalId: { in: slugs } },
+    data: { lastSyncedAt: startedAt, isActive: true },
+  });
+  const deactivated = await prisma.scheme.updateMany({
+    where: {
+      sourceId: "myscheme",
+      OR: [{ lastSyncedAt: null }, { lastSyncedAt: { lt: startedAt } }],
+    },
+    data: { isActive: false },
+  });
+
+  await prisma.schemeSource.upsert({
+    where: { id: "myscheme" },
+    update: { lastSyncAt: new Date() },
+    create: { id: "myscheme", name: "MyScheme Portal", sourceUrl: "https://www.myscheme.gov.in", lastSyncAt: new Date() },
+  });
+
+  await prisma.syncJob.update({
+    where: { id: syncJob.id },
+    data: {
+      status: "success",
+      finishedAt: new Date(),
+      recordsRead: searchHits.length,
+      recordsAdded: createBatch.length,
+      recordsUpdated: updateBatch.length,
+    },
+  });
+
+  console.log(`🏁 Created: ${createBatch.length} | Updated: ${updateBatch.length} | Deactivated: ${deactivated.count}`);
   await prisma.$disconnect();
-  return { added: createBatch.length, updated: updateBatch.length };
+  return { success: true, added: createBatch.length, updated: updateBatch.length, deactivated: deactivated.count };
+  } catch (err) {
+    console.error("❌ Sync failed:", err.message);
+    if (syncJob) {
+      await prisma.syncJob.update({
+        where: { id: syncJob.id },
+        data: { status: "failed", finishedAt: new Date(), error: { message: err.message } },
+      }).catch((jobError) => console.error("Could not update SyncJob:", jobError.message));
+    }
+    await prisma.$disconnect();
+    return { success: false, error: err.message };
+  }
 };
