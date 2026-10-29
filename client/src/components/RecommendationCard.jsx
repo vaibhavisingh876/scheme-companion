@@ -76,6 +76,22 @@ const RecommendationCard = ({ scheme, action }) => {
       </div>
 
       <h3 className="rcard__name">{scheme.name}</h3>
+      {scheme.eligibilityStatus && (
+        <div className={`eligibility-status eligibility-status--${scheme.eligibilityStatus}`}>
+          <strong>Eligibility: {scheme.eligibilityStatus.replaceAll("_", " ")}</strong>
+          {scheme.eligibilityChecks?.length > 0 && (
+            <ul>
+              {scheme.eligibilityChecks.map((check, index) => (
+                <li key={`${check.field || "check"}-${index}`}>
+                  {[check.field, check.result, check.reason]
+                    .filter(Boolean)
+                    .join(": ")}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       {scheme.description && (
         <p className="rcard__desc">{scheme.description}</p>
       )}

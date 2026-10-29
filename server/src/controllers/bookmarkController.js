@@ -21,6 +21,14 @@ export const addBookmark = async (req, res) => {
   }
 
   try {
+    const scheme = await prisma.scheme.findUnique({
+      where: { id: schemeId },
+      select: { id: true },
+    });
+    if (!scheme) {
+      return res.status(404).json({ success: false, message: "Scheme not found." });
+    }
+
     // FIX: upsert is atomic - eliminates the race condition from findFirst+create
     await prisma.bookmark.upsert({
       where: {

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon src/index.js",
-    "start": "npx prisma db push --accept-data-loss && node src/index.js",
+    "start": "npx prisma migrate deploy && npm run setup:hybrid && node src/index.js",
     "sync": "node src/ingestion/runSync.js",
     "setup:hybrid": "node src/scripts/setupHybridSchema.js",
     "warm:eligibility": "node src/scripts/warmEligibility.js",

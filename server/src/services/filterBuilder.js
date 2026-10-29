@@ -45,6 +45,23 @@ export const buildSchemeFilters = (profile, options = {}) => {
     },
   ];
 
+  // ── INCOME ─────────────────────────────
+  const income = Number(profile.income);
+  if (profile.income !== null && profile.income !== undefined && profile.income !== "" && Number.isFinite(income) && income >= 0) {
+    conditions.push({
+      OR: [
+        { minIncome: null },
+        { minIncome: { lte: income } },
+      ],
+    });
+    conditions.push({
+      OR: [
+        { maxIncome: null },
+        { maxIncome: { gte: income } },
+      ],
+    });
+  }
+
   // ── STATE ──────────────────────────────
   if (profile.state && profile.state !== "unknown") {
     const userState = normalizeState(profile.state);

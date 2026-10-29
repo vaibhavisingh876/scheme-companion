@@ -2331,6 +2331,16 @@ body:has(.hero) .closing-cta .btn--night:hover:not(:disabled) { background: #fff
   gap: 7px;
   margin-top: 14px;
 }
+.eligibility-status {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.eligibility-status strong { text-transform: capitalize; }
+.eligibility-status ul { margin: 5px 0 0; padding-left: 18px; }
+.eligibility-status li { margin-top: 3px; }
+.eligibility-status--match { color: #4e9a70; }
+.eligibility-status--no_match { color: #c66e60; }
 .epill {
   display: inline-flex;
   align-items: center;

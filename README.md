@@ -167,7 +167,7 @@ A scheduled synchronization job runs periodically to keep the database updated.
 * React
 * Vite
 * Tailwind CSS
-* React Router
+* Hand-rolled query-parameter navigation (`?page=`)
 * Axios
 * Lucide React
 
@@ -399,7 +399,7 @@ npx prisma generate
 ### 6. Apply the database schema
 
 ```bash
-npx prisma db push
+npx prisma migrate deploy
 npm run setup:hybrid
 ```
 
@@ -443,13 +443,13 @@ npm install
 npm run dev
 npm start
 npx prisma generate
-npx prisma db push
+npx prisma migrate deploy
 npm run setup:hybrid
 npm run eval -- eval/results/current.json
 npm run warm:eligibility -- 100
 ```
 
-`setup:hybrid` creates the separate eligibility cache table if needed and the weighted PostgreSQL GIN full-text index. Run it after applying the Prisma schema and before serving search traffic. Eligibility warming makes Groq extraction calls, so run it deliberately and use a limit when evaluating.
+`npm start` applies reviewed Prisma migrations, then runs `setup:hybrid` to create the separate eligibility cache table and weighted PostgreSQL GIN full-text index before starting the server. Eligibility warming makes Groq extraction calls, so run it deliberately and use a limit when evaluating.
 
 ## Background Synchronization
 
