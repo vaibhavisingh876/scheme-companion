@@ -1,3 +1,1 @@
-ALTER TABLE "Scheme"
-DROP COLUMN "embedding",
-DROP COLUMN "searchText";
+https://takeuforward.org/prep-hub/strivers-180-master-dsa-patterns?page=sheet&open=2217%2C2221%2C2236%2C2237%2C2239%2C2242%2C2244%2C2249%2C2247%2C2245%2C2253%2C2254%2C2259

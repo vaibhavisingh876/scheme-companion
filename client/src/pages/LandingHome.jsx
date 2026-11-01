@@ -3,7 +3,7 @@ import { getPaginatedSchemes } from "../services/api";
 
 const SchemeTile = ({ scheme, onViewDetails }) => (
   <article
-    className="scheme"
+    className="scheme reveal"
     onClick={() => onViewDetails?.(scheme)}
     role="button"
     tabIndex={0}

@@ -1,4 +1,4 @@
-import { useEffect, useState, useContext, useCallback } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 
 import Navbar from "./components/navigation/Navbar";
 import LandingHome from "./pages/LandingHome";
@@ -20,52 +20,27 @@ const getPageFromUrl = () => {
 function App() {
   const [activeTab, setActiveTab] = useState(getPageFromUrl);
   const [selectedScheme, setSelectedScheme] = useState(null);
-
   const [searchResults, setSearchResults] = useState([]);
   const [searchProfile, setSearchProfile] = useState(null);
-
   const [previousTab, setPreviousTab] = useState(null);
 
-  const {
-    token,
-    savedSchemesList,
-    fetchUserBookmarks,
-  } = useContext(AuthContext);
+  const { token, savedSchemesList, fetchUserBookmarks } = useContext(AuthContext);
 
   const savedIds = Array.isArray(savedSchemesList)
     ? savedSchemesList.map((scheme) => scheme.id)
     : [];
 
-  /*
-   * ---------------------------------------------------------
-   * BROWSER BACK / FORWARD
-   * ---------------------------------------------------------
-   */
-
   const syncRoute = useCallback(() => {
     const page = getPageFromUrl();
 
     if (page === "auth" && token) {
-      window.history.replaceState(
-        {},
-        "",
-        "?page=landing"
-      );
-
+      window.history.replaceState({}, "", "?page=landing");
       setActiveTab("landing");
       return;
     }
 
-    if (
-      PROTECTED_TABS.includes(page) &&
-      !token
-    ) {
-      window.history.replaceState(
-        {},
-        "",
-        "?page=auth"
-      );
-
+    if (PROTECTED_TABS.includes(page) && !token) {
+      window.history.replaceState({}, "", "?page=auth");
       setActiveTab("auth");
       return;
     }
@@ -75,445 +50,138 @@ function App() {
 
   useEffect(() => {
     syncRoute();
+    window.addEventListener("popstate", syncRoute);
 
-    window.addEventListener(
-      "popstate",
-      syncRoute
-    );
-    
-
-    return () => {
-      window.removeEventListener(
-        "popstate",
-        syncRoute
-      );
-    };
+    return () => window.removeEventListener("popstate", syncRoute);
   }, [syncRoute]);
 
-  /*
-   * ---------------------------------------------------------
-   * ROUTING
-   * ---------------------------------------------------------
-   */
-
   const handleTabChange = useCallback(
-    (tab, options = {}) => {
-      const {
-        replace = false,
-        fromAuth = false,
-      } = options;
-
-      /*
-       * Protected page without authentication
-       */
-      if (
-        PROTECTED_TABS.includes(tab) &&
-        !token
-      ) {
-        setPreviousTab(
-          activeTab === "auth"
-            ? "landing"
-            : activeTab
-        );
-
-        const authUrl =
-          `?page=auth&from=${encodeURIComponent(tab)}`;
+    (tab, { replace = false } = {}) => {
+      if (PROTECTED_TABS.includes(tab) && !token) {
+        const authUrl = "?page=auth";
 
         if (replace) {
-          window.history.replaceState(
-            {},
-            "",
-            authUrl
-          );
+          window.history.replaceState({}, "", authUrl);
         } else {
-          window.history.pushState(
-            {},
-            "",
-            authUrl
-          );
+          window.history.pushState({}, "", authUrl);
         }
 
         setActiveTab("auth");
         return;
       }
 
-      /*
-       * Normal navigation
-       */
-      const url =
-        `?page=${encodeURIComponent(tab)}`;
+      const url = `?page=${encodeURIComponent(tab)}`;
 
       if (replace) {
-        window.history.replaceState(
-          {},
-          "",
-          url
-        );
+        window.history.replaceState({}, "", url);
       } else {
-        window.history.pushState(
-          {},
-          "",
-          url
-        );
+        window.history.pushState({}, "", url);
       }
 
       setActiveTab(tab);
-
-      if (!fromAuth) {
-        window.scrollTo({
-          top: 0,
-          behavior: "smooth",
-        });
-      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
     },
-    [activeTab, token]
+    [token]
   );
 
-  /*
-   * ---------------------------------------------------------
-   * AUTH
-   * ---------------------------------------------------------
-   */
-
   const handleAuthSuccess = () => {
-    const params =
-      new URLSearchParams(
-        window.location.search
-      );
-
-    const from =
-      params.get("from");
-
-    /*
-     * After login, go where user originally
-     * intended to go.
-     */
-
-    if (
-      from &&
-      PROTECTED_TABS.includes(from)
-    ) {
-      handleTabChange(
-        from,
-        {
-          replace: true,
-          fromAuth: true,
-        }
-      );
-      return;
-    }
-
-    handleTabChange(
-      "landing",
-      {
-        replace: true,
-        fromAuth: true,
-      }
-    );
+    handleTabChange("landing", { replace: true });
   };
 
-  const handleAuthBack = () => {
-    /*
-     * If browser has a previous route,
-     * use it naturally.
-     */
-
-    if (
-      previousTab &&
-      previousTab !== "auth"
-    ) {
-      handleTabChange(
-        previousTab,
-        {
-          replace: true,
-        }
-      );
-
-      setPreviousTab(null);
-      return;
-    }
-
-    handleTabChange(
-      "landing",
-      {
-        replace: true,
-      }
-    );
+  const handleViewDetails = (scheme) => {
+    setSelectedScheme(scheme);
+    setPreviousTab(activeTab);
+    handleTabChange("details");
   };
 
-  /*
-   * ---------------------------------------------------------
-   * SCHEME DETAILS
-   * ---------------------------------------------------------
-   */
-
-  const handleViewDetailsTrigger = (
-    schemeObject
-  ) => {
-    setSelectedScheme(
-      schemeObject
-    );
-
-    setPreviousTab(
-      activeTab
-    );
-
-    handleTabChange(
-      "details"
-    );
-  };
-
-  /*
-   * ---------------------------------------------------------
-   * BOOKMARKS
-   * ---------------------------------------------------------
-   */
-
-  const handleSaveScheme = async (
-    scheme
-  ) => {
+  const handleSaveScheme = async (scheme) => {
     if (!token) {
-      setPreviousTab(
-        activeTab
-      );
-
-      handleTabChange(
-        "auth"
-      );
-
+      handleTabChange("auth");
       return;
     }
 
     try {
-      await addBookmark(
-        
-        scheme.id
-      );
-
+      await addBookmark(scheme.id);
       await fetchUserBookmarks();
     } catch (error) {
-      console.error(
-        "Bookmark add failed:",
-        error
-      );
+      console.error("Bookmark add failed:", error);
     }
   };
 
-  const handleRemoveScheme = async (
-    id
-  ) => {
+  const handleRemoveScheme = async (schemeId) => {
     try {
-      await removeBookmark(id);
-
+      await removeBookmark(schemeId);
       await fetchUserBookmarks();
     } catch (error) {
-      console.error(
-        "Bookmark removal failed:",
-        error
-      );
+      console.error("Bookmark removal failed:", error);
     }
   };
-
-  /*
-   * ---------------------------------------------------------
-   * DETAILS BACK
-   * ---------------------------------------------------------
-   */
 
   const handleBackFromDetails = () => {
-    const backTab =
-      previousTab || "landing";
-
+    const tab = previousTab || "landing";
     setPreviousTab(null);
-
-    handleTabChange(
-      backTab
-    );
+    handleTabChange(tab);
   };
 
-  /*
-   * ---------------------------------------------------------
-   * VIEWPORT
-   * ---------------------------------------------------------
-   */
+  const handleResultsUpdate = useCallback((results, profile) => {
+    setSearchResults(results);
+    setSearchProfile(profile);
+  }, []);
 
   const renderViewport = () => {
-    /*
-     * Auth
-     */
-    if (
-      activeTab === "auth" &&
-      !token
-    ) {
-      return (
-        <AuthPage
-          onAuthSuccess={
-            handleAuthSuccess
-          }
-          onBack={
-            handleAuthBack
-          }
-        />
-      );
+    if (activeTab === "auth" && !token) {
+      return <AuthPage onAuthSuccess={handleAuthSuccess} />;
     }
 
-    /*
-     * Auth page while already logged in
-     */
-    if (
-      activeTab === "auth" &&
-      token
-    ) {
-      return (
-        <LandingHome
-          onViewDetails={
-            handleViewDetailsTrigger
-          }
-          onTabChange={
-            handleTabChange
-          }
-        />
-      );
+    if (activeTab === "auth" && token) {
+      return <LandingHome onViewDetails={handleViewDetails} onTabChange={handleTabChange} />;
     }
 
-    /*
-     * Protected route
-     */
-    if (
-      PROTECTED_TABS.includes(
-        activeTab
-      ) &&
-      !token
-    ) {
-      return (
-        <AuthPage
-          onAuthSuccess={
-            handleAuthSuccess
-          }
-          onBack={
-            handleAuthBack
-          }
-        />
-      );
+    if (PROTECTED_TABS.includes(activeTab) && !token) {
+      return <AuthPage onAuthSuccess={handleAuthSuccess} />;
     }
 
     switch (activeTab) {
       case "landing":
-        return (
-          <LandingHome
-            onViewDetails={
-              handleViewDetailsTrigger
-            }
-            onTabChange={
-              handleTabChange
-            }
-          />
-        );
+        return <LandingHome onViewDetails={handleViewDetails} onTabChange={handleTabChange} />;
 
       case "search":
         return (
           <FindSchemes
-            onSaveScheme={
-              handleSaveScheme
-            }
-            savedIds={
-              savedIds
-            }
-            onViewDetails={
-              handleViewDetailsTrigger
-            }
-            initialResults={
-              searchResults
-            }
-            initialProfile={
-              searchProfile
-            }
-            onResultsUpdate={(
-              results,
-              profile
-            ) => {
-              setSearchResults(
-                results
-              );
-
-              setSearchProfile(
-                profile
-              );
-            }}
+            onSaveScheme={handleSaveScheme}
+            savedIds={savedIds}
+            onViewDetails={handleViewDetails}
+            initialResults={searchResults}
+            initialProfile={searchProfile}
+            onResultsUpdate={handleResultsUpdate}
           />
         );
 
       case "saved":
         return (
           <SavedSchemes
-            savedList={
-              savedSchemesList
-            }
-            onRemoveScheme={
-              handleRemoveScheme
-            }
-            onViewDetails={
-              handleViewDetailsTrigger
-            }
-            onTabChange={
-              handleTabChange
-            }
+            savedList={savedSchemesList}
+            onRemoveScheme={handleRemoveScheme}
+            onViewDetails={handleViewDetails}
+            onTabChange={handleTabChange}
           />
         );
 
       case "details":
-        return (
-          <SchemeDetailsView
-            scheme={
-              selectedScheme
-            }
-            onBackNavigate={
-              handleBackFromDetails
-            }
-          />
-        );
+        return <SchemeDetailsView scheme={selectedScheme} onBackNavigate={handleBackFromDetails} />;
 
       default:
-        return (
-          <LandingHome
-            onViewDetails={
-              handleViewDetailsTrigger
-            }
-            onTabChange={
-              handleTabChange
-            }
-          />
-        );
+        return <LandingHome onViewDetails={handleViewDetails} onTabChange={handleTabChange} />;
     }
   };
 
-  const isAuthPage =
-    activeTab === "auth" &&
-    !token;
+  const isAuthPage = activeTab === "auth" && !token;
 
   return (
-    <div
-      className="min-h-screen flex flex-col app-shell"
-    >
+    <div className="min-h-screen flex flex-col app-shell">
+      {!isAuthPage && <Navbar activeTab={activeTab} onTabChange={handleTabChange} />}
 
-      {!isAuthPage && (
-        <Navbar
-          activeTab={
-            activeTab
-          }
-          onTabChange={
-            handleTabChange
-          }
-        />
-      )}
-
-      <main
-        className={
-          isAuthPage
-            ? "flex-1"
-            : "flex-1"
-        }
-      >
+      <main className="flex-1">
         {renderViewport()}
 
         {!isAuthPage && (
@@ -528,19 +196,12 @@ function App() {
                     Scheme<b>Companion</b>
                   </span>
                 </div>
-
-                <p className="foot__tag">
-                  Discover government benefits that are meant for you.
-                </p>
+                <p className="foot__tag">Discover government benefits that are meant for you.</p>
               </div>
 
               <p className="foot__src">
                 Data sourced from{" "}
-                <a
-                  href="https://www.myscheme.gov.in"
-                  target="_blank"
-                  rel="noreferrer"
-                >
+                <a href="https://www.myscheme.gov.in" target="_blank" rel="noreferrer">
                   MyScheme.gov.in
                 </a>
               </p>
