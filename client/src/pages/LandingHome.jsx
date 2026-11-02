@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getPaginatedSchemes } from "../services/api";
 
 const SchemeTile = ({ scheme, onViewDetails }) => (
@@ -34,16 +34,26 @@ const LandingHome = ({ onViewDetails, onTabChange }) => {
   const [schemes, setSchemes] = useState([]);
   const [total, setTotal] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+
+  const loadFeaturedSchemes = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const data = await getPaginatedSchemes(1, 6);
+      if (data?.schemes) setSchemes(data.schemes);
+      if (typeof data?.meta?.total === "number") setTotal(data.meta.total);
+    } catch (err) {
+      console.error("Backend connection failure:", err);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    getPaginatedSchemes(1, 6)
-      .then((data) => {
-        if (data?.schemes) setSchemes(data.schemes);
-        if (typeof data?.meta?.total === "number") setTotal(data.meta.total);
-      })
-      .catch((err) => console.error("Backend connection failure:", err))
-      .finally(() => setLoading(false));
-  }, []);
+    loadFeaturedSchemes();
+  }, [loadFeaturedSchemes]);
 
   useEffect(() => {
     const els = document.querySelectorAll(".reveal:not(.is-in)");
@@ -146,7 +156,9 @@ const LandingHome = ({ onViewDetails, onTabChange }) => {
 
           {!loading && schemes.length === 0 && (
             <p className="hero__scheme-empty">
-              Schemes couldn't be loaded right now. Please check your connection and try again.
+              {loadError
+                ? <>Schemes couldn't be loaded right now. <button type="button" className="tlink" onClick={loadFeaturedSchemes}>Try again</button></>
+                : "No schemes are available right now."}
             </p>
           )}
         </div>

@@ -6,8 +6,7 @@ import {
   buildDescriptionEmbeddingText,
   buildEligibilityEmbeddingText,
 } from "../../services/ai/embeddingService.js";
-
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+import { delay } from "../../utils/helpers.js";
 
 // schemeCategory entries arrive as { label, value } objects; the DB column is String.
 const toLabel = (v) => (v && typeof v === "object" ? v.label || v.name || "" : v);

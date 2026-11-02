@@ -1,5 +1,6 @@
 import prisma from "../config/prisma.js";
 import { buildSchemeFilters } from "../services/filterBuilder.js";
+import { candidateCache } from "../utils/cache.js";
 
 const SCHEME_LIST_SELECT = {
   id: true,
@@ -36,11 +37,31 @@ const SCHEME_LIST_SELECT = {
  * GET /api/schemes — paginated list of all active schemes
  */
 export const getAllSchemes = async (req, res) => {
-  try {
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.max(1, Math.min(parseInt(req.query.limit, 10) || 50, 100));
-    const skip = (page - 1) * limit;
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.max(1, Math.min(parseInt(req.query.limit, 10) || 50, 100));
+  const skip = (page - 1) * limit;
 
+  const cachedSchemes = candidateCache.get("active");
+  if (cachedSchemes?.length) {
+    const newestFirst = [...cachedSchemes].sort(
+      (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+    );
+    const schemes = newestFirst.slice(skip, skip + limit);
+    return res.status(200).json({
+      success: true,
+      schemes,
+      count: schemes.length,
+      meta: {
+        total: newestFirst.length,
+        page,
+        limit,
+        totalPages: Math.ceil(newestFirst.length / limit),
+        cached: true,
+      },
+    });
+  }
+
+  try {
     const [schemes, total] = await prisma.$transaction([
       prisma.scheme.findMany({
         where: { isActive: true },

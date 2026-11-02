@@ -1,4 +1,5 @@
-import { getExtractor } from "../../embeddingModel.js";
+import { getExtractor } from "../embeddingModel.js";
+import { cosineSimilarity, normalizeState } from "../../../utils/helpers.js";
 import prisma from "../../../config/prisma.js";
 import { scoreScheme } from "../scoringEngine.js";
 import { embeddingCache, candidateCache } from "../../../utils/cache.js";
@@ -8,7 +9,12 @@ import { keywordSearch } from "./keywordSearch.js";
 import { reciprocalRankFusion } from "./rrf.js";
 import { rerank, isRerankerActive } from "./reranker.js";
 import { getCachedEligibilityRules, enqueueEligibilityExtraction } from "./eligibilityService.js";
-import { verifyEligibility } from "./verification.js";
+import { verifyEligibility, columnsToRules, checkRules } from "./verification.js";
+import {
+  checkTextGenderHeuristics,
+  checkTextReservedCasteHeuristics,
+  checkTextTargetGroupHeuristics,
+} from "./eligibilityHeuristics.js";
 import { createMetrics, logMetrics } from "./metrics.js";
 
 const MAX_RESULTS = 20;
@@ -30,6 +36,7 @@ const CANDIDATE_SELECT = {
   benefits: true,
   eligibility: true,
   category: true,
+  ministry: true,
   state: true,
   tags: true,
   externalId: true,
@@ -47,8 +54,13 @@ const CANDIDATE_SELECT = {
   maxAge: true,
   isFemaleOnly: true,
   isScholarship: true,
+  schemeFor: true,
+  applicationLink: true,
+  sourceUrl: true,
   descriptionEmbedding: true,
   eligibilityEmbedding: true,
+  documentsRequired: true,
+  createdAt: true,
 };
 
 const DISPLAY_SELECT = {
@@ -81,8 +93,10 @@ const DISPLAY_SELECT = {
   tags: true,
 };
 
-const CANDIDATE_PAGE = 300;
+// Keep batches small enough for Supabase's session pooler to stream reliably.
+const CANDIDATE_PAGE = 500;
 let candidatesLoadPromise = null;
+let candidateWarmRetryTimer = null;
 
 const loadCandidates = async () => {
   // Read the current catalogue from PostgreSQL. A persistent JSON snapshot can
@@ -93,7 +107,7 @@ const loadCandidates = async () => {
   for (;;) {
     let page = null;
     let attempts = 0;
-    while (attempts < 3) {
+    while (attempts < 5) {
       try {
         attempts++;
         page = await prisma.scheme.findMany({
@@ -105,8 +119,12 @@ const loadCandidates = async () => {
         });
         break;
       } catch (err) {
-        if (attempts >= 3) throw err;
-        await new Promise((r) => setTimeout(r, 1000 * attempts));
+        if (attempts >= 5) throw err;
+        const delayMs = Math.min(1000 * 2 ** (attempts - 1), 10000);
+        console.warn(
+          `[candidateCache] database connection dropped while loading page ${skip / CANDIDATE_PAGE + 1}; retrying in ${delayMs}ms (${attempts}/5): ${err.message}`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
 
@@ -142,6 +160,13 @@ export const warmCandidateCache = async () => {
     console.log(` Candidate cache warmed (${rows.length} schemes).`);
   } catch (err) {
     console.error("❌ Candidate cache warm failed:", err.message);
+    if (!candidateWarmRetryTimer) {
+      candidateWarmRetryTimer = setTimeout(() => {
+        candidateWarmRetryTimer = null;
+        void warmCandidateCache();
+      }, 30000);
+      candidateWarmRetryTimer.unref?.();
+    }
   }
   // Warm the Prisma connection + full-text path.
   try {
@@ -155,19 +180,7 @@ export const invalidateCandidateCache = () => {
   candidateCache.del("active");
 };
 
-const cosineSimilarity = (a, b) => {
-  if (!a || !b || !a.length || !b.length || a.length !== b.length) return 0;
-  let dot = 0;
-  let normA = 0;
-  let normB = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-  const denom = Math.sqrt(normA) * Math.sqrt(normB);
-  return denom === 0 ? 0 : dot / denom;
-};
+
 
 const getQueryEmbedding = async (queryText) => {
   const cached = embeddingCache.get(queryText);
@@ -213,191 +226,41 @@ export const checkHardEligibility = (scheme, profile, rawMessage = "") => {
     .join(" ")
     .toLowerCase();
 
-  // 1. AGE CONFLICT
-  if (profile.age !== null && profile.age !== undefined) {
-    if (
-      scheme.minAge !== null &&
-      scheme.minAge !== undefined &&
-      profile.age < scheme.minAge
-    ) {
-      conflicts.push("age_below_minimum");
-    }
-    if (
-      scheme.maxAge !== null &&
-      scheme.maxAge !== undefined &&
-      profile.age > scheme.maxAge
-    ) {
-      conflicts.push("age_above_maximum");
-    }
-  }
-
-  // 2. INCOME CONFLICT
-  if (profile.income !== null && profile.income !== undefined) {
-    if (
-      scheme.maxIncome !== null &&
-      scheme.maxIncome !== undefined &&
-      profile.income > scheme.maxIncome
-    ) {
-      conflicts.push("income_above_maximum");
-    }
-    if (
-      scheme.minIncome !== null &&
-      scheme.minIncome !== undefined &&
-      profile.income < scheme.minIncome
-    ) {
-      conflicts.push("income_below_minimum");
-    }
-  }
-
-  // 3. GENDER CONFLICT
-  if (profile.gender && profile.gender !== "unknown") {
-    const userGender = profile.gender.toLowerCase().trim();
-    const allowedGenders = (scheme.allowedGenders || []).map((g) =>
-      String(g).toLowerCase().trim()
-    );
-
-    if (userGender === "male") {
-      if (
-        scheme.isFemaleOnly ||
-        (allowedGenders.length > 0 &&
-          !allowedGenders.includes("all") &&
-          allowedGenders.includes("female") &&
-          !allowedGenders.includes("male"))
-      ) {
-        conflicts.push("female_only_scheme");
-      }
-
-      // Many imported schemes do not have structured gender filters. Catch
-      // unambiguous women/widow/maternity-only schemes from their source text.
-      if (
-        /\b(?:widow|widows|maternity|pregnan(?:t|cy)|girl child|women in distress)\b/.test(schemeText) ||
-        /\b(?:only|exclusively|solely)\s+(?:for\s+)?(?:women|woman|female|girls?)\b/.test(schemeText) ||
-        /\b(?:women|woman|female)\s+(?:entrepreneurs?|applicants?|beneficiaries|students?|founders?)\b/.test(schemeText)
-      ) {
-        conflicts.push("female_targeted_scheme");
-      }
-    } else if (userGender === "female") {
-      if (
-        allowedGenders.length > 0 &&
-        !allowedGenders.includes("all") &&
-        allowedGenders.includes("male") &&
-        !allowedGenders.includes("female")
-      ) {
-        conflicts.push("male_only_scheme");
-      }
-    }
-  }
-
-  // Explicit SC/ST-only programmes should not be recommended to a general
-  // category applicant, even when the source omitted structured category data.
-  if (profile.casteCategory === "general") {
-    const titleAndTags = [scheme.name, ...(scheme.tags || [])]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
-    const reservedOnlyPattern =
-      /\b(?:sc(?:\s*(?:&|and|\/)\s*st)?|st|scheduled caste(?:s)?|scheduled tribes?|obcs?|ebcs?|bcs?|backward classes?|minorities)\b/;
-
-    if (reservedOnlyPattern.test(titleAndTags)) {
-      conflicts.push("reserved_category_only");
-    }
-  }
-
-  // Do not surface schemes reserved for a specific community when the
-  // applicant's profile does not establish that they belong to it.
   const titleAndTags = [scheme.name, ...(scheme.tags || [])]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
-  const userCategory = (profile.casteCategory || "unknown").toLowerCase();
-  const explicitReservedTarget =
-    /\b(?:scheduled castes?|sc students?|\bsc\b|scheduled tribes?|st students?|\bst\b|obc students?|\bobc\b|ebc students?|\bebc\b|backward classes?|minority students?)\b/.exec(titleAndTags);
-  if (explicitReservedTarget) {
-    const label = explicitReservedTarget[0];
-    const target = /scheduled caste|\bsc\b/.test(label)
-      ? "sc"
-      : /scheduled tribe|\bst\b/.test(label)
-      ? "st"
-      : /\bobc\b|backward class/.test(label)
-      ? "obc"
-      : /\bebc\b/.test(label)
-      ? "ebc"
-      : "minority";
-    if (userCategory !== target) conflicts.push("reserved_category_only");
-  }
 
-  // Exclude occupation- or service-specific loans when the request does not
-  // identify the applicant as belonging to that group.
-  const targetRules = [
-    { pattern: /\b(?:safai karamchari|sanitation worker|scavenger)\b/i, allowed: /\b(?:safai karamchari|sanitation worker|scavenger)\b/i.test(rawMessage) },
-    { pattern: /\b(?:unorganised|unorganized)\s+(?:sector\s+)?workers?|\bcrafts(?:wo)?men\b/i, allowed: profile.occupation === "worker" || /\b(?:unorganised|unorganized)\s+(?:sector\s+)?workers?|\bcrafts(?:wo)?men\b/i.test(rawMessage) },
-    { pattern: /\b(?:construction worker|building worker|registered construction labourer)\b/i, allowed: /\b(?:construction worker|building worker|labou?rer|mazdoor)\b/i.test(rawMessage) },
-    { pattern: /\b(?:ex[- ]servicemen|ex[- ]serviceman|veteran)\b/i, allowed: /\b(?:ex[- ]servicemen|ex[- ]serviceman|veteran|army|navy|air force)\b/i.test(rawMessage) },
-    { pattern: /\b(?:central armed police|police force personnel|paramilitary personnel)\b/i, allowed: /\b(?:central armed police|police force|paramilitary)\b/i.test(rawMessage) },
-    { pattern: /\b(?:farmer|agricultural worker|cultivator)\b/i, allowed: profile.occupation === "farmer" || /\b(?:farmer|farming|agriculture)\b/i.test(rawMessage) },
-    { pattern: /\b(?:teachers?|lecturers?)\b/i, allowed: /\b(?:teachers?|lecturers?)\b/i.test(rawMessage) },
-  ];
-  if (targetRules.some(({ pattern, allowed }) => pattern.test(titleAndTags) && !allowed)) {
-    conflicts.push("target_group_mismatch");
-  }
-
-  // 4. CASTE / CATEGORY CONFLICT
-  if (profile.casteCategory && profile.casteCategory !== "unknown") {
-    const userCategory = profile.casteCategory.toLowerCase().trim();
-    const allowedCats = (scheme.allowedCategories || []).map((c) =>
-      String(c).toLowerCase().trim()
-    );
-
-    if (allowedCats.length > 0 && !allowedCats.includes("all")) {
-      if (userCategory === "general") {
-        if (
-          allowedCats.some((c) => ["sc", "st", "obc", "minority"].includes(c)) &&
-          !allowedCats.includes("general")
-        ) {
-          conflicts.push("reserved_category_only");
-        }
-      } else {
-        if (
-          !allowedCats.includes(userCategory) &&
-          !allowedCats.includes("general")
-        ) {
-          conflicts.push("category_mismatch");
+  // 1. Structured Column Checks via unified checkRules adapter
+  const rules = columnsToRules(scheme);
+  if (rules) {
+    const verified = checkRules(rules, profile);
+    for (const c of verified.checks) {
+      if (c.result === "no_match") {
+        if (c.field === "age") {
+          conflicts.push(profile.age < (rules.age?.min ?? 0) ? "age_below_minimum" : "age_above_maximum");
+        } else if (c.field === "income") {
+          conflicts.push(profile.income > (rules.maxAnnualIncome ?? Infinity) ? "income_above_maximum" : "income_below_minimum");
+        } else if (c.field === "gender") {
+          conflicts.push(profile.gender === "male" ? "female_only_scheme" : "male_only_scheme");
+        } else if (c.field === "state") {
+          conflicts.push("state_mismatch");
+        } else if (c.field === "casteCategory") {
+          conflicts.push(profile.casteCategory === "general" ? "reserved_category_only" : "category_mismatch");
         }
       }
     }
   }
 
-  // 5. STATE CONFLICT
-  if (profile.state && profile.state !== "unknown") {
-    const userState = profile.state
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, "")
-      .trim();
-    const allowedStates = (scheme.allowedStates || []).map((s) =>
-      String(s)
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, "")
-        .trim()
-    );
-    // Many catalogue rows have a single scheme.state but no allowedStates
-    // array. Use that state for regional filtering instead of treating them as
-    // location-neutral. Explicit "all India" values remain unrestricted.
-    const applicableStates = allowedStates.length
-      ? allowedStates
-      : scheme.state
-      ? [String(scheme.state).toLowerCase().replace(/[^a-z0-9]/g, "").trim()]
-      : [];
-
-    if (
-      applicableStates.length > 0 &&
-      !applicableStates.includes("all") &&
-      !applicableStates.includes("allindia")
-    ) {
-      if (!applicableStates.includes(userState)) {
-        conflicts.push("state_mismatch");
-      }
-    }
+  // 2. Female-only flag check
+  if (profile.gender === "male" && scheme.isFemaleOnly && !conflicts.includes("female_only_scheme")) {
+    conflicts.push("female_only_scheme");
   }
+
+  // 3. Unstructured text heuristics
+  conflicts.push(...checkTextGenderHeuristics(schemeText, profile.gender));
+  conflicts.push(...checkTextReservedCasteHeuristics(titleAndTags, profile.casteCategory || "unknown"));
+  conflicts.push(...checkTextTargetGroupHeuristics(titleAndTags, rawMessage, profile));
 
   return {
     isEligible: conflicts.length === 0,
@@ -924,10 +787,18 @@ export const recommendSchemes = async (message) => {
   const topResults = finalRanked.slice(0, resultLimit);
 
   // 10. Attach full display fields for the top results only, then format
-  const displayRows = await prisma.scheme.findMany({
-    where: { id: { in: topResults.map((s) => s.id) } },
-    select: DISPLAY_SELECT,
-  });
+  let displayRows;
+  try {
+    displayRows = await prisma.scheme.findMany({
+      where: { id: { in: topResults.map((s) => s.id) } },
+      select: DISPLAY_SELECT,
+    });
+  } catch (err) {
+    // Candidate rows already contain enough fields to return useful results.
+    // Keep recommendations available if Supabase drops after the cache warmed.
+    console.warn("[recommendations] display lookup failed; using cached candidate data:", err.message);
+    displayRows = topResults;
+  }
   const displayById = new Map(displayRows.map((row) => [row.id, row]));
 
   const results = topResults.map(

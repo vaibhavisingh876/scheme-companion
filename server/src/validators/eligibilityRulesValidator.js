@@ -102,15 +102,7 @@ export const eligibilityRulesSchema = z.object({
   }
 });
 
-// Batch response from the extractor: results aligned to inputs by index.
-export const eligibilityBatchSchema = z.object({
-  results: z.array(
-    z.object({
-      index: z.number().int(),
-      rules: eligibilityRulesSchema,
-    })
-  ),
-});
+
 
 // ── Normalization ───────────────────────────────────────────────────────
 // LLMs frequently emit near-miss field names (age_min, max_family_income,

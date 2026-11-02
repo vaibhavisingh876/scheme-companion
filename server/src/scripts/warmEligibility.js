@@ -8,12 +8,11 @@ import dotenv from "dotenv";
 dotenv.config();
 import prisma from "../config/prisma.js";
 import { extractAndStore, sourceHashOf } from "../services/ai/recommendation/eligibilityService.js";
+import { normalizeText } from "../utils/helpers.js";
 
 const MAX_SCHEMES = Number(process.argv[2] || Infinity);
 const PAGE = 500;
 const CHUNK = 40; // extractAndStore hard-caps at 40 per invocation
-
-const normalizeText = (t) => String(t || "").replace(/\s+/g, " ").trim();
 
 async function main() {
   let skip = 0;

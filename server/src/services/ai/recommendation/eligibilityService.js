@@ -2,6 +2,7 @@ import crypto from "crypto";
 import Groq from "groq-sdk";
 import prisma from "../../../config/prisma.js";
 import { eligibilityRulesSchema, normalizeRules } from "../../../validators/eligibilityRulesValidator.js";
+import { sleep, normalizeText } from "../../../utils/helpers.js";
 
 const MODEL = "openai/gpt-oss-120b";
 const MODEL_VERSION = `groq:${MODEL}`;
@@ -19,10 +20,6 @@ const MIN_CALL_INTERVAL_MS = Number(process.env.ELIGIBILITY_MIN_INTERVAL_MS || 2
 const MAX_429_RETRIES = 3;
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-const normalizeText = (text) => String(text || "").replace(/\s+/g, " ").trim();
 
 export const sourceHashOf = (eligibilityText) =>
   crypto.createHash("sha256").update(normalizeText(eligibilityText)).digest("hex").slice(0, 32);
@@ -320,5 +317,3 @@ export const enqueueEligibilityExtraction = (schemes) => {
   }
   return added;
 };
-
-export const eligibilityQueueSize = () => pending.size;

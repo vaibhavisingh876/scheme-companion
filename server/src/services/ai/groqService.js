@@ -152,57 +152,8 @@ export const extractUserProfile = async (message, metrics = {}) => {
 
     const parsed = JSON.parse(rawContent);
 
-    for (const field of [
-      "gender",
-      "occupation",
-      "casteCategory",
-      "educationLevel",
-      "primaryIntent",
-      "state",
-    ]) {
-      if (typeof parsed[field] === "string") {
-        parsed[field] = parsed[field]
-          .toLowerCase()
-          .trim();
-      } else {
-        parsed[field] = "unknown";
-      }
-    }
-
-    if (parsed.state === "unknown") {
+    if (!parsed.state || parsed.state === "unknown") {
       parsed.state = findExplicitState(message) || "unknown";
-    }
-
-    parsed.searchQuery =
-      typeof parsed.searchQuery === "string"
-        ? parsed.searchQuery.trim().slice(0, 1200)
-        : "";
-
-    parsed.age =
-      parsed.age != null
-        ? Number(parsed.age)
-        : null;
-
-    if (
-      parsed.age !== null &&
-      (Number.isNaN(parsed.age) ||
-        parsed.age < 0 ||
-        parsed.age > 120)
-    ) {
-      parsed.age = null;
-    }
-
-    parsed.income =
-      parsed.income != null
-        ? Number(parsed.income)
-        : null;
-
-    if (
-      parsed.income !== null &&
-      (Number.isNaN(parsed.income) ||
-        parsed.income < 0)
-    ) {
-      parsed.income = null;
     }
 
     const result = profileSchema.parse(parsed);

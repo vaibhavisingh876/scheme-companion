@@ -4,6 +4,7 @@ dotenv.config();
 
 import express from "express";
 import cors from "cors";
+import prisma from "./config/prisma.js";
 
 import { startMySchemeCron } from "./ingestion/jobs/myschemeCron.js";
 import { warmCandidateCache } from "./services/ai/recommendation/recommendationService.js";
@@ -145,7 +146,44 @@ if (process.env.ENABLE_CRON === "true") {
 // ─── Start Server ───────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 
+// Supabase may retire idle pooled connections. Probe periodically and ask
+// Prisma to reconnect after a dropped connection so the API can recover.
+const startDatabaseKeepalive = () => {
+  let checking = false;
+  let databaseAvailable = true;
+
+  const checkConnection = async () => {
+    if (checking) return;
+    checking = true;
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      if (!databaseAvailable) console.log("✅ Database connection restored");
+      databaseAvailable = true;
+    } catch (error) {
+      if (databaseAvailable) {
+        console.warn("⚠️ Database connection dropped; attempting reconnect:", error.message);
+      }
+      databaseAvailable = false;
+
+      try {
+        await prisma.$connect();
+        await prisma.$queryRaw`SELECT 1`;
+        databaseAvailable = true;
+        console.log("✅ Database connection restored");
+      } catch (reconnectError) {
+        console.warn("⚠️ Database reconnect failed; will retry:", reconnectError.message);
+      }
+    } finally {
+      checking = false;
+    }
+  };
+
+  const timer = setInterval(checkConnection, 30000);
+  timer.unref();
+};
+
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
+  startDatabaseKeepalive();
   warmCandidateCache();
 });

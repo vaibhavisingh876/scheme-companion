@@ -1,3 +1,9 @@
+import {
+  normalizeState,
+  HIGHER_EDUCATION_LEVELS,
+  SCHOOL_EDUCATION_LEVELS,
+} from "../utils/helpers.js";
+
 const getEducationValues = (level) => {
   if (!level || level === "unknown") {
     return [];
@@ -6,23 +12,11 @@ const getEducationValues = (level) => {
   const normalizedLevel = level.toLowerCase().trim();
 
   if (normalizedLevel === "higher_education") {
-    return [
-      "undergraduate",
-      "postgraduate",
-      "phd",
-      "professional",
-      "diploma",
-    ];
+    return HIGHER_EDUCATION_LEVELS;
   }
 
   if (normalizedLevel === "school") {
-    return [
-      "below 10th",
-      "9th",
-      "10th",
-      "11th",
-      "12th",
-    ];
+    return SCHOOL_EDUCATION_LEVELS;
   }
 
   return [normalizedLevel];
@@ -32,10 +26,6 @@ const normalizeValue = (value) => {
   return String(value || "")
     .toLowerCase()
     .trim();
-};
-
-const normalizeState = (state) => {
-  return normalizeValue(state).replace(/[^a-z0-9]/g, "");
 };
 
 export const buildSchemeFilters = (profile, options = {}) => {

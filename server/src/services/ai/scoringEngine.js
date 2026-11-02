@@ -1,3 +1,9 @@
+import {
+  HIGHER_EDUCATION_LEVELS,
+  SCHOOL_EDUCATION_LEVELS,
+} from "../../utils/helpers.js";
+import { columnsToRules, checkRules } from "./recommendation/verification.js";
+
 const SCORE = {
   OCCUPATION_MATCH: 10,
   OCCUPATION_MISMATCH: -5,
@@ -13,42 +19,14 @@ export const scoreScheme = (scheme, profile) => {
   const semanticSimilarity =
     scheme._similarity ?? scheme._semanticSimilarity ?? 0;
 
-  // ── AGE CHECK ──────────────────────────
-  if (profile.age !== null && profile.age !== undefined) {
-    if (
-      scheme.minAge !== null &&
-      scheme.minAge !== undefined &&
-      profile.age < scheme.minAge
-    ) {
-      hardConflicts += 1;
-    }
-
-    if (
-      scheme.maxAge !== null &&
-      scheme.maxAge !== undefined &&
-      profile.age > scheme.maxAge
-    ) {
-      hardConflicts += 1;
-    }
-  }
-
-  // ── INCOME CHECK ───────────────────────
-  if (profile.income !== null && profile.income !== undefined) {
-    if (
-      scheme.maxIncome !== null &&
-      scheme.maxIncome !== undefined &&
-      profile.income > scheme.maxIncome
-    ) {
-      hardConflicts += 1;
-    }
-
-    if (
-      scheme.minIncome !== null &&
-      scheme.minIncome !== undefined &&
-      profile.income < scheme.minIncome
-    ) {
-      hardConflicts += 1;
-    }
+  // ── AGE & INCOME HARD CHECK ──────────────────────────
+  const rules = columnsToRules(scheme);
+  if (rules) {
+    const verified = checkRules(rules, profile);
+    const hardChecks = verified.checks.filter(
+      (c) => (c.field === "age" || c.field === "income") && c.result === "no_match"
+    );
+    hardConflicts += hardChecks.length;
   }
 
   // ── RULE-BASED SCORING ─────────────────
@@ -77,13 +55,7 @@ export const scoreScheme = (scheme, profile) => {
       const schemeEducation = (scheme.allowedEducationLevels || [])
         .map((level) => String(level).toLowerCase().trim());
 
-      const schoolLevels = [
-        "below 10th",
-        "9th",
-        "10th",
-        "11th",
-        "12th",
-      ];
+      const schoolLevels = SCHOOL_EDUCATION_LEVELS;
 
       if (
         schemeEducation.length > 0 &&
@@ -135,21 +107,9 @@ export const scoreScheme = (scheme, profile) => {
       let userLevels = [];
 
       if (level === "higher_education") {
-        userLevels = [
-          "undergraduate",
-          "postgraduate",
-          "phd",
-          "professional",
-          "diploma",
-        ];
+        userLevels = HIGHER_EDUCATION_LEVELS;
       } else if (level === "school") {
-        userLevels = [
-          "below 10th",
-          "9th",
-          "10th",
-          "11th",
-          "12th",
-        ];
+        userLevels = SCHOOL_EDUCATION_LEVELS;
       } else {
         userLevels = [level];
       }

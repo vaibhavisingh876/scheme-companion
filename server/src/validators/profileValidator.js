@@ -15,7 +15,7 @@ const nullableNumber = z.preprocess(
 
     return Number.isFinite(number) ? number : null;
   },
-  z.number().min(0).max(120).nullable()
+  z.number().min(0).max(120).nullable().catch(null)
 );
 
 const nullableIncome = z.preprocess(
@@ -28,12 +28,10 @@ const nullableIncome = z.preprocess(
 
     return Number.isFinite(number) ? number : null;
   },
-  z.number().nonnegative().nullable()
+  z.number().nonnegative().nullable().catch(null)
 );
 
 export const profileSchema = z.object({
-  // Search-friendly paraphrase of the need, generated from the user's own
-  // message. It is used only for semantic retrieval, never eligibility facts.
   searchQuery: z.preprocess(
     (value) => (typeof value === "string" ? value.trim() : ""),
     z.string().max(1200).default("")
@@ -41,17 +39,19 @@ export const profileSchema = z.object({
 
   age: nullableNumber,
 
-  gender: z
-    .enum([
+  gender: z.preprocess(
+    sanitizeString,
+    z.enum([
       "male",
       "female",
       "other",
       "unknown",
-    ])
-    .catch("unknown"),
+    ]).catch("unknown")
+  ),
 
-  occupation: z
-    .enum([
+  occupation: z.preprocess(
+    sanitizeString,
+    z.enum([
       "student",
       "farmer",
       "startup",
@@ -60,38 +60,40 @@ export const profileSchema = z.object({
       "unemployed",
       "widow",
       "unknown",
-    ])
-    .catch("unknown"),
+    ]).catch("unknown")
+  ),
 
-  state: z
-    .preprocess(
-      (val) => (typeof val === "string" ? val.toLowerCase().trim() || "unknown" : "unknown"),
-      z.string().default("unknown")
-    ),
+  state: z.preprocess(
+    (val) => (typeof val === "string" ? val.toLowerCase().trim() || "unknown" : "unknown"),
+    z.string().default("unknown")
+  ),
 
   income: nullableIncome,
 
-  educationLevel: z
-    .enum([
+  educationLevel: z.preprocess(
+    sanitizeString,
+    z.enum([
       "higher_education",
       "school",
       "unknown",
-    ])
-    .catch("unknown"),
+    ]).catch("unknown")
+  ),
 
-  casteCategory: z
-    .enum([
+  casteCategory: z.preprocess(
+    sanitizeString,
+    z.enum([
       "general",
       "sc",
       "st",
       "obc",
       "minority",
       "unknown",
-    ])
-    .catch("unknown"),
+    ]).catch("unknown")
+  ),
 
-  primaryIntent: z
-    .enum([
+  primaryIntent: z.preprocess(
+    sanitizeString,
+    z.enum([
       "student",
       "business",
       "job",
@@ -112,6 +114,7 @@ export const profileSchema = z.object({
       "pension",
       "unknown",
     ])
-    .catch("unknown")
-    .default("unknown"),
+      .catch("unknown")
+      .default("unknown")
+  ),
 });

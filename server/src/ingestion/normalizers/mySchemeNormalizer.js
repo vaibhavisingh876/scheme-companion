@@ -1,11 +1,12 @@
 import crypto from "crypto";
-import { pipeline } from "@xenova/transformers";
+import { getExtractor } from "../../services/ai/embeddingModel.js";
+import { cosineSimilarity } from "../../utils/helpers.js";
 
-const SEMANTIC_MODEL = "Xenova/all-MiniLM-L6-v2";
+
 const SEMANTIC_THRESHOLD = 0.55;
 const SEMANTIC_MARGIN = 0.08;
 
-let embeddingPipeline = null;
+
 
 const canonicalEmbeddingCache = new Map();
 
@@ -1335,63 +1336,13 @@ const extractExplicitOccupations = (
   return [...occupations];
 };
 
-const getEmbeddingPipeline = async () => {
-  if (!embeddingPipeline) {
-    embeddingPipeline = await pipeline(
-      "feature-extraction",
-      SEMANTIC_MODEL
-    );
-  }
-
-  return embeddingPipeline;
-};
-
 const getEmbedding = async (text) => {
-  const extractor =
-    await getEmbeddingPipeline();
-
-  const output = await extractor(
-    text,
-    {
-      pooling: "mean",
-      normalize: true,
-    }
-  );
-
+  const extractor = await getExtractor();
+  const output = await extractor(text, {
+    pooling: "mean",
+    normalize: true,
+  });
   return Array.from(output.data);
-};
-
-const cosineSimilarity = (a, b) => {
-  if (
-    !a ||
-    !b ||
-    a.length !== b.length
-  ) {
-    return 0;
-  }
-
-  let dot = 0;
-  let normA = 0;
-  let normB = 0;
-
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-
-  if (
-    normA === 0 ||
-    normB === 0
-  ) {
-    return 0;
-  }
-
-  return (
-    dot /
-    (Math.sqrt(normA) *
-      Math.sqrt(normB))
-  );
 };
 
 const getCanonicalEmbedding = async (
@@ -2094,93 +2045,4 @@ export const normalizeMyScheme =
     };
   };
 
-export {
-  classifyClausesWithContext,
-};
 
-export const debugSemanticFilters =
-  async (
-    detailOrEligibility
-  ) => {
-    let eligibilityText = "";
-
-    if (
-      typeof detailOrEligibility ===
-      "string"
-    ) {
-      eligibilityText =
-        detailOrEligibility;
-    } else {
-      eligibilityText =
-        extractEligibility(
-          detailOrEligibility
-        );
-    }
-
-    const {
-      positive,
-      exclusions,
-    } =
-      splitEligibilityAndExclusions(
-        eligibilityText
-      );
-
-    const structured =
-      await extractStructuredFilters(
-        eligibilityText
-      );
-
-    return {
-      positiveEligibility:
-        positive,
-
-      exclusions,
-
-      final: {
-        categories:
-          structured
-            .allowedCategories,
-
-        education:
-          structured
-            .allowedEducationLevels,
-
-        occupations:
-          structured
-            .allowedOccupations,
-
-        gender:
-          structured.genderInfo,
-
-        age: {
-          minAge:
-            structured.minAge,
-          maxAge:
-            structured.maxAge,
-        },
-
-        income: {
-          minIncome:
-            structured.minIncome,
-          maxIncome:
-            structured.maxIncome,
-        },
-      },
-
-      semantic:
-        structured.semanticDebug,
-    };
-  };
-
-export {
-  extractAgeLimits,
-  extractIncomeLimits,
-  extractExplicitCategories,
-  extractExplicitEducation,
-  extractExplicitOccupations,
-  extractExplicitGender,
-  extractSemanticFilters,
-  splitEligibilityAndExclusions,
-  splitIntoClauses,
-  classifyClause,
-};

@@ -33,13 +33,6 @@ const passageFor = (scheme) =>
     .join("\n")
     .slice(0, 6000);
 
-const scoreOf = (output) => {
-  const rows = Array.isArray(output?.[0]) ? output[0] : Array.isArray(output) ? output : [output];
-  const relevant = rows.find((row) => /label_1|relevant|positive/i.test(row?.label || ""));
-  const row = relevant || rows[0];
-  return Number.isFinite(row?.score) ? row.score : null;
-};
-
 export const rerank = async (query, candidates) => {
   if (!Array.isArray(candidates) || candidates.length === 0) return [];
   const model = await getClassifier();
@@ -52,11 +45,17 @@ export const rerank = async (query, candidates) => {
     for (let start = 0; start < candidates.length; start += 4) {
       const batch = candidates.slice(start, start + 4);
       const scores = await Promise.all(batch.map(async (candidate) => {
-        const output = await model({ text: query, text_pair: passageFor(candidate) }, {
+        // TextClassificationPipeline only accepts a string. This model is a
+        // cross-encoder, so tokenize the query and passage as a true text pair
+        // and run its underlying sequence-classification model directly.
+        const inputs = model.tokenizer(query, {
+          text_pair: passageFor(candidate),
           truncation: true,
           max_length: 512,
         });
-        return scoreOf(output);
+        const output = await model.model(inputs);
+        const score = output?.logits?.data?.[0];
+        return Number.isFinite(score) ? score : null;
       }));
       batch.forEach((candidate, offset) => ranked.push({
         ...candidate,

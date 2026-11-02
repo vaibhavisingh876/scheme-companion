@@ -10,7 +10,7 @@
 //    because profile extraction may simply not capture them (avoids the
 //    "incorrect exclusions" the design warns about).
 
-const normState = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9]/g, "").trim();
+import { normalizeState as normState } from "../../../utils/helpers.js";
 
 const ALL_TOKENS = new Set(["all", "allindia", "any", "everyone"]);
 
@@ -132,3 +132,54 @@ export const verifyEligibility = (rules, profile) => {
 
   return { status, checks, unknownCriteria };
 };
+
+/**
+ * Adapts database Scheme record columns into the unified eligibility rules shape.
+ */
+export const columnsToRules = (scheme) => {
+  if (!scheme || typeof scheme !== "object") return null;
+
+  const age =
+    scheme.minAge != null || scheme.maxAge != null
+      ? { min: scheme.minAge ?? null, max: scheme.maxAge ?? null }
+      : null;
+
+  const gender =
+    Array.isArray(scheme.allowedGenders) && scheme.allowedGenders.length > 0
+      ? scheme.allowedGenders
+      : scheme.gender && scheme.gender !== "all"
+      ? [scheme.gender]
+      : null;
+
+  const state =
+    Array.isArray(scheme.allowedStates) && scheme.allowedStates.length > 0
+      ? scheme.allowedStates
+      : scheme.state && scheme.state !== "all"
+      ? [scheme.state]
+      : null;
+
+  return {
+    age,
+    gender,
+    minAnnualIncome: scheme.minIncome ?? null,
+    maxAnnualIncome: scheme.maxIncome ?? null,
+    state,
+    casteCategory:
+      Array.isArray(scheme.allowedCategories) && scheme.allowedCategories.length > 0
+        ? scheme.allowedCategories
+        : null,
+    occupation:
+      Array.isArray(scheme.allowedOccupations) && scheme.allowedOccupations.length > 0
+        ? scheme.allowedOccupations
+        : null,
+    educationLevel:
+      Array.isArray(scheme.allowedEducationLevels) && scheme.allowedEducationLevels.length > 0
+        ? scheme.allowedEducationLevels
+        : null,
+    maritalStatus: null,
+    residency: null,
+    unknownCriteria: [],
+  };
+};
+
+export const checkRules = verifyEligibility;

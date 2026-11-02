@@ -1,9 +1,8 @@
 import prisma from "../../config/prisma.js";
 import { getExtractor } from "./embeddingModel.js";
+import { delay } from "../../utils/helpers.js";
 
 const BATCH_SIZE = 5;
-
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const buildDescriptionEmbeddingText = (scheme) => {
   const parts = [

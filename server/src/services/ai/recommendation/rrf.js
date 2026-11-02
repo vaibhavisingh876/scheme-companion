@@ -3,7 +3,7 @@
 // normalize incomparable scores (cosine similarity vs ts_rank_cd).
 //   RRF(d) = sum over lists r of  1 / (k + rank_r(d))
 // k = 60 is the standard smoothing constant from the original RRF paper.
-export const RRF_K = 60;
+const RRF_K = 60;
 
 /**
  * @param {Array<Array<{id:string}>>} rankedLists each list ordered best-first
