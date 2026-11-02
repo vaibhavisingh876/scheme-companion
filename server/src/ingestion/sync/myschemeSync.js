@@ -24,6 +24,22 @@ const buildSearchFields = (detail, slug) => ({
   schemeFor: detail?.basicDetails?.schemeFor || "",
 });
 
+export const addEmptyLegacyEligibilityFields = (scheme) => ({
+  ...scheme,
+  gender: null,
+  occupation: null,
+  educationLevel: null,
+  allowedCategories: [],
+  allowedGenders: [],
+  allowedOccupations: [],
+  allowedEducationLevels: [],
+  minIncome: null,
+  maxIncome: null,
+  minAge: null,
+  maxAge: null,
+  isFemaleOnly: false,
+});
+
 const connectWithRetry = async (retries = 5, delayMs = 2000) => {
   for (let i = 0; i < retries; i++) {
     try {
@@ -203,7 +219,12 @@ export const syncMyScheme = async () => {
     dbScheme.category = toLabel(dbScheme.category);
     const existing = existingMap.get(dbScheme.externalId);
     if (!existing) {
-      createBatch.push({ ...dbScheme, version: 1, lastSyncedAt: new Date(), isActive: true });
+      createBatch.push({
+        ...addEmptyLegacyEligibilityFields(dbScheme),
+        version: 1,
+        lastSyncedAt: new Date(),
+        isActive: true,
+      });
     } else if (existing.checksum !== dbScheme.checksum || !existing.isActive) {
       const staleEmbeddings = {};
       if (buildDescriptionEmbeddingText(existing) !== buildDescriptionEmbeddingText(dbScheme)) {
@@ -215,7 +236,14 @@ export const syncMyScheme = async () => {
       updateBatch.push({
         id: existing.id,
         data: {
-          ...dbScheme,
+          // Eligibility restriction columns are legacy manual-search data.
+          // Keep existing values intact while new MyScheme ingestion stops
+          // deriving them from free-text eligibility descriptions.
+          ...Object.fromEntries(Object.entries(dbScheme).filter(([key]) => ![
+            "gender", "occupation", "educationLevel", "allowedCategories",
+            "allowedGenders", "allowedOccupations", "allowedEducationLevels",
+            "minIncome", "maxIncome", "minAge", "maxAge", "isFemaleOnly",
+          ].includes(key))),
           ...staleEmbeddings,
           version: existing.version + 1,
           lastSyncedAt: new Date(),

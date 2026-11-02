@@ -1,13 +1,12 @@
 import { getExtractor } from "../../embeddingModel.js";
 import prisma from "../../../config/prisma.js";
-import { scoreScheme } from "../scoringEngine.js";
 import { embeddingCache, candidateCache } from "../../../utils/cache.js";
 import { buildQueryText } from "./searchTextBuilder.js";
 import { extractUserProfile } from "../groqService.js";
 import { keywordSearch } from "./keywordSearch.js";
 import { reciprocalRankFusion } from "./rrf.js";
 import { rerank, isRerankerActive } from "./reranker.js";
-import { getCachedEligibilityRules, enqueueEligibilityExtraction } from "./eligibilityService.js";
+import { getEligibilityRulesOnDemand } from "./eligibilityService.js";
 import { verifyEligibility } from "./verification.js";
 import { createMetrics, logMetrics } from "./metrics.js";
 
@@ -21,8 +20,8 @@ const CANDIDATE_POOL = 200; // max unique candidates after RRF fusion
 const RERANK_INPUT = 50; // candidates passed to the reranker stage
 const ELIGIBILITY_TOP_N = 30; // top candidates that get eligibility extraction+verification
 
-// Only what scoring + hard filtering need. Embeddings dominate payload size, so
-// text/display columns are fetched separately for the final top results.
+// Retrieval and intent filtering fields. Embeddings dominate payload size, so
+// full display metadata is fetched only for the final results.
 const CANDIDATE_SELECT = {
   id: true,
   name: true,
@@ -33,19 +32,6 @@ const CANDIDATE_SELECT = {
   state: true,
   tags: true,
   externalId: true,
-  gender: true,
-  occupation: true,
-  educationLevel: true,
-  allowedCategories: true,
-  allowedStates: true,
-  allowedGenders: true,
-  allowedOccupations: true,
-  allowedEducationLevels: true,
-  minIncome: true,
-  maxIncome: true,
-  minAge: true,
-  maxAge: true,
-  isFemaleOnly: true,
   isScholarship: true,
   descriptionEmbedding: true,
   eligibilityEmbedding: true,
@@ -196,214 +182,7 @@ const deduplicateSchemes = (schemes) => {
   });
 };
 
-/**
- * Deterministic Hard Eligibility Filter
- * Checks if applicant violates any non-negotiable legal/scheme constraints.
- */
-export const checkHardEligibility = (scheme, profile, rawMessage = "") => {
-  const conflicts = [];
-  const schemeText = [
-    scheme.name,
-    scheme.description,
-    scheme.benefits,
-    scheme.eligibility,
-    ...(scheme.tags || []),
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
 
-  // 1. AGE CONFLICT
-  if (profile.age !== null && profile.age !== undefined) {
-    if (
-      scheme.minAge !== null &&
-      scheme.minAge !== undefined &&
-      profile.age < scheme.minAge
-    ) {
-      conflicts.push("age_below_minimum");
-    }
-    if (
-      scheme.maxAge !== null &&
-      scheme.maxAge !== undefined &&
-      profile.age > scheme.maxAge
-    ) {
-      conflicts.push("age_above_maximum");
-    }
-  }
-
-  // 2. INCOME CONFLICT
-  if (profile.income !== null && profile.income !== undefined) {
-    if (
-      scheme.maxIncome !== null &&
-      scheme.maxIncome !== undefined &&
-      profile.income > scheme.maxIncome
-    ) {
-      conflicts.push("income_above_maximum");
-    }
-    if (
-      scheme.minIncome !== null &&
-      scheme.minIncome !== undefined &&
-      profile.income < scheme.minIncome
-    ) {
-      conflicts.push("income_below_minimum");
-    }
-  }
-
-  // 3. GENDER CONFLICT
-  if (profile.gender && profile.gender !== "unknown") {
-    const userGender = profile.gender.toLowerCase().trim();
-    const allowedGenders = (scheme.allowedGenders || []).map((g) =>
-      String(g).toLowerCase().trim()
-    );
-
-    if (userGender === "male") {
-      if (
-        scheme.isFemaleOnly ||
-        (allowedGenders.length > 0 &&
-          !allowedGenders.includes("all") &&
-          allowedGenders.includes("female") &&
-          !allowedGenders.includes("male"))
-      ) {
-        conflicts.push("female_only_scheme");
-      }
-
-      // Many imported schemes do not have structured gender filters. Catch
-      // unambiguous women/widow/maternity-only schemes from their source text.
-      if (
-        /\b(?:widow|widows|maternity|pregnan(?:t|cy)|girl child|women in distress)\b/.test(schemeText) ||
-        /\b(?:only|exclusively|solely)\s+(?:for\s+)?(?:women|woman|female|girls?)\b/.test(schemeText) ||
-        /\b(?:women|woman|female)\s+(?:entrepreneurs?|applicants?|beneficiaries|students?|founders?)\b/.test(schemeText)
-      ) {
-        conflicts.push("female_targeted_scheme");
-      }
-    } else if (userGender === "female") {
-      if (
-        allowedGenders.length > 0 &&
-        !allowedGenders.includes("all") &&
-        allowedGenders.includes("male") &&
-        !allowedGenders.includes("female")
-      ) {
-        conflicts.push("male_only_scheme");
-      }
-    }
-  }
-
-  // Explicit SC/ST-only programmes should not be recommended to a general
-  // category applicant, even when the source omitted structured category data.
-  if (profile.casteCategory === "general") {
-    const titleAndTags = [scheme.name, ...(scheme.tags || [])]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
-    const reservedOnlyPattern =
-      /\b(?:sc(?:\s*(?:&|and|\/)\s*st)?|st|scheduled caste(?:s)?|scheduled tribes?|obcs?|ebcs?|bcs?|backward classes?|minorities)\b/;
-
-    if (reservedOnlyPattern.test(titleAndTags)) {
-      conflicts.push("reserved_category_only");
-    }
-  }
-
-  // Do not surface schemes reserved for a specific community when the
-  // applicant's profile does not establish that they belong to it.
-  const titleAndTags = [scheme.name, ...(scheme.tags || [])]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  const userCategory = (profile.casteCategory || "unknown").toLowerCase();
-  const explicitReservedTarget =
-    /\b(?:scheduled castes?|sc students?|\bsc\b|scheduled tribes?|st students?|\bst\b|obc students?|\bobc\b|ebc students?|\bebc\b|backward classes?|minority students?)\b/.exec(titleAndTags);
-  if (explicitReservedTarget) {
-    const label = explicitReservedTarget[0];
-    const target = /scheduled caste|\bsc\b/.test(label)
-      ? "sc"
-      : /scheduled tribe|\bst\b/.test(label)
-      ? "st"
-      : /\bobc\b|backward class/.test(label)
-      ? "obc"
-      : /\bebc\b/.test(label)
-      ? "ebc"
-      : "minority";
-    if (userCategory !== target) conflicts.push("reserved_category_only");
-  }
-
-  // Exclude occupation- or service-specific loans when the request does not
-  // identify the applicant as belonging to that group.
-  const targetRules = [
-    { pattern: /\b(?:safai karamchari|sanitation worker|scavenger)\b/i, allowed: /\b(?:safai karamchari|sanitation worker|scavenger)\b/i.test(rawMessage) },
-    { pattern: /\b(?:unorganised|unorganized)\s+(?:sector\s+)?workers?|\bcrafts(?:wo)?men\b/i, allowed: profile.occupation === "worker" || /\b(?:unorganised|unorganized)\s+(?:sector\s+)?workers?|\bcrafts(?:wo)?men\b/i.test(rawMessage) },
-    { pattern: /\b(?:construction worker|building worker|registered construction labourer)\b/i, allowed: /\b(?:construction worker|building worker|labou?rer|mazdoor)\b/i.test(rawMessage) },
-    { pattern: /\b(?:ex[- ]servicemen|ex[- ]serviceman|veteran)\b/i, allowed: /\b(?:ex[- ]servicemen|ex[- ]serviceman|veteran|army|navy|air force)\b/i.test(rawMessage) },
-    { pattern: /\b(?:central armed police|police force personnel|paramilitary personnel)\b/i, allowed: /\b(?:central armed police|police force|paramilitary)\b/i.test(rawMessage) },
-    { pattern: /\b(?:farmer|agricultural worker|cultivator)\b/i, allowed: profile.occupation === "farmer" || /\b(?:farmer|farming|agriculture)\b/i.test(rawMessage) },
-    { pattern: /\b(?:teachers?|lecturers?)\b/i, allowed: /\b(?:teachers?|lecturers?)\b/i.test(rawMessage) },
-  ];
-  if (targetRules.some(({ pattern, allowed }) => pattern.test(titleAndTags) && !allowed)) {
-    conflicts.push("target_group_mismatch");
-  }
-
-  // 4. CASTE / CATEGORY CONFLICT
-  if (profile.casteCategory && profile.casteCategory !== "unknown") {
-    const userCategory = profile.casteCategory.toLowerCase().trim();
-    const allowedCats = (scheme.allowedCategories || []).map((c) =>
-      String(c).toLowerCase().trim()
-    );
-
-    if (allowedCats.length > 0 && !allowedCats.includes("all")) {
-      if (userCategory === "general") {
-        if (
-          allowedCats.some((c) => ["sc", "st", "obc", "minority"].includes(c)) &&
-          !allowedCats.includes("general")
-        ) {
-          conflicts.push("reserved_category_only");
-        }
-      } else {
-        if (
-          !allowedCats.includes(userCategory) &&
-          !allowedCats.includes("general")
-        ) {
-          conflicts.push("category_mismatch");
-        }
-      }
-    }
-  }
-
-  // 5. STATE CONFLICT
-  if (profile.state && profile.state !== "unknown") {
-    const userState = profile.state
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, "")
-      .trim();
-    const allowedStates = (scheme.allowedStates || []).map((s) =>
-      String(s)
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, "")
-        .trim()
-    );
-    // Many catalogue rows have a single scheme.state but no allowedStates
-    // array. Use that state for regional filtering instead of treating them as
-    // location-neutral. Explicit "all India" values remain unrestricted.
-    const applicableStates = allowedStates.length
-      ? allowedStates
-      : scheme.state
-      ? [String(scheme.state).toLowerCase().replace(/[^a-z0-9]/g, "").trim()]
-      : [];
-
-    if (
-      applicableStates.length > 0 &&
-      !applicableStates.includes("all") &&
-      !applicableStates.includes("allindia")
-    ) {
-      if (!applicableStates.includes(userState)) {
-        conflicts.push("state_mismatch");
-      }
-    }
-  }
-
-  return {
-    isEligible: conflicts.length === 0,
-    conflicts,
-  };
-};
 
 const INTENT_EVIDENCE = {
   "startup-funding": /\b(?:start[\s-]?ups?|incubat(?:or|ion)|seed fund(?:ing)?|venture capital|accelerator|angel investor|dpiit recognition|founders?)\b/i,
@@ -662,9 +441,8 @@ const hybridRetrieve = async (allCandidates, queryEmbedding, keywordText) => {
 };
 
 /**
- * Main recommendation pipeline:
- * User query -> User query embedding -> Dual cosine similarities (description + eligibility)
- * -> Hard eligibility filter gate -> Scoring -> Deduplication -> Top recommendations (NO diversification)
+ * Main recommendation pipeline: profile, hybrid retrieval, top-50 reranking,
+ * intent filtering, then on-demand eligibility extraction for the top 30.
  */
 export const recommendSchemes = async (message) => {
   const trimmed = (message || "").trim();
@@ -705,8 +483,7 @@ export const recommendSchemes = async (message) => {
   metrics.count("fusedCandidates", retrieval.counts.fused);
   metrics.count("candidatePool", retrieval.counts.pool);
 
-  // Rerank the recall-focused hybrid pool before eligibility and legacy scoring.
-  // Keep the remaining candidates in their RRF order as a fallback tail.
+  // Only these top 50 reranked candidates proceed to intent filtering.
   const rerankInput = retrieval.schemes.slice(0, RERANK_INPUT).map((scheme) => ({
     ...scheme,
     relevance: retrieval.rrfById.get(scheme.id) || 0,
@@ -714,11 +491,7 @@ export const recommendSchemes = async (message) => {
   const reranked = (await metrics.time("rerank", () => rerank(queryText, rerankInput))).map(
     ({ relevance, reranked: _rerankedFlag, _rerankIndex, ...scheme }) => scheme
   );
-  const rerankedIds = new Set(reranked.map((scheme) => scheme.id));
-  const candidateSchemes = [
-    ...reranked,
-    ...retrieval.schemes.filter((scheme) => !rerankedIds.has(scheme.id)),
-  ];
+  const candidateSchemes = reranked;
   metrics.count("rerankCandidates", rerankInput.length);
 
   if (!candidateSchemes.length) {
@@ -788,9 +561,10 @@ export const recommendSchemes = async (message) => {
   const intentMatches = purposeCandidates.filter((scheme) =>
     hasIntentEvidence(scheme, profile.primaryIntent)
   );
-  const schemesForRanking = intentMatches.length ? intentMatches : purposeCandidates;
+  const schemesForRanking = intentMatches;
 
-  // 4. Compute dual semantic similarities & evaluate hard eligibility
+  // Rank by reranker relevance and keep the existing dual cosine score for
+  // observability. Structured legacy restriction columns do not gate candidates.
   const evaluated = schemesForRanking.map((scheme) => {
     const hasDescEmb = Array.isArray(scheme.descriptionEmbedding) && scheme.descriptionEmbedding.length > 0;
     const hasEligEmb = Array.isArray(scheme.eligibilityEmbedding) && scheme.eligibilityEmbedding.length > 0;
@@ -815,58 +589,21 @@ export const recommendSchemes = async (message) => {
       semanticSimilarity = eligSim;
     }
 
-    // Deterministic hard eligibility check
-    const { isEligible, conflicts } = checkHardEligibility(scheme, profile, trimmed);
-
-    // Rule-based soft score adjustments (occupation/education alignment)
-    const { score } = scoreScheme(
-      {
-        ...scheme,
-        _similarity: semanticSimilarity,
-        _semanticSimilarity: semanticSimilarity,
-      },
-      profile
-    );
-
     return {
       ...scheme,
       _descSim: descSim,
       _eligSim: eligSim,
       _semanticSimilarity: semanticSimilarity,
-      _isEligible: isEligible,
-      _hardConflicts: conflicts.length,
-      _conflictReasons: conflicts,
-      _score: isEligible ? score : 0,
+      _score: Number.isFinite(scheme.crossEncoderScore)
+        ? scheme.crossEncoderScore
+        : (retrieval.rrfById.get(scheme.id) || 0),
     };
   });
 
-  // 5. Hard Filter Gate: strictly eliminate schemes with hard eligibility conflicts
-  const eligibleSchemes = evaluated.filter((s) => s._isEligible && s._score > 0);
+  evaluated.sort((a, b) => b._score - a._score);
+  const deduped = deduplicateSchemes(evaluated);
 
-  // 6. Relevance Threshold filtering
-  const passingThreshold = eligibleSchemes.filter((s) => s._score >= 0.25);
-  const poolToRank = passingThreshold.length > 0 ? passingThreshold : eligibleSchemes;
-
-  // 7. Sort by composite score descending
-  poolToRank.sort((a, b) => {
-    if (cancerSpecificRequest) {
-      const priority = (scheme) => {
-        const namedText = [scheme.name, ...(scheme.tags || [])].filter(Boolean).join(" ");
-        return /\b(?:cancer|tumou?rs?|oncolog\w*|chemotherap\w*|radiotherap\w*)\b/i.test(namedText) ? 1 : 0;
-      };
-      const priorityDifference = priority(b) - priority(a);
-      if (priorityDifference !== 0) return priorityDifference;
-    }
-    return b._score - a._score;
-  });
-
-  // 8. Deduplicate identical schemes
-  const deduped = deduplicateSchemes(poolToRank);
-
-  // 10. Eligibility verification from CACHED rules (no LLM in the request path).
-  //     Missing/stale schemes are enqueued for rate-limited background
-  //     extraction, so the cache warms over time without adding latency or
-  //     tripping the provider token budget. Uncached schemes stay "unknown".
+  // Only the top 30 post-intent candidates are extracted and verified.
   const eligibilityCandidates = [...deduped].sort((a, b) => {
     if (isRerankerActive() && Number.isFinite(a.crossEncoderScore) && Number.isFinite(b.crossEncoderScore)) {
       return b.crossEncoderScore - a.crossEncoderScore;
@@ -876,16 +613,13 @@ export const recommendSchemes = async (message) => {
   const eligInput = eligibilityCandidates.slice(0, ELIGIBILITY_TOP_N);
   let verified = eligInput.map((s) => ({ ...s, _eligibilityStatus: "unknown", _eligibilityChecks: [] }));
   try {
-    const { rules, missing, stats } = await metrics.time("eligibilityCache", () =>
-      getCachedEligibilityRules(eligInput.map((s) => ({ id: s.id, eligibility: s.eligibility })))
+    const { rules, stats } = await metrics.time("eligibilityExtraction", () =>
+      getEligibilityRulesOnDemand(eligInput.map((s) => ({ id: s.id, eligibility: s.eligibility })))
     );
-    metrics.addEligibilityStats({ cacheHits: stats.cacheHits, missing: stats.missing });
-    metrics.count("eligibilityMissing", stats.missing);
-
-    if (missing.length) {
-      const enqueued = enqueueEligibilityExtraction(missing);
-      metrics.count("eligibilityEnqueued", enqueued);
-    }
+    metrics.addEligibilityStats(stats);
+    metrics.count("eligibilityExtracted", stats.extracted || 0);
+    metrics.count("eligibilityFailures", stats.failed || 0);
+    metrics.count("eligibilityMissing", stats.missing || 0);
 
     verified = eligInput.map((s) => {
       const v = verifyEligibility(rules.get(s.id) || null, profile);
@@ -899,19 +633,12 @@ export const recommendSchemes = async (message) => {
   // 11. Final ranking — relevance and eligibility kept SEPARATE. Confirmed
   //     mismatch is excluded; confirmed match is prioritized; unknown is kept
   //     but ranked lower (never treated as confirmed eligible).
-  const cancerPriority = (scheme) => {
-    if (!cancerSpecificRequest) return 0;
-    const namedText = [scheme.name, ...(scheme.tags || [])].filter(Boolean).join(" ");
-    return /\b(?:cancer|tumou?rs?|oncolog\w*|chemotherap\w*|radiotherap\w*)\b/i.test(namedText) ? 1 : 0;
-  };
   const statusRank = (s) =>
     s._eligibilityStatus === "match" ? 0 : s._eligibilityStatus === "unknown" ? 1 : 2;
 
   const finalRanked = verified
     .filter((s) => s._eligibilityStatus !== "no_match")
     .sort((a, b) => {
-      const cd = cancerPriority(b) - cancerPriority(a);
-      if (cd !== 0) return cd;
       const sd = statusRank(a) - statusRank(b);
       if (sd !== 0) return sd;
       if (isRerankerActive() && Number.isFinite(a.crossEncoderScore) && Number.isFinite(b.crossEncoderScore)) {
@@ -937,9 +664,6 @@ export const recommendSchemes = async (message) => {
       _descSim,
       _eligSim,
       _semanticSimilarity,
-      _isEligible,
-      _hardConflicts,
-      _conflictReasons,
       _score,
       _eligibilityStatus,
       _eligibilityChecks,
@@ -947,7 +671,9 @@ export const recommendSchemes = async (message) => {
     }) => ({
       ...rest,
       ...displayById.get(rest.id),
-      relevanceScore: Math.round(_score * 100),
+      relevanceScore: Math.round(
+        (Number.isFinite(rest.crossEncoderScore) ? rest.crossEncoderScore : _semanticSimilarity) * 100
+      ),
       eligibilityStatus: _eligibilityStatus,
       eligibilityChecks: _eligibilityChecks,
     })
