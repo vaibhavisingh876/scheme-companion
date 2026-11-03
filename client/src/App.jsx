@@ -1,4 +1,5 @@
-import { useCallback, useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import Navbar from "./components/navigation/Navbar";
 import LandingHome from "./pages/LandingHome";
@@ -12,17 +13,18 @@ import { addBookmark, removeBookmark } from "./services/api";
 
 const PROTECTED_TABS = ["search", "saved"];
 
-const getPageFromUrl = () => {
-  const params = new URLSearchParams(window.location.search);
-  return params.get("page") || "landing";
-};
+const TAB_PATHS = { landing: "/", search: "/search", saved: "/saved", auth: "/auth" };
 
 function App() {
-  const [activeTab, setActiveTab] = useState(getPageFromUrl);
-  const [selectedScheme, setSelectedScheme] = useState(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const activeTab = useMemo(() => {
+    if (location.pathname.startsWith("/schemes/")) return "details";
+    return Object.keys(TAB_PATHS).find((tab) => TAB_PATHS[tab] === location.pathname) || "landing";
+  }, [location.pathname]);
+  const selectedScheme = location.state?.scheme || null;
   const [searchResults, setSearchResults] = useState([]);
   const [searchProfile, setSearchProfile] = useState(null);
-  const [previousTab, setPreviousTab] = useState(null);
 
   const { token, savedSchemesList, fetchUserBookmarks } = useContext(AuthContext);
 
@@ -30,58 +32,26 @@ function App() {
     ? savedSchemesList.map((scheme) => scheme.id)
     : [];
 
-  const syncRoute = useCallback(() => {
-    const page = getPageFromUrl();
-
-    if (page === "auth" && token) {
-      window.history.replaceState({}, "", "?page=landing");
-      setActiveTab("landing");
-      return;
-    }
-
-    if (PROTECTED_TABS.includes(page) && !token) {
-      window.history.replaceState({}, "", "?page=auth");
-      setActiveTab("auth");
-      return;
-    }
-
-    setActiveTab(page);
-  }, [token]);
-
   useEffect(() => {
-    syncRoute();
-    window.addEventListener("popstate", syncRoute);
-
-    return () => window.removeEventListener("popstate", syncRoute);
-  }, [syncRoute]);
+    const legacyPage = new URLSearchParams(location.search).get("page");
+    if (legacyPage && TAB_PATHS[legacyPage]) {
+      navigate(TAB_PATHS[legacyPage], { replace: true });
+      return;
+    }
+    if (activeTab === "auth" && token) navigate("/", { replace: true });
+    else if (PROTECTED_TABS.includes(activeTab) && !token) navigate("/auth", { replace: true });
+  }, [activeTab, location.search, navigate, token]);
 
   const handleTabChange = useCallback(
     (tab, { replace = false } = {}) => {
       if (PROTECTED_TABS.includes(tab) && !token) {
-        const authUrl = "?page=auth";
-
-        if (replace) {
-          window.history.replaceState({}, "", authUrl);
-        } else {
-          window.history.pushState({}, "", authUrl);
-        }
-
-        setActiveTab("auth");
+        navigate("/auth", { replace });
         return;
       }
-
-      const url = `?page=${encodeURIComponent(tab)}`;
-
-      if (replace) {
-        window.history.replaceState({}, "", url);
-      } else {
-        window.history.pushState({}, "", url);
-      }
-
-      setActiveTab(tab);
+      navigate(TAB_PATHS[tab] || "/", { replace });
       window.scrollTo({ top: 0, behavior: "smooth" });
     },
-    [token]
+    [navigate, token]
   );
 
   const handleAuthSuccess = () => {
@@ -89,9 +59,9 @@ function App() {
   };
 
   const handleViewDetails = (scheme) => {
-    setSelectedScheme(scheme);
-    setPreviousTab(activeTab);
-    handleTabChange("details");
+    navigate(`/schemes/${encodeURIComponent(scheme.id)}`, {
+      state: { scheme, from: location.pathname },
+    });
   };
 
   const handleSaveScheme = async (scheme) => {
@@ -118,62 +88,13 @@ function App() {
   };
 
   const handleBackFromDetails = () => {
-    const tab = previousTab || "landing";
-    setPreviousTab(null);
-    handleTabChange(tab);
+    navigate(location.state?.from || "/");
   };
 
   const handleResultsUpdate = useCallback((results, profile) => {
     setSearchResults(results);
     setSearchProfile(profile);
   }, []);
-
-  const renderViewport = () => {
-    if (activeTab === "auth" && !token) {
-      return <AuthPage onAuthSuccess={handleAuthSuccess} />;
-    }
-
-    if (activeTab === "auth" && token) {
-      return <LandingHome onViewDetails={handleViewDetails} onTabChange={handleTabChange} />;
-    }
-
-    if (PROTECTED_TABS.includes(activeTab) && !token) {
-      return <AuthPage onAuthSuccess={handleAuthSuccess} />;
-    }
-
-    switch (activeTab) {
-      case "landing":
-        return <LandingHome onViewDetails={handleViewDetails} onTabChange={handleTabChange} />;
-
-      case "search":
-        return (
-          <FindSchemes
-            onSaveScheme={handleSaveScheme}
-            savedIds={savedIds}
-            onViewDetails={handleViewDetails}
-            initialResults={searchResults}
-            initialProfile={searchProfile}
-            onResultsUpdate={handleResultsUpdate}
-          />
-        );
-
-      case "saved":
-        return (
-          <SavedSchemes
-            savedList={savedSchemesList}
-            onRemoveScheme={handleRemoveScheme}
-            onViewDetails={handleViewDetails}
-            onTabChange={handleTabChange}
-          />
-        );
-
-      case "details":
-        return <SchemeDetailsView scheme={selectedScheme} onBackNavigate={handleBackFromDetails} />;
-
-      default:
-        return <LandingHome onViewDetails={handleViewDetails} onTabChange={handleTabChange} />;
-    }
-  };
 
   const isAuthPage = activeTab === "auth" && !token;
 
@@ -182,7 +103,14 @@ function App() {
       {!isAuthPage && <Navbar activeTab={activeTab} onTabChange={handleTabChange} />}
 
       <main className="flex-1">
-        {renderViewport()}
+        <Routes>
+          <Route path="/" element={<LandingHome onViewDetails={handleViewDetails} onTabChange={handleTabChange} />} />
+          <Route path="/search" element={<FindSchemes onSaveScheme={handleSaveScheme} savedIds={savedIds} onViewDetails={handleViewDetails} initialResults={searchResults} initialProfile={searchProfile} onResultsUpdate={handleResultsUpdate} />} />
+          <Route path="/saved" element={<SavedSchemes savedList={savedSchemesList} onRemoveScheme={handleRemoveScheme} onViewDetails={handleViewDetails} onTabChange={handleTabChange} />} />
+          <Route path="/auth" element={<AuthPage onAuthSuccess={handleAuthSuccess} />} />
+          <Route path="/schemes/:schemeId" element={<SchemeDetailsView scheme={selectedScheme} onBackNavigate={handleBackFromDetails} />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
 
         {!isAuthPage && (
           <footer className="foot">
