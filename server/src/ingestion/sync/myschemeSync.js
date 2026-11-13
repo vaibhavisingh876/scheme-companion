@@ -7,6 +7,7 @@ import {
   buildEligibilityEmbeddingText,
 } from "../../services/ai/embeddingService.js";
 import { delay } from "../../utils/helpers.js";
+import { eligibilitySourceChanged } from "../../services/ai/recommendation/eligibilityHash.js";
 
 // schemeCategory entries arrive as { label, value } objects; the DB column is String.
 const toLabel = (v) => (v && typeof v === "object" ? v.label || v.name || "" : v);
@@ -196,6 +197,7 @@ export const syncMyScheme = async () => {
 
   const createBatch = [];
   const updateBatch = [];
+  const invalidatedEligibilityIds = [];
 
   for (const scheme of enrichedSchemes) {
     const { _semanticDebug, ...dbScheme } = scheme;
@@ -210,6 +212,11 @@ export const syncMyScheme = async () => {
       }
       if (buildEligibilityEmbeddingText(existing) !== buildEligibilityEmbeddingText(dbScheme)) {
         staleEmbeddings.eligibilityEmbedding = [];
+      }
+      // Only an eligibility text change invalidates Groq rules. Changes to
+      // description, images, or other fields keep the persisted rules.
+      if (eligibilitySourceChanged(existing.eligibility, dbScheme.eligibility)) {
+        invalidatedEligibilityIds.push(existing.id);
       }
       updateBatch.push({
         id: existing.id,
@@ -237,6 +244,20 @@ export const syncMyScheme = async () => {
       const chunk = updateBatch.slice(i, i + UPDATE_CONCURRENCY);
       await Promise.all(chunk.map(u => prisma.scheme.update({ where: { id: u.id }, data: u.data })));
     }
+  }
+
+  // Invalidate only the rule sets whose source text changed. Ingestion never
+  // calls Groq; the next recommendation re-extracts and persists fresh rules.
+  let invalidatedRules = 0;
+  if (invalidatedEligibilityIds.length) {
+    for (let i = 0; i < invalidatedEligibilityIds.length; i += 500) {
+      const chunk = invalidatedEligibilityIds.slice(i, i + 500);
+      const result = await prisma.groqEligibilityRule.deleteMany({
+        where: { schemeId: { in: chunk } },
+      });
+      invalidatedRules += result.count;
+    }
+    console.log(`♻️ Invalidated ${invalidatedRules} Groq eligibility rule set(s): eligibility text changed`);
   }
 
   // Stamp every seen scheme, including unchanged records. This gives the
@@ -270,9 +291,15 @@ export const syncMyScheme = async () => {
     },
   });
 
-  console.log(`🏁 Created: ${createBatch.length} | Updated: ${updateBatch.length} | Deactivated: ${deactivated.count}`);
+  console.log(`🏁 Created: ${createBatch.length} | Updated: ${updateBatch.length} | Deactivated: ${deactivated.count} | Eligibility rules invalidated: ${invalidatedRules}`);
   await prisma.$disconnect();
-  return { success: true, added: createBatch.length, updated: updateBatch.length, deactivated: deactivated.count };
+  return {
+    success: true,
+    added: createBatch.length,
+    updated: updateBatch.length,
+    deactivated: deactivated.count,
+    eligibilityRulesInvalidated: invalidatedRules,
+  };
   } catch (err) {
     console.error("❌ Sync failed:", err.message);
     if (syncJob) {

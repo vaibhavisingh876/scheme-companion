@@ -21,7 +21,7 @@ Scheme Companion allows users to describe their situation in natural language, f
 
 > I am a student from Uttar Pradesh looking for scholarship schemes.
 
-The system extracts relevant information from the user's message, retrieves candidates with semantic and PostgreSQL full-text search, fuses and reranks them, then checks cached eligibility rules against the profile.
+The system extracts relevant information from the user's message, retrieves candidates with semantic and PostgreSQL full-text search, fuses and reranks them, then verifies persisted per-scheme eligibility rules against the profile.
 
 The application supports both English and Hinglish queries.
 
@@ -52,17 +52,17 @@ User query -> Groq profile extraction -> MiniLM query embedding
      |                                      |
      +------ PostgreSQL full-text search ---+
                         |
-                 RRF candidate fusion
+          RRF fusion (up to 200 candidates)
                         |
-       Local MiniLM cross-encoder reranking
+       Cross-encoder rerank (top 50 only)
                         |
-            Intent + hard conflict checks
+        Intent / domain filters + dedupe
                         |
-     Cached eligibility rules (source-hash keyed)
+  GroqEligibilityRules (reuse, on-demand, queue)
                         |
-       Deterministic match / no-match / unknown
+     Deterministic match / no-match / unknown
                         |
-                Top recommendations
+      Eligibility-first ranking (up to 20)
 ```
 
 ## AI Recommendation Pipeline
@@ -105,7 +105,7 @@ The system calculates cosine similarity between the user's query embedding and s
 
 This allows semantically related schemes to be discovered even when the user does not use the exact terminology present in the scheme data.
 
-The fused candidate pool is reranked with the local `Xenova/ms-marco-MiniLM-L-6-v2` cross-encoder. It loads on first use and runs through the Transformers.js dependency already used for embeddings. Set `RERANKER_ENABLED=false` to disable it or `RERANKER_MODEL` to select another compatible model. If model loading fails, recommendations fall back to the RRF ranking.
+The fused candidate pool is reranked with the local `Xenova/ms-marco-MiniLM-L-6-v2` cross-encoder. It loads on first use and runs through the Transformers.js dependency already used for embeddings. Only the top 50 fused candidates are reranked; the remaining RRF tail is dropped rather than appended, so weakly relevant schemes cannot re-enter the shortlist. Set `RERANKER_ENABLED=false` to disable it or `RERANKER_MODEL` to select another compatible model. If model loading fails, recommendations fall back to the RRF ranking.
 
 ### 4. Eligibility Filtering
 
@@ -120,29 +120,38 @@ The system therefore applies eligibility rules based on available scheme informa
 * Caste category
 * State
 
-Structured catalogue checks remove clear conflicts. Separately, source-hash keyed rules are extracted from raw eligibility text only when missing or stale, then verified deterministically. The original eligibility text is preserved. A scheme is labeled as matching only when at least one stated rule is confirmed; missing, ambiguous, or non-machine-checkable rules remain unknown and are never presented as confirmed eligibility.
+Structured catalogue checks remove clear conflicts. Detailed rules are extracted by Groq from each scheme's raw eligibility text and persisted in the `GroqEligibilityRules` table (one row per scheme, keyed by a hash of that text). Rows are created only when Groq is actually called; bulk normalization never populates the table.
 
-### 5. Hybrid Scoring
+The request path reuses persisted rules whose source hash still matches. A bounded synchronous extraction warms up to five missing schemes, and the remainder join a paced background queue, so repeated requests and repeated users do not trigger repeat Groq calls. Validation happens before persistence; extraction failures are recorded as attempts and eventually stop retrying.
 
-The final recommendation score combines semantic relevance with rule-based relevance.
+Tuning knobs: `ELIGIBILITY_ON_DEMAND=false` disables synchronous extraction, `ELIGIBILITY_ON_DEMAND_BATCH` (default 5), `ELIGIBILITY_ON_DEMAND_TIMEOUT_MS` (8000), `ELIGIBILITY_MIN_INTERVAL_MS` (20000, background pacing), `ELIGIBILITY_RETRY_COOLDOWN_MS` (1800000, retry window after exhausted failures), and `GROQ_ELIGIBILITY_MODEL` (defaults to `openai/gpt-oss-120b`).
+
+Ingestion invalidates only the rule rows whose eligibility text changed. Description, image, and other unrelated updates keep the rules. Deleting a scheme cascades to its rules through the foreign key.
+
+Verification is deterministic. A scheme is labeled `match` only when a stated rule is confirmed; missing, ambiguous, or non-machine-checkable criteria produce `unknown` and are never treated as confirmed eligibility. Confirmed conflicts produce `no_match` and are excluded.
+
+### 5. Eligibility-First Ranking
+
+There is no composite scoring formula. Final order is:
 
 ```text
-Final Score =
-    Retrieval relevance + rule-based relevance
-    Eligibility status remains a separate signal
+1. Exclude no_match
+2. Confirmed match before unknown
+3. Within each status group, cross-encoder score decides
+4. Fall back to RRF order when the reranker is unavailable
 ```
 
-The 20% component reflects rule-based relevance adjustments; eligibility conflicts are handled separately as a hard filter.
+The UI relevance percentage is display-only: it maps the cross-encoder logit through a sigmoid, or normalizes the RRF score when reranking is inactive.
 
 ### 6. Result Quality Controls
 
 Before returning recommendations, the system also performs:
 
-* Relevance thresholding
+* Intent and domain filtering (study abroad, widow support, medical/cancer, loans, startup, etc.)
 * Duplicate removal
-* Result ranking
+* Eligibility-first ranking
 
-The system returns up to 20 recommendations.
+The system returns up to 20 recommendations, or fewer when the shortlist is smaller.
 
 ## Data Source and Ingestion
 
@@ -167,7 +176,7 @@ A scheduled synchronization job runs periodically to keep the database updated.
 * React
 * Vite
 * Tailwind CSS
-* Hand-rolled query-parameter navigation (`?page=`)
+* React Router
 * Axios
 * Lucide React
 
@@ -186,6 +195,7 @@ A scheduled synchronization job runs periodically to keep the database updated.
 * `Xenova/ms-marco-MiniLM-L-6-v2` local cross-encoder reranking
 * PostgreSQL full-text search and Reciprocal Rank Fusion
 * Cosine similarity with separate eligibility verification
+* Persisted per-scheme Groq eligibility rules (`GroqEligibilityRules`) with source-hash invalidation
 
 ### Authentication
 
@@ -249,7 +259,7 @@ Services
   |
   +---- Filtering
   |
-  +---- Scoring
+  +---- Ranking
   |
   +---- Database
   |
@@ -447,9 +457,12 @@ npx prisma migrate deploy
 npm run setup:hybrid
 npm run eval -- eval/results/current.json
 npm run warm:eligibility -- 100
+npm test
 ```
 
-`npm start` applies reviewed Prisma migrations, then runs `setup:hybrid` to create the separate eligibility cache table and weighted PostgreSQL GIN full-text index before starting the server. Eligibility warming makes Groq extraction calls, so run it deliberately and use a limit when evaluating.
+`npm start` applies reviewed Prisma migrations, then runs `setup:hybrid` to ensure the weighted PostgreSQL GIN full-text index before starting the server. The `GroqEligibilityRules` table is created by the Prisma migrations, not by the setup script. Eligibility warming makes Groq extraction calls, so run it deliberately and use a limit when evaluating; it fills the table opportunistically and never during bulk normalization.
+
+`npm test` runs the backend unit suite with the Node.js test runner. It uses fake database and LLM adapters, so it does not need a live PostgreSQL instance or a Groq API key.
 
 ## Background Synchronization
 
@@ -487,7 +500,7 @@ Potential future improvements include:
 * Additional government data sources
 * Improved scheme freshness monitoring
 * Advanced recommendation personalization
-* More comprehensive automated testing
+* Integration tests against a live database and Groq API
 * Improved observability for ingestion and recommendation pipelines
 
 ## Deployment

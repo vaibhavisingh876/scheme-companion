@@ -11,7 +11,7 @@
     "warm:eligibility": "node src/scripts/warmEligibility.js",
     "eval": "node eval/runEval.js",
     "postinstall": "prisma generate",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test \"test/*.test.js\""
   },
   "prisma": {
     "seed": "node prisma/seed.js"

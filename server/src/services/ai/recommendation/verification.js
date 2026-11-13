@@ -11,6 +11,11 @@
 //    "incorrect exclusions" the design warns about).
 
 import { normalizeState as normState } from "../../../utils/helpers.js";
+import {
+  checkTextGenderHeuristics,
+  checkTextReservedCasteHeuristics,
+  checkTextTargetGroupHeuristics,
+} from "./eligibilityHeuristics.js";
 
 const ALL_TOKENS = new Set(["all", "allindia", "any", "everyone"]);
 
@@ -147,6 +152,8 @@ export const columnsToRules = (scheme) => {
   const gender =
     Array.isArray(scheme.allowedGenders) && scheme.allowedGenders.length > 0
       ? scheme.allowedGenders
+      : scheme.isFemaleOnly
+      ? ["female"]
       : scheme.gender && scheme.gender !== "all"
       ? [scheme.gender]
       : null;
@@ -182,4 +189,75 @@ export const columnsToRules = (scheme) => {
   };
 };
 
-export const checkRules = verifyEligibility;
+const schemeSearchText = (scheme) =>
+  [scheme.name, scheme.description, scheme.benefits, scheme.eligibility, ...(scheme.tags || [])]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+/**
+ * Single eligibility-verification entry point for the recommendation pipeline.
+ *
+ * Sources, in priority order:
+ *  1. Persisted Groq rules (detailed, scheme-level, reusable across users).
+ *  2. Normalized structured columns (fallback + hard safety net for cold cache).
+ *  3. Text heuristics, ONLY when no Groq rules exist. Once Groq has produced
+ *     detailed rules, they are authoritative and noisy text heuristics must not
+ *     add duplicate exclusions.
+ *
+ * Unknown always dominates match: if any source leaves a stated criterion
+ * unconfirmed, the result stays unknown rather than becoming eligible.
+ */
+export const verifySchemeEligibility = (scheme, profile, groqRules = null, rawMessage = "") => {
+  const checks = [];
+  const sources = [];
+  let sawNoMatch = false;
+  let sawUnknown = false;
+  let sawMatch = false;
+
+  const addResult = (source, result) => {
+    if (!result?.checks?.length) return;
+    sources.push(source);
+    for (const check of result.checks) {
+      checks.push({ ...check, source });
+      if (check.result === "no_match") sawNoMatch = true;
+      else if (check.result === "unknown") sawUnknown = true;
+      else if (check.result === "match") sawMatch = true;
+    }
+  };
+
+  const hasGroqRules = Boolean(groqRules && typeof groqRules === "object");
+  if (hasGroqRules) {
+    addResult("groq", verifyEligibility(groqRules, profile));
+  }
+
+  addResult("columns", verifyEligibility(columnsToRules(scheme), profile));
+
+  if (!hasGroqRules) {
+    const fullText = schemeSearchText(scheme);
+    const titleAndTags = [scheme.name, ...(scheme.tags || [])]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    const conflicts = [
+      ...checkTextGenderHeuristics(fullText, profile.gender),
+      ...checkTextReservedCasteHeuristics(titleAndTags, profile.casteCategory || "unknown"),
+      ...checkTextTargetGroupHeuristics(titleAndTags, rawMessage, profile),
+    ];
+    for (const reason of conflicts) {
+      checks.push({ field: "textHeuristic", result: "no_match", reason, source: "heuristics" });
+      sawNoMatch = true;
+      if (!sources.includes("heuristics")) sources.push("heuristics");
+    }
+  }
+
+  const status = sawNoMatch
+    ? "no_match"
+    : sawUnknown
+    ? "unknown"
+    : sawMatch
+    ? "match"
+    : "unknown";
+
+  return { status, checks, sources };
+};

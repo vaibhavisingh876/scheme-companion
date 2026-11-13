@@ -1,10 +1,20 @@
 // Per-request monitoring collector (Milestone 6).
 // Tracks the signals the design calls for: latency per stage, candidate counts
-// before/after each stage, LLM calls, tokens, and eligibility cache hit rate.
+// before/after each stage, LLM calls, tokens, and eligibility-rule reuse.
 
 export const createMetrics = () => {
   const stages = {};
-  const counters = { llmCalls: 0, tokens: 0, cacheHits: 0, cacheMisses: 0, extracted: 0, failed: 0, skipped: 0 };
+  const counters = {
+    llmCalls: 0,
+    tokens: 0,
+    reused: 0,
+    missing: 0,
+    extracted: 0,
+    onDemandExtracted: 0,
+    onDemandFailed: 0,
+    enqueued: 0,
+    failed: 0,
+  };
   const counts = {};
   const startedAt = Date.now();
 
@@ -28,31 +38,35 @@ export const createMetrics = () => {
       counters.tokens += n;
     },
     addEligibilityStats(stats = {}) {
-      counters.cacheHits += stats.cacheHits || 0;
-      counters.cacheMisses += stats.missing || 0;
+      counters.reused += stats.reused || 0;
+      counters.missing += stats.missing || 0;
       counters.extracted += stats.extracted || 0;
+      counters.onDemandExtracted += stats.onDemandExtracted || 0;
+      counters.onDemandFailed += stats.onDemandFailed || 0;
+      counters.enqueued += stats.enqueued || 0;
       counters.failed += stats.failed || 0;
-      counters.skipped += stats.skipped || 0;
       counters.llmCalls += stats.llmCalls || 0;
       counters.tokens += stats.tokens || 0;
     },
     summary() {
       const totalMs = Date.now() - startedAt;
-      const eligRequests = counters.cacheHits + counters.cacheMisses;
-      const cacheHitRate = eligRequests ? Number((counters.cacheHits / eligRequests).toFixed(3)) : null;
+      const requested = counters.reused + counters.missing;
+      const reuseRate = requested ? Number((counters.reused / requested).toFixed(3)) : null;
       return {
         totalMs,
         stageMs: { ...stages },
         counts: { ...counts },
         llmCalls: counters.llmCalls,
         tokens: counters.tokens,
-        eligibilityCacheHitRate: cacheHitRate,
+        eligibilityReuseRate: reuseRate,
         eligibility: {
-          cacheHits: counters.cacheHits,
-          cacheMisses: counters.cacheMisses,
+          reused: counters.reused,
+          missing: counters.missing,
           extracted: counters.extracted,
+          onDemandExtracted: counters.onDemandExtracted,
+          onDemandFailed: counters.onDemandFailed,
+          enqueued: counters.enqueued,
           failed: counters.failed,
-          skipped: counters.skipped,
         },
       };
     },
@@ -61,6 +75,6 @@ export const createMetrics = () => {
 
 export const logMetrics = (label, summary) => {
   console.log(
-    `[metrics:${label}] total=${summary.totalMs}ms stages=${JSON.stringify(summary.stageMs)} counts=${JSON.stringify(summary.counts)} llm=${summary.llmCalls} tokens=${summary.tokens} cacheHitRate=${summary.eligibilityCacheHitRate}`
+    `[metrics:${label}] total=${summary.totalMs}ms stages=${JSON.stringify(summary.stageMs)} counts=${JSON.stringify(summary.counts)} llm=${summary.llmCalls} tokens=${summary.tokens} eligibilityReuseRate=${summary.eligibilityReuseRate}`
   );
 };

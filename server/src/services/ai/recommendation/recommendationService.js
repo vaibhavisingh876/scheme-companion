@@ -1,20 +1,15 @@
 import { getExtractor } from "../embeddingModel.js";
-import { cosineSimilarity, normalizeState } from "../../../utils/helpers.js";
+import { cosineSimilarity } from "../../../utils/helpers.js";
 import prisma from "../../../config/prisma.js";
-import { scoreScheme } from "../scoringEngine.js";
 import { embeddingCache, candidateCache } from "../../../utils/cache.js";
 import { buildQueryText } from "./searchTextBuilder.js";
 import { extractUserProfile } from "../groqService.js";
 import { keywordSearch } from "./keywordSearch.js";
 import { reciprocalRankFusion } from "./rrf.js";
 import { rerank, isRerankerActive } from "./reranker.js";
-import { getCachedEligibilityRules, enqueueEligibilityExtraction } from "./eligibilityService.js";
-import { verifyEligibility, columnsToRules, checkRules } from "./verification.js";
-import {
-  checkTextGenderHeuristics,
-  checkTextReservedCasteHeuristics,
-  checkTextTargetGroupHeuristics,
-} from "./eligibilityHeuristics.js";
+import { ensureEligibilityRules } from "./eligibilityService.js";
+import { verifySchemeEligibility } from "./verification.js";
+import { rankEligibilityResults, publicRelevanceScore } from "./ranking.js";
 import { createMetrics, logMetrics } from "./metrics.js";
 
 const MAX_RESULTS = 20;
@@ -24,8 +19,7 @@ const MAX_RESULTS = 20;
 const VECTOR_TOP_K = 100; // semantic candidates (recall-focused)
 const KEYWORD_TOP_K = 100; // full-text candidates (recall-focused)
 const CANDIDATE_POOL = 200; // max unique candidates after RRF fusion
-const RERANK_INPUT = 50; // candidates passed to the reranker stage
-const ELIGIBILITY_TOP_N = 30; // top candidates that get eligibility extraction+verification
+const RERANK_INPUT = 50; // candidates passed to the reranker stage (and nothing after it)
 
 // Only what scoring + hard filtering need. Embeddings dominate payload size, so
 // text/display columns are fetched separately for the final top results.
@@ -207,65 +201,6 @@ const deduplicateSchemes = (schemes) => {
     seen.add(key);
     return true;
   });
-};
-
-/**
- * Deterministic Hard Eligibility Filter
- * Checks if applicant violates any non-negotiable legal/scheme constraints.
- */
-export const checkHardEligibility = (scheme, profile, rawMessage = "") => {
-  const conflicts = [];
-  const schemeText = [
-    scheme.name,
-    scheme.description,
-    scheme.benefits,
-    scheme.eligibility,
-    ...(scheme.tags || []),
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-
-  const titleAndTags = [scheme.name, ...(scheme.tags || [])]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-
-  // 1. Structured Column Checks via unified checkRules adapter
-  const rules = columnsToRules(scheme);
-  if (rules) {
-    const verified = checkRules(rules, profile);
-    for (const c of verified.checks) {
-      if (c.result === "no_match") {
-        if (c.field === "age") {
-          conflicts.push(profile.age < (rules.age?.min ?? 0) ? "age_below_minimum" : "age_above_maximum");
-        } else if (c.field === "income") {
-          conflicts.push(profile.income > (rules.maxAnnualIncome ?? Infinity) ? "income_above_maximum" : "income_below_minimum");
-        } else if (c.field === "gender") {
-          conflicts.push(profile.gender === "male" ? "female_only_scheme" : "male_only_scheme");
-        } else if (c.field === "state") {
-          conflicts.push("state_mismatch");
-        } else if (c.field === "casteCategory") {
-          conflicts.push(profile.casteCategory === "general" ? "reserved_category_only" : "category_mismatch");
-        }
-      }
-    }
-  }
-
-  // 2. Female-only flag check
-  if (profile.gender === "male" && scheme.isFemaleOnly && !conflicts.includes("female_only_scheme")) {
-    conflicts.push("female_only_scheme");
-  }
-
-  // 3. Unstructured text heuristics
-  conflicts.push(...checkTextGenderHeuristics(schemeText, profile.gender));
-  conflicts.push(...checkTextReservedCasteHeuristics(titleAndTags, profile.casteCategory || "unknown"));
-  conflicts.push(...checkTextTargetGroupHeuristics(titleAndTags, rawMessage, profile));
-
-  return {
-    isEligible: conflicts.length === 0,
-    conflicts,
-  };
 };
 
 const INTENT_EVIDENCE = {
@@ -526,8 +461,10 @@ const hybridRetrieve = async (allCandidates, queryEmbedding, keywordText) => {
 
 /**
  * Main recommendation pipeline:
- * User query -> User query embedding -> Dual cosine similarities (description + eligibility)
- * -> Hard eligibility filter gate -> Scoring -> Deduplication -> Top recommendations (NO diversification)
+ * Profile extraction -> hybrid retrieval (vector + FTS fused with RRF)
+ * -> cross-encoder rerank of the top 50 -> intent filters -> Groq eligibility
+ * rules (reused from PostgreSQL when available) -> per-user verification
+ * -> eligibility-first ranking.
  */
 export const recommendSchemes = async (message) => {
   const trimmed = (message || "").trim();
@@ -568,20 +505,17 @@ export const recommendSchemes = async (message) => {
   metrics.count("fusedCandidates", retrieval.counts.fused);
   metrics.count("candidatePool", retrieval.counts.pool);
 
-  // Rerank the recall-focused hybrid pool before eligibility and legacy scoring.
-  // Keep the remaining candidates in their RRF order as a fallback tail.
-  const rerankInput = retrieval.schemes.slice(0, RERANK_INPUT).map((scheme) => ({
+  // 4. Rerank only the top RERANK_INPUT (50) fused candidates. The RRF tail is
+  //    intentionally dropped: it did not survive reranking, and appending it
+  //    would reintroduce weakly-relevant schemes.
+  const rerankInput = retrieval.schemes.slice(0, RERANK_INPUT).map((scheme, index) => ({
     ...scheme,
-    relevance: retrieval.rrfById.get(scheme.id) || 0,
+    _rrfScore: retrieval.rrfById.get(scheme.id) || 0,
+    _retrievalRank: index,
   }));
-  const reranked = (await metrics.time("rerank", () => rerank(queryText, rerankInput))).map(
-    ({ relevance, reranked: _rerankedFlag, _rerankIndex, ...scheme }) => scheme
-  );
-  const rerankedIds = new Set(reranked.map((scheme) => scheme.id));
-  const candidateSchemes = [
-    ...reranked,
-    ...retrieval.schemes.filter((scheme) => !rerankedIds.has(scheme.id)),
-  ];
+  const candidateSchemes = (
+    await metrics.time("rerank", () => rerank(queryText, rerankInput))
+  ).map(({ reranked: _rerankedFlag, _rerankIndex, ...scheme }) => scheme);
   metrics.count("rerankCandidates", rerankInput.length);
 
   if (!candidateSchemes.length) {
@@ -653,140 +587,51 @@ export const recommendSchemes = async (message) => {
   );
   const schemesForRanking = intentMatches.length ? intentMatches : purposeCandidates;
 
-  // 4. Compute dual semantic similarities & evaluate hard eligibility
-  const evaluated = schemesForRanking.map((scheme) => {
-    const hasDescEmb = Array.isArray(scheme.descriptionEmbedding) && scheme.descriptionEmbedding.length > 0;
-    const hasEligEmb = Array.isArray(scheme.eligibilityEmbedding) && scheme.eligibilityEmbedding.length > 0;
+  // 5. Deduplicate before eligibility verification so Groq is never asked to
+  //    extract the same source text twice within one request.
+  const shortlist = deduplicateSchemes(schemesForRanking);
 
-    const descSim = hasDescEmb
-      ? cosineSimilarity(queryEmbedding, scheme.descriptionEmbedding)
-      : 0;
-
-    const eligSim = hasEligEmb
-      ? cosineSimilarity(queryEmbedding, scheme.eligibilityEmbedding)
-      : 0;
-
-    // Dual semantic similarity:
-    // Description embedding captures domain/intent/benefits.
-    // Full raw eligibility embedding captures citizen persona/detailed qualifications.
-    let semanticSimilarity = 0;
-    if (hasDescEmb && hasEligEmb) {
-      semanticSimilarity = 0.5 * descSim + 0.5 * eligSim;
-    } else if (hasDescEmb) {
-      semanticSimilarity = descSim;
-    } else if (hasEligEmb) {
-      semanticSimilarity = eligSim;
-    }
-
-    // Deterministic hard eligibility check
-    const { isEligible, conflicts } = checkHardEligibility(scheme, profile, trimmed);
-
-    // Rule-based soft score adjustments (occupation/education alignment)
-    const { score } = scoreScheme(
-      {
-        ...scheme,
-        _similarity: semanticSimilarity,
-        _semanticSimilarity: semanticSimilarity,
-      },
-      profile
+  // 6. Load or extract per-scheme eligibility rules. Stored rules are reused;
+  //    a bounded synchronous extraction warms the newest shortlist entries;
+  //    everything else joins the paced background queue.
+  let eligibility = { rules: new Map(), stats: {} };
+  try {
+    eligibility = await metrics.time("eligibility", () =>
+      ensureEligibilityRules(
+        shortlist.map((scheme) => ({ id: scheme.id, eligibility: scheme.eligibility }))
+      )
     );
+    metrics.addEligibilityStats(eligibility.stats || {});
+  } catch (err) {
+    console.warn("[eligibility] rule lookup failed; continuing as unknown:", err.message);
+  }
 
+  // 7. Per-user verification: confirmed mismatch is excluded, confirmed match
+  //    is prioritised, and unknown is kept last but never treated as eligible.
+  const verified = shortlist.map((scheme) => {
+    const result = verifySchemeEligibility(
+      scheme,
+      profile,
+      eligibility.rules?.get(scheme.id) || null,
+      trimmed
+    );
     return {
       ...scheme,
-      _descSim: descSim,
-      _eligSim: eligSim,
-      _semanticSimilarity: semanticSimilarity,
-      _isEligible: isEligible,
-      _hardConflicts: conflicts.length,
-      _conflictReasons: conflicts,
-      _score: isEligible ? score : 0,
+      _eligibilityStatus: result.status,
+      _eligibilityChecks: result.checks,
     };
   });
-
-  // 5. Hard Filter Gate: strictly eliminate schemes with hard eligibility conflicts
-  const eligibleSchemes = evaluated.filter((s) => s._isEligible && s._score > 0);
-
-  // 6. Relevance Threshold filtering
-  const passingThreshold = eligibleSchemes.filter((s) => s._score >= 0.25);
-  const poolToRank = passingThreshold.length > 0 ? passingThreshold : eligibleSchemes;
-
-  // 7. Sort by composite score descending
-  poolToRank.sort((a, b) => {
-    if (cancerSpecificRequest) {
-      const priority = (scheme) => {
-        const namedText = [scheme.name, ...(scheme.tags || [])].filter(Boolean).join(" ");
-        return /\b(?:cancer|tumou?rs?|oncolog\w*|chemotherap\w*|radiotherap\w*)\b/i.test(namedText) ? 1 : 0;
-      };
-      const priorityDifference = priority(b) - priority(a);
-      if (priorityDifference !== 0) return priorityDifference;
-    }
-    return b._score - a._score;
-  });
-
-  // 8. Deduplicate identical schemes
-  const deduped = deduplicateSchemes(poolToRank);
-
-  // 10. Eligibility verification from CACHED rules (no LLM in the request path).
-  //     Missing/stale schemes are enqueued for rate-limited background
-  //     extraction, so the cache warms over time without adding latency or
-  //     tripping the provider token budget. Uncached schemes stay "unknown".
-  const eligibilityCandidates = [...deduped].sort((a, b) => {
-    if (isRerankerActive() && Number.isFinite(a.crossEncoderScore) && Number.isFinite(b.crossEncoderScore)) {
-      return b.crossEncoderScore - a.crossEncoderScore;
-    }
-    return b._score - a._score;
-  });
-  const eligInput = eligibilityCandidates.slice(0, ELIGIBILITY_TOP_N);
-  let verified = eligInput.map((s) => ({ ...s, _eligibilityStatus: "unknown", _eligibilityChecks: [] }));
-  try {
-    const { rules, missing, stats } = await metrics.time("eligibilityCache", () =>
-      getCachedEligibilityRules(eligInput.map((s) => ({ id: s.id, eligibility: s.eligibility })))
-    );
-    metrics.addEligibilityStats({ cacheHits: stats.cacheHits, missing: stats.missing });
-    metrics.count("eligibilityMissing", stats.missing);
-
-    if (missing.length) {
-      const enqueued = enqueueEligibilityExtraction(missing);
-      metrics.count("eligibilityEnqueued", enqueued);
-    }
-
-    verified = eligInput.map((s) => {
-      const v = verifyEligibility(rules.get(s.id) || null, profile);
-      return { ...s, _eligibilityStatus: v.status, _eligibilityChecks: v.checks };
-    });
-  } catch (err) {
-    console.warn("[eligibility] verification stage skipped:", err.message);
-  }
   metrics.count("verifiedCandidates", verified.length);
 
-  // 11. Final ranking — relevance and eligibility kept SEPARATE. Confirmed
-  //     mismatch is excluded; confirmed match is prioritized; unknown is kept
-  //     but ranked lower (never treated as confirmed eligible).
-  const cancerPriority = (scheme) => {
-    if (!cancerSpecificRequest) return 0;
-    const namedText = [scheme.name, ...(scheme.tags || [])].filter(Boolean).join(" ");
-    return /\b(?:cancer|tumou?rs?|oncolog\w*|chemotherap\w*|radiotherap\w*)\b/i.test(namedText) ? 1 : 0;
-  };
-  const statusRank = (s) =>
-    s._eligibilityStatus === "match" ? 0 : s._eligibilityStatus === "unknown" ? 1 : 2;
+  // 8. Final order: eligibility status first, cross-encoder score second.
+  //    No composite score and no semantic re-scoring pass.
+  const maxRrf = candidateSchemes.reduce(
+    (max, scheme) => Math.max(max, scheme._rrfScore || 0),
+    0
+  );
+  const topResults = rankEligibilityResults(verified, { limit: MAX_RESULTS });
 
-  const finalRanked = verified
-    .filter((s) => s._eligibilityStatus !== "no_match")
-    .sort((a, b) => {
-      const cd = cancerPriority(b) - cancerPriority(a);
-      if (cd !== 0) return cd;
-      const sd = statusRank(a) - statusRank(b);
-      if (sd !== 0) return sd;
-      if (isRerankerActive() && Number.isFinite(a.crossEncoderScore) && Number.isFinite(b.crossEncoderScore)) {
-        return b.crossEncoderScore - a.crossEncoderScore;
-      }
-      return b._score - a._score;
-    });
-
-  const resultLimit = asksForMedicalTreatment ? Math.min(MAX_RESULTS, 8) : MAX_RESULTS;
-  const topResults = finalRanked.slice(0, resultLimit);
-
-  // 10. Attach full display fields for the top results only, then format
+  // 9. Attach full display fields for the top results only, then format.
   let displayRows;
   try {
     displayRows = await prisma.scheme.findMany({
@@ -797,32 +642,31 @@ export const recommendSchemes = async (message) => {
     // Candidate rows already contain enough fields to return useful results.
     // Keep recommendations available if Supabase drops after the cache warmed.
     console.warn("[recommendations] display lookup failed; using cached candidate data:", err.message);
-    displayRows = topResults;
+    displayRows = [];
   }
   const displayById = new Map(displayRows.map((row) => [row.id, row]));
 
-  const results = topResults.map(
-    ({
+  const results = topResults.map((scheme) => {
+    const relevanceScore = publicRelevanceScore(scheme, maxRrf);
+    const {
       descriptionEmbedding,
       eligibilityEmbedding,
-      _descSim,
-      _eligSim,
-      _semanticSimilarity,
-      _isEligible,
-      _hardConflicts,
-      _conflictReasons,
-      _score,
+      crossEncoderScore,
+      _rrfScore,
+      _retrievalRank,
       _eligibilityStatus,
       _eligibilityChecks,
       ...rest
-    }) => ({
+    } = scheme;
+
+    return {
       ...rest,
       ...displayById.get(rest.id),
-      relevanceScore: Math.round(_score * 100),
+      relevanceScore,
       eligibilityStatus: _eligibilityStatus,
       eligibilityChecks: _eligibilityChecks,
-    })
-  );
+    };
+  });
 
   const summary = metrics.summary();
   logMetrics(profile.primaryIntent || "query", summary);
@@ -835,6 +679,7 @@ export const recommendSchemes = async (message) => {
       candidatesEvaluated: candidateSchemes.length,
       engine: "hybrid",
       rerankerActive: isRerankerActive(),
+      eligibility: eligibility.stats || {},
       monitoring: summary,
     },
   };
