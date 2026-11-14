@@ -29,8 +29,7 @@ export const cosineSimilarity = (a, b) => {
   return magnitude === 0 ? 0 : dotProduct / magnitude;
 };
 
-export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-export const delay = sleep;
+export const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const HIGHER_EDUCATION_LEVELS = [
   "undergraduate",

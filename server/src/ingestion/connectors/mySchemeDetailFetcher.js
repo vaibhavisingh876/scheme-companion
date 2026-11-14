@@ -1,4 +1,5 @@
 import axios from "axios";
+import { delay as sleep } from "../../utils/helpers.js";
 
 const BASE_URL = "https://www.myscheme.gov.in/api/apisetu/schemes";
 const API_KEY = process.env.MYSCHEME_API_KEY;
@@ -15,8 +16,6 @@ const getHeaders = () => {
     Accept: "application/json, text/plain, */*",
   };
 };
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const fetchSchemeDetail = async (slug) => {
   if (!API_KEY) {

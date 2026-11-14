@@ -9,7 +9,6 @@
     "sync": "node src/ingestion/runSync.js",
     "setup:hybrid": "node src/scripts/setupHybridSchema.js",
     "warm:eligibility": "node src/scripts/warmEligibility.js",
-    "eval": "node eval/runEval.js",
     "postinstall": "prisma generate",
     "test": "node --test \"test/*.test.js\""
   },

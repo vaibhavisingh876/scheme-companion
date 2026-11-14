@@ -455,7 +455,6 @@ npm start
 npx prisma generate
 npx prisma migrate deploy
 npm run setup:hybrid
-npm run eval -- eval/results/current.json
 npm run warm:eligibility -- 100
 npm test
 ```

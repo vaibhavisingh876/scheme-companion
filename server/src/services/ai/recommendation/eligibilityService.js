@@ -453,7 +453,6 @@ export const createEligibilityService = ({
   return {
     getStoredEligibilityRules,
     extractAndStore,
-    enqueueEligibilityExtraction,
     ensureEligibilityRules,
   };
 };
@@ -462,5 +461,4 @@ const defaultService = createEligibilityService();
 
 export const getStoredEligibilityRules = defaultService.getStoredEligibilityRules;
 export const extractAndStore = defaultService.extractAndStore;
-export const enqueueEligibilityExtraction = defaultService.enqueueEligibilityExtraction;
 export const ensureEligibilityRules = defaultService.ensureEligibilityRules;

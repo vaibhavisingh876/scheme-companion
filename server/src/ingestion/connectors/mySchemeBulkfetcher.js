@@ -1,4 +1,5 @@
 import axios from "axios";
+import { delay } from "../../utils/helpers.js";
 
 const BASE_URL = "https://www.myscheme.gov.in/api/apisetu/schemes";
 const API_KEY = process.env.MYSCHEME_API_KEY;
@@ -14,8 +15,6 @@ const HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
   Accept: "application/json, text/plain, */*",
 };
-
-const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // The apisetu catalog endpoint ignores from/size and returns every scheme in one
 // response as { _id, slug, en: { basicDetails } } — an index, not full details.

@@ -123,41 +123,6 @@ const schemeSelect = {
 };
 
 /**
- * Regenerates embeddings for ALL active schemes.
- */
-export const regenerateAllEmbeddings = async () => {
-  try {
-    const schemes = await prisma.scheme.findMany({
-      where: {
-        isActive: true,
-      },
-      select: schemeSelect,
-    });
-
-    console.log(
-      `🔍 Regenerating embeddings for ${schemes.length} active schemes...`
-    );
-
-    const extractor = await getExtractor();
-
-    const { successCount, failCount } = await processSchemes(
-      schemes,
-      extractor,
-      { force: true }
-    );
-
-    console.log(
-      `🎉 Embedding regeneration complete. Success: ${successCount} | Failed: ${failCount}`
-    );
-  } catch (error) {
-    console.error(
-      "❌ Embedding regeneration error:",
-      error.message
-    );
-  }
-};
-
-/**
  * Updates embeddings only for schemes that have missing embeddings.
  */
 export const updateMissingEmbeddings = async () => {
